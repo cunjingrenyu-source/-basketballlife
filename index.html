@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BASKETBALL LIFE - マイページ</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #eee;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            background-color: #222;
+            padding: 20px;
+            border-radius: 8px;
+            border-top: 5px solid #ff6600; /* バスケカラー */
+        }
+        h1, h2, h3 {
+            color: #ff6600;
+            margin-top: 0;
+        }
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .status-header div { font-size: 1.1em; font-weight: bold; }
+        
+        /* ゲージ関連 */
+        .gauge-container { margin-bottom: 10px; }
+        .gauge-bar {
+            width: 100%;
+            background-color: #444;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        .gauge-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        .gauge-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+        }
+        #fatigue-fill { background-color: #e74c3c; }
+        #stress-fill { background-color: #9b59b6; }
+
+        /* ステータス表 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #444;
+            padding: 10px;
+            text-align: center;
+        }
+        th { background-color: #333; color: #ff6600; }
+        
+        /* ボタン群 */
+        .action-area {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        button {
+            background-color: #ff6600;
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: bold;
+        }
+        button:hover { background-color: #e05500; }
+        button:disabled { background-color: #555; cursor: not-allowed; color: #888; }
+        .rest-btn { background-color: #27ae60; }
+        .rest-btn:hover { background-color: #2ecc71; }
+        
+        /* ログ */
+        #log-area {
+            margin-top: 20px;
+            background: #000;
+            padding: 10px;
+            height: 100px;
+            overflow-y: auto;
+            border: 1px solid #444;
+            font-size: 14px;
+            color: #00ff00;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <h1>BASKETBALL LIFE</h1>
+    
+    <div class="status-header">
+        <div>選手: <span id="player-name">名無しルーキー</span> (PG)</div>
+        <div>年齢: <span id="player-age">18</span>歳</div>
+        <div>行動残数: <span id="action-points">15</span> / 30</div>
+    </div>
+
+    <!-- コンディション -->
+    <div class="gauge-container">
+        <div>疲労度 (ケガ率に影響)</div>
+        <div class="gauge-bar">
+            <div id="fatigue-fill" class="gauge-fill" style="width: 0%;"></div>
+            <div id="fatigue-text" class="gauge-text">0%</div>
+        </div>
+    </div>
+    <div class="gauge-container">
+        <div>ストレス (練習効率に影響)</div>
+        <div class="gauge-bar">
+            <div id="stress-fill" class="gauge-fill" style="width: 0%;"></div>
+            <div id="stress-text" class="gauge-text">0%</div>
+        </div>
+    </div>
+
+    <!-- 能力値 -->
+    <h2>選手能力</h2>
+    <table>
+        <tr>
+            <th>2P (インサイド)</th>
+            <th>3P (アウトサイド)</th>
+            <th>スピード</th>
+            <th>ディフェンス</th>
+            <th>パス</th>
+            <th>メンタル</th>
+            <th>スタミナ</th>
+        </tr>
+        <tr>
+            <td id="stat-2p">10</td>
+            <td id="stat-3p">10</td>
+            <td id="stat-speed">10</td>
+            <td id="stat-def">10</td>
+            <td id="stat-pass">10</td>
+            <td id="stat-men">10</td>
+            <td id="stat-sta">30</td>
+        </tr>
+    </table>
+
+    <!-- アクション（練習） -->
+    <h2>行動 (1回につき行動残数-1)</h2>
+    <div class="action-area">
+        <button onclick="doAction('shoot_3p')">3Pシュート練習<br><small>(3P↑ 疲労+3)</small></button>
+        <button onclick="doAction('dribble')">ドライブ練習<br><small>(スピード↑ 疲労+3)</small></button>
+        <button onclick="doAction('defense')">フットワーク<br><small>(ディフェンス↑ 疲労+4)</small></button>
+        <button class="rest-btn" onclick="doAction('rest')">休養・リフレッシュ<br><small>(疲労・ストレス↓)</small></button>
+    </div>
+
+    <!-- システムログ -->
+    <div id="log-area"></div>
+</div>
+
+<script>
+    // --- プレイヤーの裏側データ ---
+    let player = {
+        ap: 15, // 行動残数
+        fatigue: 0,
+        stress: 0,
+        stats: {
+            p2: 10, p3: 10, speed: 10, def: 10, pass: 10, men: 10, sta: 30
+        }
+    };
+
+    // --- 画面を最新のデータに更新する関数 ---
+    function updateUI() {
+        document.getElementById('action-points').innerText = player.ap;
+        
+        document.getElementById('fatigue-fill').style.width = player.fatigue + '%';
+        document.getElementById('fatigue-text').innerText = player.fatigue + '%';
+        
+        document.getElementById('stress-fill').style.width = player.stress + '%';
+        document.getElementById('stress-text').innerText = player.stress + '%';
+
+        document.getElementById('stat-2p').innerText = player.stats.p2;
+        document.getElementById('stat-3p').innerText = player.stats.p3;
+        document.getElementById('stat-speed').innerText = player.stats.speed;
+        document.getElementById('stat-def').innerText = player.stats.def;
+        document.getElementById('stat-pass').innerText = player.stats.pass;
+        document.getElementById('stat-men').innerText = player.stats.men;
+        document.getElementById('stat-sta').innerText = player.stats.sta;
+    }
+
+    // --- ログに文字を出す関数 ---
+    function addLog(message) {
+        const logArea = document.getElementById('log-area');
+        const time = new Date().toLocaleTimeString('ja-JP', { hour12: false });
+        logArea.innerHTML = `[${time}] ${message}<br>` + logArea.innerHTML;
+    }
+
+    // --- 練習や休養を実行する関数 ---
+    function doAction(type) {
+        if (player.ap <= 0) {
+            addLog("【エラー】行動残数が足りません！明日の21時を待ってください。");
+            return;
+        }
+        if (player.fatigue >= 100 && type !== 'rest') {
+            addLog("【警告】疲労が限界です！ケガをする前に休養してください。");
+            return;
+        }
+
+        player.ap -= 1; // 行動を1消費
+
+        // 行動ごとの処理
+        if (type === 'shoot_3p') {
+            player.stats.p3 += 1;
+            player.fatigue += 3;
+            player.stress += 1;
+            addLog("3Pシュート練習を行った！ 3P能力が1上がった。");
+        } 
+        else if (type === 'dribble') {
+            player.stats.speed += 1;
+            player.fatigue += 3;
+            player.stress += 1;
+            addLog("ドライブ練習を行った！ スピードが1上がった。");
+        }
+        else if (type === 'defense') {
+            player.stats.def += 1;
+            player.fatigue += 4;
+            player.stress += 2;
+            addLog("フットワーク練習を行った！ ディフェンスが1上がった。");
+        }
+        else if (type === 'rest') {
+            player.fatigue = Math.max(0, player.fatigue - 20); // 最低0にする
+            player.stress = Math.max(0, player.stress - 15);
+            addLog("休養した。疲労とストレスが大幅に回復した！");
+        }
+
+        // 限界値の調整
+        if (player.fatigue > 100) player.fatigue = 100;
+        if (player.stress > 100) player.stress = 100;
+
+        updateUI(); // 画面に反映
+    }
+
+    // 最初に1回UIを更新しておく
+    updateUI();
+    addLog("システム: BASKETBALL LIFE マイページにログインしました。");
+</script>
+</body>
+</html>
