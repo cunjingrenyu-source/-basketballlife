@@ -3,32 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BASKETBALL LIFE - マイページ</title>
+    <title>BASKETBALL LIFE</title>
     <style>
+        /* 全体の設定（強制的に白背景） */
         body {
-            background-color: #f5f6fa; /* 白系の背景に変更 */
-            color: #2f3640;
+            background-color: #ffffff !important;
+            color: #333333 !important;
             font-family: 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 20px;
             display: flex;
             justify-content: center;
         }
-        #game-container {
+        
+        /* 共通コンテナ */
+        .container {
             width: 100%;
             max-width: 800px;
-            background-color: #ffffff; /* コンテナも白 */
+            background-color: #ffffff;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             border-top: 5px solid #ff6600; 
         }
+
         h1, h2, h3 {
             color: #ff6600;
             margin-top: 0;
             border-bottom: 2px solid #f1f2f6;
             padding-bottom: 5px;
         }
+
+        /* 登録画面のテーブル（画像風） */
+        .reg-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        .reg-table th, .reg-table td {
+            border: 2px solid #333;
+            padding: 12px;
+            text-align: left;
+        }
+        .reg-table th {
+            background-color: #f5f6fa;
+            width: 35%;
+            font-weight: normal;
+        }
+        .reg-table input[type="text"], .reg-table select {
+            width: 90%;
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+        }
+        .submit-btn {
+            background-color: #5fa8d3;
+            color: white;
+            border: 2px solid #3b7b9e;
+            padding: 10px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            display: block;
+            margin: 0 auto;
+        }
+        .submit-btn:hover { background-color: #4b8eb5; }
+
+        /* マイページ側のUI */
         .status-header {
             display: flex;
             justify-content: space-between;
@@ -39,10 +82,8 @@
             border: 1px solid #dcdde1;
         }
         .status-header div { font-size: 1.1em; font-weight: bold; }
-        .injured-text { color: #e74c3c; font-weight: bold; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.5; } }
         
-        /* ゲージ関連 */
+        /* ゲージ */
         .gauge-container { margin-bottom: 10px; font-weight: bold;}
         .gauge-bar {
             width: 100%;
@@ -51,94 +92,146 @@
             border-radius: 10px;
             overflow: hidden;
             position: relative;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
         }
-        .gauge-fill {
-            height: 100%;
-            transition: width 0.3s ease-in-out;
-        }
+        .gauge-fill { height: 100%; transition: width 0.3s; }
         .gauge-text {
-            position: absolute;
-            width: 100%;
-            text-align: center;
-            line-height: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            color: #fff;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            position: absolute; width: 100%; text-align: center;
+            line-height: 20px; font-size: 12px; font-weight: bold; color: #fff;
+            text-shadow: 1px 1px 2px #000;
         }
         #fatigue-fill { background-color: #e74c3c; }
         #stress-fill { background-color: #9b59b6; }
 
         /* ステータス表 */
-        table {
+        .stat-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
+            font-size: 14px;
         }
-        th, td {
+        .stat-table th, .stat-table td {
             border: 1px solid #dcdde1;
-            padding: 10px;
+            padding: 8px;
             text-align: center;
         }
-        th { background-color: #f5f6fa; color: #ff6600; }
-        td { font-weight: bold; font-size: 1.2em; }
-        
+        .stat-table th { background-color: #f5f6fa; color: #333; }
+        .stat-val { font-weight: bold; font-size: 1.2em; }
+        .stat-rank {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #fff;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-left: 5px;
+        }
+        /* ランクの色 */
+        .rank-S { background-color: #ffd700; color: #000; }
+        .rank-A { background-color: #e74c3c; }
+        .rank-B { background-color: #e67e22; }
+        .rank-C { background-color: #f1c40f; color: #000; }
+        .rank-D { background-color: #2ecc71; }
+        .rank-E { background-color: #3498db; }
+        .rank-F { background-color: #9b59b6; }
+        .rank-G { background-color: #95a5a6; }
+
         /* ボタン群 */
         .action-area {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 10px;
             margin-bottom: 20px;
         }
-        button {
-            background-color: #ff6600;
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 5px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
-            font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        button.action-btn {
+            background-color: #ff6600; color: white; border: none;
+            padding: 12px; border-radius: 5px; font-size: 13px; font-weight: bold;
+            cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        button:hover { background-color: #e05500; transform: translateY(-1px); }
-        button:active { transform: translateY(1px); box-shadow: none; }
-        button:disabled { background-color: #bdc3c7; cursor: not-allowed; box-shadow: none; transform: none;}
-        
-        .btn-large { background-color: #d35400; }
-        .btn-large:hover { background-color: #a04000; }
-        .rest-btn { background-color: #27ae60; }
-        .rest-btn:hover { background-color: #2ecc71; }
-        .hospital-btn { background-color: #2980b9; }
-        .hospital-btn:hover { background-color: #3498db; }
-        
-        /* ログ */
+        button.action-btn:hover { background-color: #e05500; }
+        button.action-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        .btn-large { background-color: #d35400 !important; }
+        .hospital-btn { background-color: #2980b9 !important; }
+
         #log-area {
-            background: #f1f2f6;
-            padding: 10px;
-            height: 120px;
-            overflow-y: auto;
-            border: 1px solid #dcdde1;
-            border-radius: 5px;
-            font-size: 14px;
-            color: #333;
-            line-height: 1.5;
+            background: #f1f2f6; padding: 10px; height: 120px; overflow-y: auto;
+            border: 1px solid #dcdde1; border-radius: 5px; font-size: 14px;
         }
-        .log-time { color: #7f8fa6; margin-right: 5px; font-size: 0.9em; }
-        .log-error { color: #c0392b; font-weight: bold; }
-        .log-success { color: #27ae60; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="game-container">
+<!-- ================= 登録画面 ================= -->
+<div id="registration-screen" class="container">
+    <h1>プロバスケ志望届</h1>
+    <table class="reg-table">
+        <tr>
+            <th>選手名（10文字以内）</th>
+            <td><input type="text" id="reg-name" placeholder="選手名"></td>
+        </tr>
+        <tr>
+            <th>年齢</th>
+            <td>
+                <select id="reg-age">
+                    <option value="18">18歳</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th>出身</th>
+            <td>
+                <select id="reg-origin">
+                    <option value="東京">東京</option>
+                    <option value="大阪">大阪</option>
+                    <option value="北海道">北海道</option>
+                    <option value="福岡">福岡</option>
+                    <option value="海外">海外</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th>利き手</th>
+            <td>
+                <select id="reg-hand">
+                    <option value="右利き">右利き</option>
+                    <option value="左利き">左利き</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th>ポジション</th>
+            <td>
+                <select id="reg-pos">
+                    <option value="PG">PG (ポイントガード)</option>
+                    <option value="SG">SG (シューティングガード)</option>
+                    <option value="SF">SF (スモールフォワード)</option>
+                    <option value="PF">PF (パワーフォワード)</option>
+                    <option value="C">C (センター)</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th>アピールポイント</th>
+            <td>
+                <select id="reg-appeal">
+                    <option value="three">スリーポイント</option>
+                    <option value="dribble">シュートオブドリブル</option>
+                    <option value="physical">フィジカル</option>
+                    <option value="playmaking">プレイメイキング</option>
+                    <option value="defense">ディフェンス</option>
+                </select>
+            </td>
+        </tr>
+    </table>
+    <button class="submit-btn" onclick="registerPlayer()">提出</button>
+</div>
+
+<!-- ================= マイページ画面 ================= -->
+<div id="game-screen" class="container" style="display: none;">
     <h1>BASKETBALL LIFE</h1>
     
     <div class="status-header">
-        <div>選手: <span id="player-name">名無しルーキー</span> <span id="injury-status"></span></div>
-        <div>年齢: <span id="player-age">18</span>歳</div>
+        <div>選手: <span id="player-name"></span> (<span id="player-pos"></span>)</div>
+        <div>年齢: <span id="player-age"></span>歳</div>
         <div>行動残数: <span id="action-points">15</span> / 30</div>
     </div>
 
@@ -151,7 +244,7 @@
         </div>
     </div>
     <div class="gauge-container">
-        <div>ストレス (高いと練習効率ダウン)</div>
+        <div>ストレス</div>
         <div class="gauge-bar">
             <div id="stress-fill" class="gauge-fill" style="width: 0%;"></div>
             <div id="stress-text" class="gauge-text">0%</div>
@@ -160,203 +253,224 @@
 
     <!-- 能力値 -->
     <h2>選手能力</h2>
-    <table>
+    
+    <!-- シュート系 (MAX150) -->
+    <table class="stat-table">
         <tr>
-            <th>2P</th>
-            <th>3P</th>
-            <th>スピード</th>
-            <th>ディフェンス</th>
-            <th>パス</th>
-            <th>メンタル</th>
-            <th>スタミナ</th>
+            <th colspan="4">シュート能力 (MAX:150)</th>
         </tr>
         <tr>
-            <td id="stat-2p">10</td>
-            <td id="stat-3p">10</td>
-            <td id="stat-speed">10</td>
-            <td id="stat-def">10</td>
-            <td id="stat-pass">10</td>
-            <td id="stat-men">10</td>
-            <td id="stat-sta">30</td>
+            <th>シュートオブドリブル</th>
+            <th>レイアップ&ダンク</th>
+            <th>ミドル</th>
+            <th>スリー</th>
+        </tr>
+        <tr>
+            <td id="cell-shootDribble"></td>
+            <td id="cell-layupDunk"></td>
+            <td id="cell-middle"></td>
+            <td id="cell-three"></td>
         </tr>
     </table>
 
-    <!-- アクション（練習） -->
+    <!-- 身体・技術系 (MAX100) -->
+    <table class="stat-table">
+        <tr>
+            <th colspan="5">身体・技術 (MAX:100)</th>
+        </tr>
+        <tr>
+            <th>俊敏性</th>
+            <th>フィジカル</th>
+            <th>リバウンド</th>
+            <th>プレイメイキング</th>
+            <th>ディフェンス</th>
+        </tr>
+        <tr>
+            <td id="cell-agility"></td>
+            <td id="cell-physical"></td>
+            <td id="cell-rebound"></td>
+            <td id="cell-playmaking"></td>
+            <td id="cell-defense"></td>
+        </tr>
+    </table>
+
+    <!-- その他 -->
+    <table class="stat-table">
+        <tr>
+            <th colspan="3">その他 (メンタル/ケガ MAX:100, スタミナ MAX:50)</th>
+        </tr>
+        <tr>
+            <th>メンタル</th>
+            <th>ケガ耐性</th>
+            <th>スタミナ</th>
+        </tr>
+        <tr>
+            <td id="cell-mental"></td>
+            <td id="cell-injuryResist"></td>
+            <td id="cell-stamina"></td>
+        </tr>
+    </table>
+
+    <!-- アクション -->
     <h2>行動 (1回につき行動残数-1)</h2>
-    
-    <h3>🏀 小練習 (安全にコツコツ育成)</h3>
     <div class="action-area">
-        <button onclick="doAction('shoot_3p', 'small')">3Pシュート (小)<br><small>疲労+3 ストレス+1</small></button>
-        <button onclick="doAction('dribble', 'small')">ドライブ (小)<br><small>疲労+3 ストレス+1</small></button>
-        <button onclick="doAction('defense', 'small')">フットワーク (小)<br><small>疲労+4 ストレス+2</small></button>
+        <button class="action-btn" onclick="doPractice('three', 1)">スリー練習 (小)<br><small>疲労+3</small></button>
+        <button class="action-btn btn-large" onclick="doPractice('three', 3)">スリー練習 (大)<br><small>疲労+8</small></button>
+        <button class="action-btn" onclick="doPractice('playmaking', 1)">パス練習 (小)<br><small>疲労+3</small></button>
+        <button class="action-btn hospital-btn" onclick="goToHospital()">片酢病院<br><small>ケガ治療</small></button>
     </div>
 
-    <h3>🔥 大練習 (ハイリスク・ハイリターン)</h3>
-    <div class="action-area">
-        <button class="btn-large" onclick="doAction('shoot_3p', 'large')">3Pシュート (大)<br><small>疲労+8 ケガ率高</small></button>
-        <button class="btn-large" onclick="doAction('dribble', 'large')">ドライブ (大)<br><small>疲労+8 ケガ率高</small></button>
-        <button class="btn-large" onclick="doAction('defense', 'large')">フットワーク (大)<br><small>疲労+10 ケガ率高</small></button>
-    </div>
-
-    <h3>🏥 ケア・外出</h3>
-    <div class="action-area">
-        <button class="rest-btn" onclick="doAction('rest', 'none')">休養<br><small>疲労-20 ストレス-15</small></button>
-        <button class="hospital-btn" onclick="doAction('hospital', 'none')">片酢病院<br><small>ケガを治療する</small></button>
-    </div>
-
-    <!-- システムログ -->
+    <!-- ログ -->
     <h2>システムログ</h2>
     <div id="log-area"></div>
 </div>
 
 <script>
-    // --- プレイヤーデータ ---
+    // --- データ定義 ---
+    const MAX_SHOOT = 150;
+    const MAX_STAMINA = 50;
+    const MAX_NORMAL = 100;
+
     let player = {
-        ap: 15,
-        fatigue: 0,
-        stress: 0,
-        isInjured: false, // ケガ状態
-        stats: {
-            p2: 10, p3: 10, speed: 10, def: 10, pass: 10, men: 10, sta: 30
-        }
+        name: "", pos: "", age: 18,
+        ap: 15, fatigue: 0, stress: 0, isInjured: false,
+        stats: {} // 登録時に初期化
     };
 
+    // --- ランダム生成用 (最小値10、大体F〜E、上振れでD) ---
+    function rollStat(max) {
+        // G(〜24%), F(25〜39%), E(40〜54%), D(55〜69%)
+        // F〜E〜低D になるように乱数幅を調整
+        let minPercent = 0.25; // 25% (Fの底)
+        let maxPercent = 0.58; // 58% (Dの下位)
+        
+        let minVal = Math.floor(max * minPercent);
+        let maxVal = Math.floor(max * maxPercent);
+        
+        let val = Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal;
+        return Math.max(10, val); // 最低値は10
+    }
+
+    // --- ランク判定 ---
+    function getRank(val, max) {
+        let ratio = val / max;
+        if (ratio >= 1.00) return 'S';
+        if (ratio >= 0.90) return 'A';
+        if (ratio >= 0.80) return 'B';
+        if (ratio >= 0.70) return 'C';
+        if (ratio >= 0.55) return 'D';
+        if (ratio >= 0.40) return 'E';
+        if (ratio >= 0.25) return 'F';
+        return 'G';
+    }
+
+    // --- 登録処理 ---
+    function registerPlayer() {
+        let nameInput = document.getElementById('reg-name').value;
+        if (!nameInput) nameInput = "名無しルーキー";
+        
+        player.name = nameInput;
+        player.pos = document.getElementById('reg-pos').value;
+        let appeal = document.getElementById('reg-appeal').value;
+
+        // ステータスの初期振り分け
+        player.stats = {
+            shootDribble: rollStat(MAX_SHOOT),
+            layupDunk: rollStat(MAX_SHOOT),
+            middle: rollStat(MAX_SHOOT),
+            three: rollStat(MAX_SHOOT),
+            agility: rollStat(MAX_NORMAL),
+            physical: rollStat(MAX_NORMAL),
+            rebound: rollStat(MAX_NORMAL),
+            playmaking: rollStat(MAX_NORMAL),
+            defense: rollStat(MAX_NORMAL),
+            mental: rollStat(MAX_NORMAL),
+            injuryResist: rollStat(MAX_NORMAL),
+            stamina: rollStat(MAX_STAMINA)
+        };
+
+        // アピールポイントにボーナス（少し高めに出るように）
+        if(player.stats[appeal]) {
+            player.stats[appeal] += 10; 
+        }
+
+        // 画面切り替え
+        document.getElementById('registration-screen').style.display = 'none';
+        document.getElementById('game-screen').style.display = 'block';
+
+        updateUI();
+        addLog(`志望届を受理しました。BBLへようこそ、${player.name}選手！`);
+    }
+
     // --- UI更新 ---
+    function updateStatCell(cellId, val, max) {
+        let rank = getRank(val, max);
+        document.getElementById(cellId).innerHTML = 
+            `<span class="stat-val">${val}</span> <span class="stat-rank rank-${rank}">${rank}</span>`;
+    }
+
     function updateUI() {
+        document.getElementById('player-name').innerText = player.name;
+        document.getElementById('player-pos').innerText = player.pos;
+        document.getElementById('player-age').innerText = player.age;
         document.getElementById('action-points').innerText = player.ap;
         
         document.getElementById('fatigue-fill').style.width = player.fatigue + '%';
         document.getElementById('fatigue-text').innerText = player.fatigue + '%';
-        
         document.getElementById('stress-fill').style.width = player.stress + '%';
         document.getElementById('stress-text').innerText = player.stress + '%';
 
-        document.getElementById('stat-2p').innerText = player.stats.p2;
-        document.getElementById('stat-3p').innerText = player.stats.p3;
-        document.getElementById('stat-speed').innerText = player.stats.speed;
-        document.getElementById('stat-def').innerText = player.stats.def;
-        document.getElementById('stat-pass').innerText = player.stats.pass;
-        document.getElementById('stat-men').innerText = player.stats.men;
-        document.getElementById('stat-sta').innerText = player.stats.sta;
+        // ステータス表更新
+        updateStatCell('cell-shootDribble', player.stats.shootDribble, MAX_SHOOT);
+        updateStatCell('cell-layupDunk', player.stats.layupDunk, MAX_SHOOT);
+        updateStatCell('cell-middle', player.stats.middle, MAX_SHOOT);
+        updateStatCell('cell-three', player.stats.three, MAX_SHOOT);
 
-        const injuryStatus = document.getElementById('injury-status');
-        if (player.isInjured) {
-            injuryStatus.innerHTML = '<span class="injured-text">[ケガ発生中]</span>';
-        } else {
-            injuryStatus.innerHTML = '';
-        }
+        updateStatCell('cell-agility', player.stats.agility, MAX_NORMAL);
+        updateStatCell('cell-physical', player.stats.physical, MAX_NORMAL);
+        updateStatCell('cell-rebound', player.stats.rebound, MAX_NORMAL);
+        updateStatCell('cell-playmaking', player.stats.playmaking, MAX_NORMAL);
+        updateStatCell('cell-defense', player.stats.defense, MAX_NORMAL);
+        updateStatCell('cell-mental', player.stats.mental, MAX_NORMAL);
+        updateStatCell('cell-injuryResist', player.stats.injuryResist, MAX_NORMAL);
+        
+        updateStatCell('cell-stamina', player.stats.stamina, MAX_STAMINA);
     }
 
-    // --- ログ出力 ---
-    function addLog(message, type = 'normal') {
+    function addLog(msg) {
         const logArea = document.getElementById('log-area');
         const time = new Date().toLocaleTimeString('ja-JP', { hour12: false });
-        let styledMessage = message;
+        logArea.innerHTML = `[${time}] ${msg}<br>` + logArea.innerHTML;
+    }
+
+    // --- 仮のアクション（練習・病院） ---
+    function doPractice(statKey, gain) {
+        if (player.ap <= 0) return addLog("行動残数が足りません！");
+        if (player.isInjured) return addLog("ケガ中！病院へ行ってください。");
+        if (player.fatigue >= 100) return addLog("疲労限界！");
+
+        player.ap -= 1;
+        player.stats[statKey] += gain;
         
-        if (type === 'error') styledMessage = `<span class="log-error">${message}</span>`;
-        if (type === 'success') styledMessage = `<span class="log-success">${message}</span>`;
-
-        logArea.innerHTML = `<span class="log-time">[${time}]</span> ${styledMessage}<br>` + logArea.innerHTML;
-    }
-
-    // --- ケガ判定関数 ---
-    function checkInjury(intensity) {
-        // 疲労度に応じてケガ確率が上がる。大練習はさらに危険。
-        let injuryChance = player.fatigue / 4; 
-        if (intensity === 'large') injuryChance *= 2; 
-
-        if (Math.random() * 100 < injuryChance) {
-            player.isInjured = true;
-            return true;
-        }
-        return false;
-    }
-
-    // --- アクション実行 ---
-    function doAction(actionType, intensity) {
-        if (player.ap <= 0) {
-            addLog("行動残数が足りません！", "error");
-            return;
-        }
-
-        // 病院以外の行動は、ケガ中だと実行できない
-        if (player.isInjured && actionType !== 'hospital') {
-            addLog("ケガをしていて動けない！「片酢病院」で治療しよう。", "error");
-            return;
-        }
-
-        if (player.fatigue >= 100 && actionType !== 'rest' && actionType !== 'hospital') {
-            addLog("疲労が限界だ！休養を取ろう。", "error");
-            return;
-        }
-
-        player.ap -= 1; 
-
-        // 病院の処理
-        if (actionType === 'hospital') {
-            if (player.isInjured) {
-                player.isInjured = false;
-                player.fatigue = Math.max(0, player.fatigue - 10);
-                addLog("病院で治療を受けた！ケガが治った！", "success");
-            } else {
-                addLog("ケガをしていないので、お医者さんに笑われた。");
-            }
-            updateUI();
-            return;
-        }
-
-        // 休養の処理
-        if (actionType === 'rest') {
-            player.fatigue = Math.max(0, player.fatigue - 20);
-            player.stress = Math.max(0, player.stress - 15);
-            addLog("休養した。疲労とストレスが回復した！", "success");
-            updateUI();
-            return;
-        }
-
-        // ケガ判定（練習の場合）
-        if (checkInjury(intensity)) {
-            addLog("【悲報】練習中にケガをしてしまった！", "error");
-            updateUI();
-            return; // ケガをしたら能力は上がらない
-        }
-
-        // 練習の処理（小練習・大練習でパラメーターを変える）
-        let statGain = (intensity === 'large') ? 3 : 1;
-        let fatigueCost = 0;
-        let stressCost = 0;
-
-        if (actionType === 'shoot_3p') {
-            player.stats.p3 += statGain;
-            fatigueCost = (intensity === 'large') ? 8 : 3;
-            stressCost = (intensity === 'large') ? 3 : 1;
-            addLog(`3Pシュート練習(${intensity === 'large' ? '大' : '小'})！ 3Pが${statGain}上がった。`);
-        } 
-        else if (actionType === 'dribble') {
-            player.stats.speed += statGain;
-            fatigueCost = (intensity === 'large') ? 8 : 3;
-            stressCost = (intensity === 'large') ? 3 : 1;
-            addLog(`ドライブ練習(${intensity === 'large' ? '大' : '小'})！ スピードが${statGain}上がった。`);
-        }
-        else if (actionType === 'defense') {
-            player.stats.def += statGain;
-            fatigueCost = (intensity === 'large') ? 10 : 4;
-            stressCost = (intensity === 'large') ? 4 : 2;
-            addLog(`フットワーク練習(${intensity === 'large' ? '大' : '小'})！ ディフェンスが${statGain}上がった。`);
-        }
-
+        let fatigueCost = (gain > 1) ? 8 : 3;
         player.fatigue += fatigueCost;
-        player.stress += stressCost;
+        if(player.fatigue > 100) player.fatigue = 100;
 
-        if (player.fatigue > 100) player.fatigue = 100;
-        if (player.stress > 100) player.stress = 100;
-
+        addLog(`練習を実施。（${statKey} +${gain}）`);
         updateUI();
     }
 
-    // 初期化
-    updateUI();
-    addLog("システム: BASKETBALL LIFE マイページにログインしました。");
+    function goToHospital() {
+        if (player.ap <= 0) return addLog("行動残数が足りません！");
+        player.ap -= 1;
+        if (player.isInjured) {
+            player.isInjured = false;
+            addLog("病院で治療し、ケガが治りました。");
+        } else {
+            addLog("ケガはしていません。");
+        }
+        updateUI();
+    }
 </script>
 </body>
 </html>
