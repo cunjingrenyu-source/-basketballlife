@@ -6,8 +6,8 @@
     <title>BASKETBALL LIFE - マイページ</title>
     <style>
         body {
-            background-color: #1a1a1a;
-            color: #eee;
+            background-color: #f5f6fa; /* 白系の背景に変更 */
+            color: #2f3640;
             font-family: 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
             padding: 20px;
@@ -17,38 +17,45 @@
         #game-container {
             width: 100%;
             max-width: 800px;
-            background-color: #222;
+            background-color: #ffffff; /* コンテナも白 */
             padding: 20px;
             border-radius: 8px;
-            border-top: 5px solid #ff6600; /* バスケカラー */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-top: 5px solid #ff6600; 
         }
         h1, h2, h3 {
             color: #ff6600;
             margin-top: 0;
+            border-bottom: 2px solid #f1f2f6;
+            padding-bottom: 5px;
         }
         .status-header {
             display: flex;
             justify-content: space-between;
-            background: #333;
+            background: #f1f2f6;
             padding: 15px;
             border-radius: 5px;
             margin-bottom: 20px;
+            border: 1px solid #dcdde1;
         }
         .status-header div { font-size: 1.1em; font-weight: bold; }
+        .injured-text { color: #e74c3c; font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
         
         /* ゲージ関連 */
-        .gauge-container { margin-bottom: 10px; }
+        .gauge-container { margin-bottom: 10px; font-weight: bold;}
         .gauge-bar {
             width: 100%;
-            background-color: #444;
+            background-color: #dcdde1;
             height: 20px;
             border-radius: 10px;
             overflow: hidden;
             position: relative;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
         }
         .gauge-fill {
             height: 100%;
-            transition: width 0.3s;
+            transition: width 0.3s ease-in-out;
         }
         .gauge-text {
             position: absolute;
@@ -58,7 +65,7 @@
             font-size: 12px;
             font-weight: bold;
             color: #fff;
-            text-shadow: 1px 1px 2px #000;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
         #fatigue-fill { background-color: #e74c3c; }
         #stress-fill { background-color: #9b59b6; }
@@ -70,45 +77,58 @@
             margin-bottom: 20px;
         }
         th, td {
-            border: 1px solid #444;
+            border: 1px solid #dcdde1;
             padding: 10px;
             text-align: center;
         }
-        th { background-color: #333; color: #ff6600; }
+        th { background-color: #f5f6fa; color: #ff6600; }
+        td { font-weight: bold; font-size: 1.2em; }
         
         /* ボタン群 */
         .action-area {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px;
+            margin-bottom: 20px;
         }
         button {
             background-color: #ff6600;
             color: white;
             border: none;
-            padding: 15px;
+            padding: 12px;
             border-radius: 5px;
-            font-size: 16px;
+            font-size: 14px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.1s;
             font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        button:hover { background-color: #e05500; }
-        button:disabled { background-color: #555; cursor: not-allowed; color: #888; }
+        button:hover { background-color: #e05500; transform: translateY(-1px); }
+        button:active { transform: translateY(1px); box-shadow: none; }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; box-shadow: none; transform: none;}
+        
+        .btn-large { background-color: #d35400; }
+        .btn-large:hover { background-color: #a04000; }
         .rest-btn { background-color: #27ae60; }
         .rest-btn:hover { background-color: #2ecc71; }
+        .hospital-btn { background-color: #2980b9; }
+        .hospital-btn:hover { background-color: #3498db; }
         
         /* ログ */
         #log-area {
-            margin-top: 20px;
-            background: #000;
+            background: #f1f2f6;
             padding: 10px;
-            height: 100px;
+            height: 120px;
             overflow-y: auto;
-            border: 1px solid #444;
+            border: 1px solid #dcdde1;
+            border-radius: 5px;
             font-size: 14px;
-            color: #00ff00;
+            color: #333;
+            line-height: 1.5;
         }
+        .log-time { color: #7f8fa6; margin-right: 5px; font-size: 0.9em; }
+        .log-error { color: #c0392b; font-weight: bold; }
+        .log-success { color: #27ae60; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -117,21 +137,21 @@
     <h1>BASKETBALL LIFE</h1>
     
     <div class="status-header">
-        <div>選手: <span id="player-name">名無しルーキー</span> (PG)</div>
+        <div>選手: <span id="player-name">名無しルーキー</span> <span id="injury-status"></span></div>
         <div>年齢: <span id="player-age">18</span>歳</div>
         <div>行動残数: <span id="action-points">15</span> / 30</div>
     </div>
 
     <!-- コンディション -->
     <div class="gauge-container">
-        <div>疲労度 (ケガ率に影響)</div>
+        <div>疲労度 (高いほどケガ率UP)</div>
         <div class="gauge-bar">
             <div id="fatigue-fill" class="gauge-fill" style="width: 0%;"></div>
             <div id="fatigue-text" class="gauge-text">0%</div>
         </div>
     </div>
     <div class="gauge-container">
-        <div>ストレス (練習効率に影響)</div>
+        <div>ストレス (高いと練習効率ダウン)</div>
         <div class="gauge-bar">
             <div id="stress-fill" class="gauge-fill" style="width: 0%;"></div>
             <div id="stress-text" class="gauge-text">0%</div>
@@ -142,8 +162,8 @@
     <h2>選手能力</h2>
     <table>
         <tr>
-            <th>2P (インサイド)</th>
-            <th>3P (アウトサイド)</th>
+            <th>2P</th>
+            <th>3P</th>
             <th>スピード</th>
             <th>ディフェンス</th>
             <th>パス</th>
@@ -163,29 +183,45 @@
 
     <!-- アクション（練習） -->
     <h2>行動 (1回につき行動残数-1)</h2>
+    
+    <h3>🏀 小練習 (安全にコツコツ育成)</h3>
     <div class="action-area">
-        <button onclick="doAction('shoot_3p')">3Pシュート練習<br><small>(3P↑ 疲労+3)</small></button>
-        <button onclick="doAction('dribble')">ドライブ練習<br><small>(スピード↑ 疲労+3)</small></button>
-        <button onclick="doAction('defense')">フットワーク<br><small>(ディフェンス↑ 疲労+4)</small></button>
-        <button class="rest-btn" onclick="doAction('rest')">休養・リフレッシュ<br><small>(疲労・ストレス↓)</small></button>
+        <button onclick="doAction('shoot_3p', 'small')">3Pシュート (小)<br><small>疲労+3 ストレス+1</small></button>
+        <button onclick="doAction('dribble', 'small')">ドライブ (小)<br><small>疲労+3 ストレス+1</small></button>
+        <button onclick="doAction('defense', 'small')">フットワーク (小)<br><small>疲労+4 ストレス+2</small></button>
+    </div>
+
+    <h3>🔥 大練習 (ハイリスク・ハイリターン)</h3>
+    <div class="action-area">
+        <button class="btn-large" onclick="doAction('shoot_3p', 'large')">3Pシュート (大)<br><small>疲労+8 ケガ率高</small></button>
+        <button class="btn-large" onclick="doAction('dribble', 'large')">ドライブ (大)<br><small>疲労+8 ケガ率高</small></button>
+        <button class="btn-large" onclick="doAction('defense', 'large')">フットワーク (大)<br><small>疲労+10 ケガ率高</small></button>
+    </div>
+
+    <h3>🏥 ケア・外出</h3>
+    <div class="action-area">
+        <button class="rest-btn" onclick="doAction('rest', 'none')">休養<br><small>疲労-20 ストレス-15</small></button>
+        <button class="hospital-btn" onclick="doAction('hospital', 'none')">片酢病院<br><small>ケガを治療する</small></button>
     </div>
 
     <!-- システムログ -->
+    <h2>システムログ</h2>
     <div id="log-area"></div>
 </div>
 
 <script>
-    // --- プレイヤーの裏側データ ---
+    // --- プレイヤーデータ ---
     let player = {
-        ap: 15, // 行動残数
+        ap: 15,
         fatigue: 0,
         stress: 0,
+        isInjured: false, // ケガ状態
         stats: {
             p2: 10, p3: 10, speed: 10, def: 10, pass: 10, men: 10, sta: 30
         }
     };
 
-    // --- 画面を最新のデータに更新する関数 ---
+    // --- UI更新 ---
     function updateUI() {
         document.getElementById('action-points').innerText = player.ap;
         
@@ -202,61 +238,123 @@
         document.getElementById('stat-pass').innerText = player.stats.pass;
         document.getElementById('stat-men').innerText = player.stats.men;
         document.getElementById('stat-sta').innerText = player.stats.sta;
+
+        const injuryStatus = document.getElementById('injury-status');
+        if (player.isInjured) {
+            injuryStatus.innerHTML = '<span class="injured-text">[ケガ発生中]</span>';
+        } else {
+            injuryStatus.innerHTML = '';
+        }
     }
 
-    // --- ログに文字を出す関数 ---
-    function addLog(message) {
+    // --- ログ出力 ---
+    function addLog(message, type = 'normal') {
         const logArea = document.getElementById('log-area');
         const time = new Date().toLocaleTimeString('ja-JP', { hour12: false });
-        logArea.innerHTML = `[${time}] ${message}<br>` + logArea.innerHTML;
+        let styledMessage = message;
+        
+        if (type === 'error') styledMessage = `<span class="log-error">${message}</span>`;
+        if (type === 'success') styledMessage = `<span class="log-success">${message}</span>`;
+
+        logArea.innerHTML = `<span class="log-time">[${time}]</span> ${styledMessage}<br>` + logArea.innerHTML;
     }
 
-    // --- 練習や休養を実行する関数 ---
-    function doAction(type) {
+    // --- ケガ判定関数 ---
+    function checkInjury(intensity) {
+        // 疲労度に応じてケガ確率が上がる。大練習はさらに危険。
+        let injuryChance = player.fatigue / 4; 
+        if (intensity === 'large') injuryChance *= 2; 
+
+        if (Math.random() * 100 < injuryChance) {
+            player.isInjured = true;
+            return true;
+        }
+        return false;
+    }
+
+    // --- アクション実行 ---
+    function doAction(actionType, intensity) {
         if (player.ap <= 0) {
-            addLog("【エラー】行動残数が足りません！明日の21時を待ってください。");
-            return;
-        }
-        if (player.fatigue >= 100 && type !== 'rest') {
-            addLog("【警告】疲労が限界です！ケガをする前に休養してください。");
+            addLog("行動残数が足りません！", "error");
             return;
         }
 
-        player.ap -= 1; // 行動を1消費
+        // 病院以外の行動は、ケガ中だと実行できない
+        if (player.isInjured && actionType !== 'hospital') {
+            addLog("ケガをしていて動けない！「片酢病院」で治療しよう。", "error");
+            return;
+        }
 
-        // 行動ごとの処理
-        if (type === 'shoot_3p') {
-            player.stats.p3 += 1;
-            player.fatigue += 3;
-            player.stress += 1;
-            addLog("3Pシュート練習を行った！ 3P能力が1上がった。");
-        } 
-        else if (type === 'dribble') {
-            player.stats.speed += 1;
-            player.fatigue += 3;
-            player.stress += 1;
-            addLog("ドライブ練習を行った！ スピードが1上がった。");
+        if (player.fatigue >= 100 && actionType !== 'rest' && actionType !== 'hospital') {
+            addLog("疲労が限界だ！休養を取ろう。", "error");
+            return;
         }
-        else if (type === 'defense') {
-            player.stats.def += 1;
-            player.fatigue += 4;
-            player.stress += 2;
-            addLog("フットワーク練習を行った！ ディフェンスが1上がった。");
+
+        player.ap -= 1; 
+
+        // 病院の処理
+        if (actionType === 'hospital') {
+            if (player.isInjured) {
+                player.isInjured = false;
+                player.fatigue = Math.max(0, player.fatigue - 10);
+                addLog("病院で治療を受けた！ケガが治った！", "success");
+            } else {
+                addLog("ケガをしていないので、お医者さんに笑われた。");
+            }
+            updateUI();
+            return;
         }
-        else if (type === 'rest') {
-            player.fatigue = Math.max(0, player.fatigue - 20); // 最低0にする
+
+        // 休養の処理
+        if (actionType === 'rest') {
+            player.fatigue = Math.max(0, player.fatigue - 20);
             player.stress = Math.max(0, player.stress - 15);
-            addLog("休養した。疲労とストレスが大幅に回復した！");
+            addLog("休養した。疲労とストレスが回復した！", "success");
+            updateUI();
+            return;
         }
 
-        // 限界値の調整
+        // ケガ判定（練習の場合）
+        if (checkInjury(intensity)) {
+            addLog("【悲報】練習中にケガをしてしまった！", "error");
+            updateUI();
+            return; // ケガをしたら能力は上がらない
+        }
+
+        // 練習の処理（小練習・大練習でパラメーターを変える）
+        let statGain = (intensity === 'large') ? 3 : 1;
+        let fatigueCost = 0;
+        let stressCost = 0;
+
+        if (actionType === 'shoot_3p') {
+            player.stats.p3 += statGain;
+            fatigueCost = (intensity === 'large') ? 8 : 3;
+            stressCost = (intensity === 'large') ? 3 : 1;
+            addLog(`3Pシュート練習(${intensity === 'large' ? '大' : '小'})！ 3Pが${statGain}上がった。`);
+        } 
+        else if (actionType === 'dribble') {
+            player.stats.speed += statGain;
+            fatigueCost = (intensity === 'large') ? 8 : 3;
+            stressCost = (intensity === 'large') ? 3 : 1;
+            addLog(`ドライブ練習(${intensity === 'large' ? '大' : '小'})！ スピードが${statGain}上がった。`);
+        }
+        else if (actionType === 'defense') {
+            player.stats.def += statGain;
+            fatigueCost = (intensity === 'large') ? 10 : 4;
+            stressCost = (intensity === 'large') ? 4 : 2;
+            addLog(`フットワーク練習(${intensity === 'large' ? '大' : '小'})！ ディフェンスが${statGain}上がった。`);
+        }
+
+        player.fatigue += fatigueCost;
+        player.stress += stressCost;
+
         if (player.fatigue > 100) player.fatigue = 100;
         if (player.stress > 100) player.stress = 100;
 
-        updateUI(); // 画面に反映
+        updateUI();
     }
 
-    // 最初に1回UIを更新しておく
+    // 初期化
     updateUI();
     addLog("システム: BASKETBALL LIFE マイページにログインしました。");
 </script>
