@@ -2,7 +2,522 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, <!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BASKETBALL LIFE</title>
+    <style>
+        /* ================= 全体設定 ================= */
+        body { background-color: #ffffff; color: #333; font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 800px; min-height: 100vh; background-color: #ffffff; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        button { cursor: pointer; }
+        
+        /* ================= ヘッダー＆メニュー ================= */
+        .header { background-color: #333; color: #fff; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .header h1 { margin: 0; font-size: 18px; color: #ff6600; }
+        .menu-btn { background: #ff6600; color: #fff; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; }
+        .nav-menu { display: none; background: #f8f9fa; border-bottom: 2px solid #ddd; padding: 10px; display: flex; gap: 5px; overflow-x: auto; }
+        .nav-menu button { background: #fff; border: 1px solid #ccc; padding: 8px 10px; border-radius: 4px; white-space: nowrap; font-weight: bold; font-size: 13px;}
+
+        /* ================= 共通 ================= */
+        .content-area { padding: 15px; }
+        h2 { color: #ff6600; border-bottom: 2px solid #f1f2f6; padding-bottom: 5px; font-size: 18px; margin-top: 0;}
+        .clickable-team { color: #2980b9; cursor: pointer; font-weight: bold; text-decoration: underline; }
+        .clickable-team:hover { color: #e74c3c; }
+
+        /* ================= 登録画面 ================= */
+        .reg-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .reg-table th, .reg-table td { border: 1px solid #ccc; padding: 10px; }
+        .reg-table th { background-color: #f5f6fa; width: 35%; font-size: 14px;}
+        .reg-table input, .reg-table select { width: 90%; padding: 8px; font-size: 16px; }
+        .submit-btn { background-color: #5fa8d3; color: white; border: 2px solid #3b7b9e; padding: 10px 40px; font-size: 18px; font-weight: bold; border-radius: 4px; display: block; margin: 0 auto; }
+        .icon-preview { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc; display: block; margin-top: 5px;}
+
+        /* ================= ホーム＆プロフ画面 ================= */
+        .player-banner { color: #fff; padding: 15px; border-radius: 5px; display: flex; align-items: center; position: relative; margin-bottom: 15px;}
+        .banner-icon { width: 70px; height: 70px; border-radius: 50%; margin-right: 15px; object-fit: cover; border: 2px solid #fff; background: #ccc;}
+        .banner-info .team-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);}
+        .banner-info .player-detail { font-size: 22px; font-weight: bold;}
+        .banner-number { font-size: 24px; font-weight: bold; margin-right: 10px; }
+
+        .stats-table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: center; font-size: 12px; }
+        .stats-table th { background: #f5f6fa; padding: 6px 4px; border: 1px solid #ccc; }
+        .stats-table td { padding: 6px 4px; border: 1px solid #ccc; }
+        
+        .play-match-btn { background-color: #e74c3c; color: white; border: none; padding: 12px; width: 100%; border-radius: 5px; font-size: 16px; font-weight: bold; margin-top: 15px; }
+        
+        /* ランクバッジ */
+        .rank { display: inline-block; padding: 1px 4px; border-radius: 3px; color: #fff; font-weight: bold; font-size: 10px;}
+        .rank-S { background-color: #ff00ff; color: #fff; }
+        .rank-A { background-color: #e74c3c; } .rank-B { background-color: #e67e22; }
+        .rank-C { background-color: #f1c40f; color: #000; } .rank-D { background-color: #2ecc71; }
+        .rank-E { background-color: #3498db; } .rank-F { background-color: #9b59b6; } .rank-G { background-color: #7f8c8d; }
+
+        /* ================= チーム・順位表 ================= */
+        .standings-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; }
+        .standings-table th { background: #333; color: #fff; padding: 8px; border: 1px solid #555; }
+        .standings-table td { padding: 8px; border: 1px solid #ccc; }
+        .standings-table tr:nth-child(even) { background-color: #f9f9f9; }
+
+        /* ================= 試合実況画面 ================= */
+        .match-header { display: flex; justify-content: space-between; background: #eee; padding: 10px; font-weight: bold; font-size: 18px; border-radius: 5px; align-items: center;}
+        .match-score { font-size: 28px; color: #e74c3c; }
+        .match-log-box { background: #1e272e; color: #d2dae2; height: 450px; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 13px; border-radius: 5px; margin-top: 10px; }
+        .log-entry { margin-bottom: 8px; border-bottom: 1px solid #485460; padding-bottom: 5px; }
+        .log-time { color: #f1c40f; font-weight: bold; }
+        .log-score { color: #2ecc71; font-weight: bold; margin-left: 5px;}
+        .log-team { font-weight: bold; color: #0fb9b1; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- 登録画面 -->
+    <div id="reg-view" class="content-area">
+        <h2>プロバスケ志望届</h2>
+        <table class="reg-table">
+            <tr><th>選手アイコン</th><td>
+                <input type="file" id="reg-icon" accept="image/*">
+                <img id="icon-preview" class="icon-preview" src="" style="display:none;">
+            </td></tr>
+            <tr><th>選手名</th><td><input type="text" id="reg-name" placeholder="例: J.スミス"></td></tr>
+            <tr><th>ポジション</th><td><select id="reg-pos"><option value="PG">PG</option><option value="SG">SG</option><option value="SF">SF</option><option value="PF">PF</option><option value="C">C</option></select></td></tr>
+            <tr><th>アピールポイント</th><td>
+                <select id="reg-appeal">
+                    <option value="layupDunk">レイアップ/ダンク</option><option value="middle">ミドルシュート</option><option value="three">スリーポイント</option>
+                    <option value="shootDribble">シュートオブドリブル</option><option value="dribble">ドリブル (新要素)</option>
+                    <option value="playmaking">プレイメイキング</option><option value="physical">フィジカル</option><option value="rebound">リバウンド</option>
+                    <option value="agility">俊敏性</option><option value="defense">ディフェンス</option><option value="mental">メンタル</option><option value="stamina">スタミナ</option>
+                </select>
+            </td></tr>
+        </table>
+        <button class="submit-btn" onclick="registerPlayer()">ドラフトへ進む</button>
+    </div>
+
+    <!-- メインUI -->
+    <div id="game-ui" style="display: none;">
+        <div class="header">
+            <h1>BBL</h1>
+            <button class="menu-btn" onclick="toggleMenu()">MENU ▼</button>
+        </div>
+        <div id="nav-menu" class="nav-menu">
+            <button onclick="changeView('home')">🏠 ホーム</button>
+            <button onclick="changeView('standings')">🏆 順位表</button>
+            <button onclick="changeView('match')">🔥 試合進行</button>
+        </div>
+
+        <!-- ホーム画面 -->
+        <div id="home-view" class="content-area">
+            <div id="home-profile-target"></div> <!-- プロフ共通パーツ -->
+            <button class="play-match-btn" onclick="changeView('match'); startMatch();">▶ 次の試合を開始する</button>
+        </div>
+
+        <!-- 順位表画面 -->
+        <div id="standings-view" class="content-area" style="display: none;">
+            <h2>リーグ順位表</h2>
+            <table class="standings-table" id="standings-table"></table>
+        </div>
+
+        <!-- ロスター画面 -->
+        <div id="roster-view" class="content-area" style="display: none;">
+            <button onclick="changeView('standings')" style="margin-bottom: 10px;">← 戻る</button>
+            <h2 id="roster-team-name">チーム名</h2>
+            <table class="stats-table" id="roster-table"></table>
+        </div>
+
+        <!-- 試合実況画面 -->
+        <div id="match-view" class="content-area" style="display: none;">
+            <button onclick="changeView('home')" style="margin-bottom: 10px; padding: 5px 15px;">← ホームへ戻る</button>
+            <div class="match-header">
+                <span id="match-team1" class="clickable-team">Team A</span>
+                <span id="match-score" class="match-score">0 - 0</span>
+                <span id="match-team2" class="clickable-team">Team B</span>
+            </div>
+            <div class="match-log-box" id="match-log"></div>
+        </div>
+        
+        <!-- 選手詳細(プロフ)画面 -->
+        <div id="player-detail-view" class="content-area" style="display: none;">
+            <button onclick="changeView('home')" style="margin-bottom: 10px;">← 戻る</button>
+            <div id="detail-profile-target"></div>
+            
+            <h3 style="font-size: 14px; margin-top: 15px; border-bottom: 1px solid #ccc;">能力値</h3>
+            <div id="detail-stats" style="font-size:13px; line-height: 1.6; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;"></div>
+
+            <h3 style="font-size: 14px; margin-top: 15px; border-bottom: 1px solid #ccc;">直近の試合成績</h3>
+            <table class="stats-table" id="recent-games-table"></table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 初期設定 & 変数 ---
+    const TEAM_COLORS = ["#E03A3E", "#007A33", "#002B5C", "#CE1141", "#860038", "#00538C", "#98002E", "#F9A01B", "#002D62", "#1D1160", "#E31837", "#006BB6", "#552583", "#00471B", "#0C2340", "#98002E", "#00538A", "#002B5C", "#006BB6", "#007AC1", "#002B5C", "#0077C0", "#006BB6", "#1D1160", "#E03A3E", "#002B5C", "#0C2340", "#CE1141", "#002B5C", "#E31837"];
+    const MAX_SHOOT = 150; const MAX_STAMINA = 50; const MAX_NORMAL = 100;
+    const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
+    
+    let teams = []; let allPlayers = []; let currentUser = null; let playerIdCounter = 1;
+    let userIconBase64 = "";
+
+    // 画像アップロードプレビュー
+    document.getElementById('reg-icon').addEventListener('change', function(e) {
+        let file = e.target.files[0];
+        if(!file) return;
+        let reader = new FileReader();
+        reader.onload = function(evt) {
+            userIconBase64 = evt.target.result;
+            let img = document.getElementById('icon-preview');
+            img.src = userIconBase64;
+            img.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // --- ユーティリティ ---
+    function getRank(val, max) {
+        if (val >= max) return 'S';
+        let p = Math.floor((val / max) * 100);
+        if (p >= 90) return 'A'; if (p >= 75) return 'B'; if (p >= 60) return 'C';
+        if (p >= 45) return 'D'; if (p >= 30) return 'E'; if (p >= 15) return 'F'; return 'G';
+    }
+
+    function rollStat(max, isAppeal = false) {
+        if (isAppeal) return max;
+        let baseMax = Math.floor(max * 0.44); let baseMin = Math.floor(max * 0.15);
+        return Math.floor(Math.random() * (baseMax - baseMin + 1)) + baseMin;
+    }
+
+    function createStats(appealPoint = null) {
+        return {
+            layupDunk: rollStat(MAX_SHOOT, appealPoint === 'layupDunk'), middle: rollStat(MAX_SHOOT, appealPoint === 'middle'),
+            three: rollStat(MAX_SHOOT, appealPoint === 'three'), shootDribble: rollStat(MAX_SHOOT, appealPoint === 'shootDribble'),
+            dribble: rollStat(MAX_NORMAL, appealPoint === 'dribble'), playmaking: rollStat(MAX_NORMAL, appealPoint === 'playmaking'),
+            physical: rollStat(MAX_NORMAL, appealPoint === 'physical'), rebound: rollStat(MAX_NORMAL, appealPoint === 'rebound'),
+            agility: rollStat(MAX_NORMAL, appealPoint === 'agility'), defense: rollStat(MAX_NORMAL, appealPoint === 'defense'),
+            mental: rollStat(MAX_NORMAL, appealPoint === 'mental'), injuryResist: rollStat(MAX_NORMAL, appealPoint === 'injuryResist'),
+            stamina: rollStat(MAX_STAMINA, appealPoint === 'stamina')
+        };
+    }
+
+    function createBoxScore() {
+        return { g:0, gs:0, min:0, pts:0, reb:0, ast:0, stl:0, blk:0, fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0 };
+    }
+
+    // --- 初期化 ---
+    function initWorld() {
+        for (let i = 1; i <= 30; i++) {
+            let team = { id: i, name: `チーム ${i}`, color: TEAM_COLORS[i-1], roster: [], w:0, l:0, pf:0, pa:0 };
+            let nums = Array.from({length: 100}, (_, k) => k).sort(() => Math.random() - 0.5); // 0-99ランダム
+            let comCount = 1;
+            POSITIONS.forEach(pos => {
+                for (let j = 0; j < 3; j++) {
+                    let p = {
+                        id: playerIdCounter++, teamId: i, isUser: false, name: `COM${i}-${comCount++}`, pos: pos,
+                        num: nums.pop(), stats: createStats(), box: createBoxScore(), recent: [], icon: ""
+                    };
+                    team.roster.push(p); allPlayers.push(p);
+                }
+            });
+            teams.push(team);
+        }
+    }
+
+    function registerPlayer() {
+        let name = document.getElementById('reg-name').value || "ルーキー";
+        let pos = document.getElementById('reg-pos').value;
+        let appeal = document.getElementById('reg-appeal').value;
+
+        currentUser = {
+            id: playerIdCounter++, isUser: true, name: name, pos: pos, icon: userIconBase64,
+            stats: createStats(appeal), box: createBoxScore(), recent: []
+        };
+
+        let targetTeam = teams[Math.floor(Math.random() * 30)];
+        currentUser.teamId = targetTeam.id;
+        
+        let cIdx = targetTeam.roster.findIndex(p => p.pos === pos);
+        currentUser.num = targetTeam.roster[cIdx].num; // COMの背番号を奪う
+        targetTeam.roster.splice(cIdx, 1, currentUser);
+        allPlayers.push(currentUser);
+
+        document.getElementById('reg-view').style.display = 'none';
+        document.getElementById('game-ui').style.display = 'block';
+        changeView('home');
+    }
+
+    // --- UI切り替え ---
+    function changeView(v) {
+        ['home','standings','roster','match','player-detail'].forEach(id => document.getElementById(id+'-view').style.display = 'none');
+        document.getElementById('nav-menu').style.display = 'none';
+        
+        if(v === 'home') document.getElementById('home-profile-target').innerHTML = generateProfileHTML(currentUser);
+        if(v === 'standings') renderStandings();
+        document.getElementById(v+'-view').style.display = 'block';
+    }
+    function toggleMenu() { let m = document.getElementById('nav-menu'); m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; }
+
+    // --- プロフ・スタッツ生成 ---
+    function calcPct(m, a) { return a > 0 ? ((m/a)*100).toFixed(1)+"%" : "0.0%"; }
+    function calcAvg(v, g) { return g > 0 ? (v/g).toFixed(1) : "0.0"; }
+    function calcMin(sec, g) { 
+        if(g===0) return "0:00"; 
+        let m = Math.floor((sec/g)/60); let s = Math.floor((sec/g)%60); 
+        return `${m}:${s.toString().padStart(2,'0')}`; 
+    }
+
+    function generateProfileHTML(player) {
+        let t = teams.find(x => x.id === player.teamId);
+        let b = player.box;
+        let iconSrc = player.icon || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23ccc'/></svg>";
+        
+        return `
+        <div class="player-banner" style="background: linear-gradient(to right, ${t.color}, #333);" onclick="showPlayerDetail(${player.id})">
+            <img class="banner-icon" src="${iconSrc}">
+            <div class="banner-info">
+                <div class="team-name" onclick="event.stopPropagation(); showRoster(${t.id})">${t.name}</div>
+                <div class="player-detail"><span class="banner-number">#${player.num}</span> ${player.pos} | ${player.name}</div>
+            </div>
+        </div>
+        <table class="stats-table">
+            <tr><th>ｼｰｽﾞﾝ</th><th>ﾁｰﾑ</th><th>G</th><th>GS</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>FG%</th><th>3P%</th></tr>
+            <tr><td>26-27</td><td class="clickable-team" onclick="showRoster(${t.id})">${t.name}</td>
+            <td>${b.g}</td><td>${b.gs}</td><td>${calcMin(b.min, b.g)}</td>
+            <td>${calcAvg(b.pts,b.g)}</td><td>${calcAvg(b.reb,b.g)}</td><td>${calcAvg(b.ast,b.g)}</td>
+            <td>${calcAvg(b.stl,b.g)}</td><td>${calcAvg(b.blk,b.g)}</td>
+            <td>${calcPct(b.fgm, b.fga)}</td><td>${calcPct(b.tpm, b.tpa)}</td></tr>
+        </table>`;
+    }
+
+    function showPlayerDetail(id) {
+        let p = allPlayers.find(x => x.id === id);
+        document.getElementById('detail-profile-target').innerHTML = generateProfileHTML(p);
+        
+        let html = "";
+        const statKeys = [
+            {k:'layupDunk', n:'ﾚｲｱｯﾌﾟ/ﾀﾞﾝｸ', m:MAX_SHOOT}, {k:'middle', n:'ﾐﾄﾞﾙ', m:MAX_SHOOT}, {k:'three', n:'3P', m:MAX_SHOOT}, {k:'shootDribble', n:'ｼｭｰﾄ(ﾄﾞﾘﾌﾞﾙ)', m:MAX_SHOOT},
+            {k:'dribble', n:'ﾄﾞﾘﾌﾞﾙ', m:MAX_NORMAL}, {k:'playmaking', n:'ﾊﾟｽ/ﾒｲｸ', m:MAX_NORMAL}, {k:'physical', n:'ﾌｨｼﾞｶﾙ', m:MAX_NORMAL}, {k:'rebound', n:'ﾘﾊﾞｳﾝﾄﾞ', m:MAX_NORMAL},
+            {k:'agility', n:'俊敏性', m:MAX_NORMAL}, {k:'defense', n:'ﾃﾞｨﾌｪﾝｽ', m:MAX_NORMAL}, {k:'mental', n:'ﾒﾝﾀﾙ', m:MAX_NORMAL}, {k:'stamina', n:'ｽﾀﾐﾅ', m:MAX_STAMINA}
+        ];
+        statKeys.forEach(s => {
+            let val = p.stats[s.k]; let r = getRank(val, s.m);
+            html += `<div>${s.n}: <strong>${val}</strong> <span class="rank rank-${r}">${r}</span></div>`;
+        });
+        document.getElementById('detail-stats').innerHTML = html;
+
+        let rt = document.getElementById('recent-games-table');
+        rt.innerHTML = `<tr><th>試合</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>FG%</th><th>3P%</th></tr>`;
+        p.recent.slice(-5).reverse().forEach(r => { // 最新5試合
+            let fpc = r.fga > 0 ? Math.floor((r.fgm/r.fga)*100)+"%" : "-";
+            let tpc = r.tpa > 0 ? Math.floor((r.tpm/r.tpa)*100)+"%" : "-";
+            rt.innerHTML += `<tr><td>vs COM</td><td>${Math.floor(r.min/60)}分</td><td>${r.pts}</td><td>${r.reb}</td><td>${r.ast}</td><td>${r.stl}</td><td>${r.blk}</td><td>${fpc}</td><td>${tpc}</td></tr>`;
+        });
+
+        changeView('player-detail');
+    }
+
+    function renderStandings() {
+        let tbl = document.getElementById('standings-table');
+        tbl.innerHTML = `<tr><th>順位</th><th>チーム</th><th>勝</th><th>敗</th><th>勝率</th><th>差</th><th>得点</th><th>失点</th></tr>`;
+        
+        let sorted = [...teams].sort((a,b) => (b.w - b.l) - (a.w - a.l));
+        let topW = sorted[0].w; let topL = sorted[0].l;
+
+        sorted.forEach((t, i) => {
+            let wp = t.w+t.l > 0 ? (t.w/(t.w+t.l)).toFixed(3).replace('0.', '.') : ".000";
+            let gb = ((topW - t.w) + (t.l - topL)) / 2;
+            tbl.innerHTML += `<tr><td>${i+1}</td><td class="clickable-team" onclick="showRoster(${t.id})" style="color:${t.color}">${t.name}</td>
+            <td>${t.w}</td><td>${t.l}</td><td>${wp}</td><td>${gb===0 ? '-' : gb}</td><td>${t.pf}</td><td>${t.pa}</td></tr>`;
+        });
+    }
+
+    function showRoster(teamId) {
+        let t = teams.find(x => x.id === teamId);
+        document.getElementById('roster-team-name').innerText = t.name;
+        document.getElementById('roster-team-name').style.color = t.color;
+        let tbl = document.getElementById('roster-table');
+        tbl.innerHTML = `<tr style="background:#333; color:#fff;"><th>#</th><th>Pos</th><th>選手名</th><th>PTS</th><th>REB</th><th>AST</th></tr>`;
+        
+        // スタメンとベンチの簡易ソート
+        let sorted = [];
+        POSITIONS.forEach(pos => { sorted.push(...t.roster.filter(p=>p.pos===pos)); });
+
+        sorted.forEach((p, i) => {
+            let b = p.box; let isStarter = (i%3===0);
+            let tr = document.createElement('tr');
+            if(p.isUser) tr.style.background = "#fff0f0";
+            tr.innerHTML = `<td>${p.num}</td><td>${isStarter?'★':''}${p.pos}</td>
+                <td class="clickable-team" onclick="showPlayerDetail(${p.id})">${p.name}</td>
+                <td>${calcAvg(b.pts,b.g)}</td><td>${calcAvg(b.reb,b.g)}</td><td>${calcAvg(b.ast,b.g)}</td>`;
+            tbl.appendChild(tr);
+        });
+        changeView('roster');
+    }
+
+    // --- 試合エンジン (AI監督・スタッツ完全連動・4Q制) ---
+    function startMatch() {
+        let t1 = teams.find(t => t.id === currentUser.teamId);
+        let t2 = teams[Math.floor(Math.random() * 30)];
+        while(t2.id === t1.id) t2 = teams[Math.floor(Math.random() * 30)];
+
+        document.getElementById('match-team1').innerText = t1.name; document.getElementById('match-team1').onclick = ()=>showRoster(t1.id);
+        document.getElementById('match-team2').innerText = t2.name; document.getElementById('match-team2').onclick = ()=>showRoster(t2.id);
+        let logBox = document.getElementById('match-log'); logBox.innerHTML = "";
+        let scoreUI = document.getElementById('match-score');
+        
+        let score = { t1:0, t2:0 };
+        let logs = [];
+        let pStats = {}; // 試合中の状態保持
+
+        // 初期化＆スタメン選出
+        const initPlayers = (team) => {
+            let onCourt = []; let bench = [];
+            POSITIONS.forEach(pos => {
+                let posP = team.roster.filter(p=>p.pos===pos);
+                onCourt.push(posP[0]); bench.push(posP[1], posP[2]);
+            });
+            team.roster.forEach(p => {
+                pStats[p.id] = { curStam: 1000, gameBox: createBoxScore() };
+                p.box.g++; if(onCourt.includes(p)) { p.box.gs++; pStats[p.id].gameBox.gs = 1; }
+            });
+            return { onCourt, bench };
+        };
+
+        let s1 = initPlayers(t1); let s2 = initPlayers(t2);
+        
+        // AI監督: スタミナによる交代処理
+        const doSubstitutions = (s, teamName) => {
+            let subbed = false;
+            for(let i=0; i<5; i++) {
+                let onP = s.onCourt[i];
+                if(pStats[onP.id].curStam < 300) { // バテたら
+                    let subP = s.bench.find(p => p.pos === onP.pos && pStats[p.id].curStam > 600);
+                    if(subP) {
+                        s.onCourt[i] = subP;
+                        s.bench.splice(s.bench.indexOf(subP), 1, onP);
+                        subbed = true;
+                    }
+                }
+            }
+            if(subbed) logs.push(`<div class="log-entry"><span class="log-team">${teamName}</span> メンバーチェンジ (オンコート: ${s.onCourt.map(p=>p.name).join(', ')})</div>`);
+        };
+
+        const pushLog = (timeStr, text) => {
+            logs.push(`<div class="log-entry"><span class="log-time">${timeStr}</span> ${text} <span class="log-score">[${score.t1} - ${score.t2}]</span></div>`);
+        };
+
+        let hasBall = Math.random() > 0.5 ? 1 : 2;
+
+        // 4クォーター回す
+        for(let q=1; q<=4; q++) {
+            pushLog(`Q${q} 12:00`, `第${q}クォーター開始！`);
+            let time = 720;
+
+            while(time > 0) {
+                let clockPass = Math.floor(Math.random() * 12) + 8;
+                time -= clockPass; if(time < 0) time = 0;
+                let timeStr = `Q${q} ${Math.floor(time/60)}:${(time%60).toString().padStart(2,'0')}`;
+
+                // スタミナ消費(出場中)と回復(ベンチ)
+                s1.onCourt.forEach(p => { pStats[p.id].curStam -= (60 - p.stats.stamina); pStats[p.id].gameBox.min += clockPass; });
+                s2.onCourt.forEach(p => { pStats[p.id].curStam -= (60 - p.stats.stamina); pStats[p.id].gameBox.min += clockPass; });
+                s1.bench.forEach(p => { pStats[p.id].curStam += 50; if(pStats[p.id].curStam>1000) pStats[p.id].curStam=1000; });
+                s2.bench.forEach(p => { pStats[p.id].curStam += 50; if(pStats[p.id].curStam>1000) pStats[p.id].curStam=1000; });
+
+                if(time % 180 < 15) { doSubstitutions(s1, t1.name); doSubstitutions(s2, t2.name); }
+
+                let offTeam = hasBall === 1 ? t1 : t2; let defTeam = hasBall === 1 ? t2 : t1;
+                let offP = hasBall === 1 ? s1.onCourt : s2.onCourt; let defP = hasBall === 1 ? s2.onCourt : s1.onCourt;
+
+                // メンタル(クラッチ)計算: 4Qで10点差以内なら負けてる/競ってる側にバフ
+                let clutchBuff = 1.0;
+                if(q === 4 && Math.abs(score.t1 - score.t2) <= 10) {
+                    clutchBuff = 1.0 + (offP[0].stats.mental / 100) * 0.2; // 代表してPGのメンタル参照
+                }
+
+                let shooter = offP[Math.floor(Math.random() * 5)];
+                let defender = defP[Math.floor(Math.random() * 5)];
+                let sb = pStats[shooter.id].gameBox;
+
+                // ターンオーバー判定 (守備の俊敏・D vs 攻めのドリブル・パス)
+                let toRate = (defender.stats.agility + defender.stats.defense) / ((shooter.stats.dribble + shooter.stats.playmaking)*2 + 1);
+                if(Math.random() < toRate * 0.15) {
+                    pushLog(timeStr, `<span class="log-team">${offTeam.name}</span> ${shooter.name} がターンオーバー！ ${defender.name} がスティール！`);
+                    pStats[defender.id].gameBox.stl++;
+                    hasBall = hasBall === 1 ? 2 : 1; continue;
+                }
+
+                // シュート種類
+                let r = Math.random();
+                let is3P = r < 0.3; let isMid = r >= 0.3 && r < 0.6; let isLayup = r >= 0.6 && r < 0.9;
+                let typeStr = is3P ? "3Pシュート" : isMid ? "ミドルシュート" : isLayup ? "レイアップ" : "プルアップジャンパー";
+                let offStat = is3P ? shooter.stats.three : isMid ? shooter.stats.middle : isLayup ? shooter.stats.layupDunk : shooter.stats.shootDribble;
+                
+                // スタミナ減衰
+                let stamPenalty = pStats[shooter.id].curStam < 300 ? 0.8 : 1.0;
+                let makeRate = ((offStat * clutchBuff * stamPenalty) / MAX_SHOOT) * (is3P ? 0.45 : 0.6) - (defender.stats.defense/300);
+                
+                sb.fga++; if(is3P) sb.tpa++;
+
+                if(Math.random() < makeRate) {
+                    // 成功
+                    sb.fgm++; let pts = is3P ? 3 : 2; sb.pts += pts;
+                    if(is3P) sb.tpm++;
+                    if(hasBall===1) score.t1 += pts; else score.t2 += pts;
+
+                    let astP = offP[Math.floor(Math.random() * 5)];
+                    let astText = "";
+                    if(astP !== shooter && Math.random() < (astP.stats.playmaking/150)) {
+                        pStats[astP.id].gameBox.ast++; astText = `(${astP.name} のアシスト) `;
+                    }
+                    pushLog(timeStr, `<span class="log-team">${offTeam.name}</span> ${shooter.name} が${typeStr}を決める！${astText}`);
+                    hasBall = hasBall === 1 ? 2 : 1;
+                } else {
+                    // 失敗 -> ブロック判定
+                    if(Math.random() < (defender.stats.physical + defender.stats.defense)/1000) {
+                        pStats[defender.id].gameBox.blk++;
+                        pushLog(timeStr, `<span class="log-team">${defTeam.name}</span> ${defender.name} が豪快なブロック！`);
+                    } else {
+                        pushLog(timeStr, `<span class="log-team">${offTeam.name}</span> ${shooter.name} の${typeStr}は外れる`);
+                    }
+                    
+                    // リバウンド判定 (Rebound + Physical)
+                    let rebArr = [...offP, ...defP].map(p => ({ p:p, val: p.stats.rebound*1.5 + p.stats.physical + Math.random()*50 }));
+                    rebArr.sort((a,b) => b.val - a.val);
+                    let rebP = rebArr[0].p;
+                    pStats[rebP.id].gameBox.reb++;
+                    let isOffReb = offP.includes(rebP);
+                    pushLog(timeStr, `${rebP.name} がリバウンド。`);
+                    hasBall = isOffReb ? hasBall : (hasBall === 1 ? 2 : 1);
+                }
+            }
+            pushLog(`Q${q} 0:00`, `第${q}クォーター終了`);
+        }
+
+        // 試合終了処理 (スタッツ本反映)
+        t1.pf += score.t1; t1.pa += score.t2;
+        t2.pf += score.t2; t2.pa += score.t1;
+        if(score.t1 > score.t2) { t1.w++; t2.l++; } else { t2.w++; t1.l++; }
+
+        [...t1.roster, ...t2.roster].forEach(p => {
+            let gb = pStats[p.id].gameBox;
+            // 累計に追加
+            ['min','pts','reb','ast','stl','blk','fgm','fga','tpm','tpa','ftm','fta'].forEach(k => p.box[k] += gb[k]);
+            // 最近の試合に追加
+            p.recent.push(gb);
+            if(p.recent.length > 5) p.recent.shift();
+        });
+
+        scoreUI.innerText = `${score.t1} - ${score.t2}`;
+        logBox.innerHTML = logs.reverse().join('');
+    }
+
+    window.onload = initWorld;
+</script>
+</body>
+</html>
+initial-scale=1.0">
     <title>BASKETBALL LIFE</title>
     <style>
         /* ================= 全体設定 ================= */
