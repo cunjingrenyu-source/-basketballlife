@@ -5,127 +5,112 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BASKETBALL LIFE</title>
     <style>
-        /* 全体の設定（強制的に白背景） */
+        /* ================= 全体設定 ================= */
         body {
             background-color: #ffffff !important;
-            color: #333333 !important;
+            color: #333333;
             font-family: 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             display: flex;
             justify-content: center;
         }
-        
-        /* 共通コンテナ */
-        .container {
+        .app-container {
             width: 100%;
             max-width: 800px;
+            min-height: 100vh;
             background-color: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            border-top: 5px solid #ff6600; 
-        }
-
-        h1, h2, h3 {
-            color: #ff6600;
-            margin-top: 0;
-            border-bottom: 2px solid #f1f2f6;
-            padding-bottom: 5px;
-        }
-
-        /* 登録画面のテーブル（画像風） */
-        .reg-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            font-size: 16px;
-        }
-        .reg-table th, .reg-table td {
-            border: 2px solid #333;
-            padding: 12px;
-            text-align: left;
-        }
-        .reg-table th {
-            background-color: #f5f6fa;
-            width: 35%;
-            font-weight: normal;
-        }
-        .reg-table input[type="text"], .reg-table select {
-            width: 90%;
-            padding: 8px;
-            font-size: 16px;
-            border: 1px solid #ccc;
-        }
-        .submit-btn {
-            background-color: #5fa8d3;
-            color: white;
-            border: 2px solid #3b7b9e;
-            padding: 10px 40px;
-            font-size: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 4px;
-            display: block;
-            margin: 0 auto;
-        }
-        .submit-btn:hover { background-color: #4b8eb5; }
-
-        /* マイページ側のUI */
-        .status-header {
-            display: flex;
-            justify-content: space-between;
-            background: #f1f2f6;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border: 1px solid #dcdde1;
-        }
-        .status-header div { font-size: 1.1em; font-weight: bold; }
-        
-        /* ゲージ */
-        .gauge-container { margin-bottom: 10px; font-weight: bold;}
-        .gauge-bar {
-            width: 100%;
-            background-color: #dcdde1;
-            height: 20px;
-            border-radius: 10px;
-            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
             position: relative;
         }
-        .gauge-fill { height: 100%; transition: width 0.3s; }
-        .gauge-text {
-            position: absolute; width: 100%; text-align: center;
-            line-height: 20px; font-size: 12px; font-weight: bold; color: #fff;
-            text-shadow: 1px 1px 2px #000;
-        }
-        #fatigue-fill { background-color: #e74c3c; }
-        #stress-fill { background-color: #9b59b6; }
 
-        /* ステータス表 */
-        .stat-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        .stat-table th, .stat-table td {
-            border: 1px solid #dcdde1;
-            padding: 8px;
-            text-align: center;
-        }
-        .stat-table th { background-color: #f5f6fa; color: #333; }
-        .stat-val { font-weight: bold; font-size: 1.2em; }
-        .stat-rank {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 3px;
+        /* ================= ヘッダー＆メニュー ================= */
+        .header {
+            background-color: #333;
             color: #fff;
-            font-weight: bold;
-            font-size: 0.9em;
-            margin-left: 5px;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        /* ランクの色 */
+        .header h1 { margin: 0; font-size: 18px; color: #ff6600; }
+        .menu-btn {
+            background: #ff6600; color: #fff; border: none;
+            padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer;
+        }
+        .nav-menu {
+            display: none; background: #f8f9fa; border-bottom: 2px solid #ddd;
+            padding: 10px; display: flex; gap: 10px; overflow-x: auto;
+        }
+        .nav-menu button {
+            background: #fff; border: 1px solid #ccc; padding: 8px 12px;
+            border-radius: 4px; cursor: pointer; white-space: nowrap; font-weight: bold;
+        }
+        .nav-menu button:hover { background: #e2e6ea; }
+
+        /* ================= 共通パーツ ================= */
+        .content-area { padding: 15px; }
+        h2 { color: #ff6600; border-bottom: 2px solid #f1f2f6; padding-bottom: 5px; font-size: 18px; margin-top: 0;}
+        
+        /* ================= 登録画面 ================= */
+        .reg-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .reg-table th, .reg-table td { border: 1px solid #ccc; padding: 10px; }
+        .reg-table th { background-color: #f5f6fa; width: 35%; }
+        .reg-table input, .reg-table select { width: 90%; padding: 8px; font-size: 16px; }
+        .submit-btn {
+            background-color: #5fa8d3; color: white; border: 2px solid #3b7b9e;
+            padding: 10px 40px; font-size: 18px; font-weight: bold; cursor: pointer;
+            border-radius: 4px; display: block; margin: 0 auto;
+        }
+
+        /* ================= ホーム画面 (画像参照風) ================= */
+        .top-status-bar {
+            display: flex; justify-content: space-between; background: #f1f2f6;
+            border: 1px solid #ccc; font-weight: bold; font-size: 14px; text-align: center;
+        }
+        .top-status-bar div { border-right: 1px solid #ccc; padding: 5px 10px; flex: 1; }
+        .top-status-bar div:last-child { border-right: none; }
+        
+        .player-banner {
+            background: linear-gradient(to right, #4a00e0, #8e2de2);
+            color: #fff; padding: 15px; margin-top: 10px; border-radius: 5px;
+            display: flex; align-items: center; cursor: pointer; position: relative;
+        }
+        .player-banner:hover { opacity: 0.9; }
+        .banner-icon {
+            width: 60px; height: 60px; background: #ccc; border-radius: 50%;
+            margin-right: 15px; display: flex; align-items: center; justify-content: center; color: #333;
+        }
+        .banner-info .league-name { font-size: 12px; color: #ddd; margin-bottom: 2px; }
+        .banner-info .team-name { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
+        .banner-info .player-detail { font-size: 16px; }
+        
+        .stats-summary-table {
+            width: 100%; border-collapse: collapse; margin-top: 10px; text-align: center;
+        }
+        .stats-summary-table th, .stats-summary-table td { border: 1px solid #ccc; padding: 8px; }
+        .stats-summary-table th { background: #f5f6fa; font-size: 12px; }
+        .stats-summary-table td { font-size: 18px; font-weight: bold; }
+
+        /* ================= ロスター＆チーム一覧 ================= */
+        .team-list-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .team-btn {
+            background: #fff; border: 2px solid #ccc; padding: 15px; border-radius: 5px;
+            text-align: center; font-weight: bold; cursor: pointer; font-size: 16px;
+        }
+        .team-btn:hover { border-color: #ff6600; background: #fff5eb; }
+        
+        .roster-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px;}
+        .roster-header { background: #ffdde1; color: #333; }
+        .roster-table th, .roster-table td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+        .roster-table tr:nth-child(even) { background-color: #fcfcfc; }
+        .roster-name-cell { text-align: left !important; font-size: 14px; font-weight: bold; color: #2980b9; cursor: pointer; text-decoration: underline;}
+        
+        /* ランクバッジ */
+        .rank { display: inline-block; padding: 1px 4px; border-radius: 3px; color: #fff; font-weight: bold; font-size: 10px;}
         .rank-S { background-color: #ffd700; color: #000; }
         .rank-A { background-color: #e74c3c; }
         .rank-B { background-color: #e67e22; }
@@ -135,194 +120,151 @@
         .rank-F { background-color: #9b59b6; }
         .rank-G { background-color: #95a5a6; }
 
-        /* ボタン群 */
-        .action-area {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        button.action-btn {
-            background-color: #ff6600; color: white; border: none;
-            padding: 12px; border-radius: 5px; font-size: 13px; font-weight: bold;
-            cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
+        /* ================= 練習画面 ================= */
+        .action-area { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 20px;}
+        button.action-btn { background-color: #ff6600; color: white; border: none; padding: 12px; border-radius: 5px; font-size: 13px; font-weight: bold; cursor: pointer; }
         button.action-btn:hover { background-color: #e05500; }
-        button.action-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
         .btn-large { background-color: #d35400 !important; }
-        .hospital-btn { background-color: #2980b9 !important; }
 
-        #log-area {
-            background: #f1f2f6; padding: 10px; height: 120px; overflow-y: auto;
-            border: 1px solid #dcdde1; border-radius: 5px; font-size: 14px;
-        }
+        /* ================= ステータス詳細ポップアップ風 ================= */
+        #player-detail-view { display: none; background: #fff; padding: 15px; border: 2px solid #333; border-radius: 5px; margin-top: 15px;}
+        .detail-close { float: right; background: #ccc; border: none; padding: 5px 10px; cursor: pointer; }
+
+        /* ゲージ */
+        .gauge-container { margin-bottom: 10px; font-weight: bold; font-size: 12px;}
+        .gauge-bar { width: 100%; background-color: #dcdde1; height: 15px; border-radius: 8px; overflow: hidden; position: relative; }
+        .gauge-fill { height: 100%; }
+        #fatigue-fill { background-color: #e74c3c; }
     </style>
 </head>
 <body>
 
-<!-- ================= 登録画面 ================= -->
-<div id="registration-screen" class="container">
-    <h1>プロバスケ志望届</h1>
-    <table class="reg-table">
-        <tr>
-            <th>選手名（10文字以内）</th>
-            <td><input type="text" id="reg-name" placeholder="選手名"></td>
-        </tr>
-        <tr>
-            <th>年齢</th>
-            <td>
-                <select id="reg-age">
-                    <option value="18">18歳</option>
-                </select>
-            </td>
-        </tr>
-        <tr>
-            <th>出身</th>
-            <td>
-                <select id="reg-origin">
-                    <option value="東京">東京</option>
-                    <option value="大阪">大阪</option>
-                    <option value="北海道">北海道</option>
-                    <option value="福岡">福岡</option>
-                    <option value="海外">海外</option>
-                </select>
-            </td>
-        </tr>
-        <tr>
-            <th>利き手</th>
-            <td>
-                <select id="reg-hand">
-                    <option value="右利き">右利き</option>
-                    <option value="左利き">左利き</option>
-                </select>
-            </td>
-        </tr>
-        <tr>
-            <th>ポジション</th>
-            <td>
-                <select id="reg-pos">
-                    <option value="PG">PG (ポイントガード)</option>
-                    <option value="SG">SG (シューティングガード)</option>
-                    <option value="SF">SF (スモールフォワード)</option>
-                    <option value="PF">PF (パワーフォワード)</option>
-                    <option value="C">C (センター)</option>
-                </select>
-            </td>
-        </tr>
-        <tr>
-            <th>アピールポイント</th>
-            <td>
-                <select id="reg-appeal">
-                    <option value="three">スリーポイント</option>
-                    <option value="dribble">シュートオブドリブル</option>
-                    <option value="physical">フィジカル</option>
-                    <option value="playmaking">プレイメイキング</option>
-                    <option value="defense">ディフェンス</option>
-                </select>
-            </td>
-        </tr>
-    </table>
-    <button class="submit-btn" onclick="registerPlayer()">提出</button>
-</div>
-
-<!-- ================= マイページ画面 ================= -->
-<div id="game-screen" class="container" style="display: none;">
-    <h1>BASKETBALL LIFE</h1>
+<div class="app-container">
     
-    <div class="status-header">
-        <div>選手: <span id="player-name"></span> (<span id="player-pos"></span>)</div>
-        <div>年齢: <span id="player-age"></span>歳</div>
-        <div>行動残数: <span id="action-points">15</span> / 30</div>
+    <!-- 登録画面 -->
+    <div id="reg-view" class="content-area">
+        <h2 style="border-bottom: 2px solid #ff6600;">プロバスケ志望届</h2>
+        <table class="reg-table">
+            <tr><th>選手名（10文字以内）</th><td><input type="text" id="reg-name" placeholder="選手名"></td></tr>
+            <tr><th>年齢</th><td><select id="reg-age"><option value="18">18歳</option></select></td></tr>
+            <tr>
+                <th>ポジション</th>
+                <td>
+                    <select id="reg-pos">
+                        <option value="PG">PG</option><option value="SG">SG</option>
+                        <option value="SF">SF</option><option value="PF">PF</option><option value="C">C</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th>アピールポイント</th>
+                <td>
+                    <select id="reg-appeal">
+                        <option value="three">スリーポイント</option><option value="shootDribble">シュートオブドリブル</option>
+                        <option value="physical">フィジカル</option><option value="playmaking">プレイメイキング</option><option value="defense">ディフェンス</option>
+                    </select>
+                </td>
+            </tr>
+        </table>
+        <button class="submit-btn" onclick="registerPlayer()">入団する</button>
     </div>
 
-    <!-- コンディション -->
-    <div class="gauge-container">
-        <div>疲労度 (高いほどケガ率UP)</div>
-        <div class="gauge-bar">
-            <div id="fatigue-fill" class="gauge-fill" style="width: 0%;"></div>
-            <div id="fatigue-text" class="gauge-text">0%</div>
+    <!-- ゲーム内メインUI (登録後表示) -->
+    <div id="game-ui" style="display: none;">
+        <!-- ヘッダーとメニュー -->
+        <div class="header">
+            <h1>BBL</h1>
+            <button class="menu-btn" onclick="toggleMenu()">MENU ▼</button>
         </div>
-    </div>
-    <div class="gauge-container">
-        <div>ストレス</div>
-        <div class="gauge-bar">
-            <div id="stress-fill" class="gauge-fill" style="width: 0%;"></div>
-            <div id="stress-text" class="gauge-text">0%</div>
+        <div id="nav-menu" class="nav-menu">
+            <button onclick="changeView('home')">🏠 ホーム</button>
+            <button onclick="changeView('practice')">🏀 練習・治療</button>
+            <button onclick="changeView('team-list')">📋 チーム一覧</button>
         </div>
+
+        <!-- 1. ホーム画面 -->
+        <div id="home-view" class="content-area">
+            <div class="top-status-bar">
+                <div>1年目</div><div>1軍</div><div>順位: -</div><div id="top-ap">行動: 15</div><div>$5.00万</div>
+            </div>
+            
+            <div class="player-banner" onclick="showPlayerDetail(currentUser.id)">
+                <div class="banner-icon">ICON</div>
+                <div class="banner-info">
+                    <div class="league-name" id="home-league">リーグ1 / BBL機構</div>
+                    <div class="team-name" id="home-team">チーム名</div>
+                    <div class="player-detail">
+                        <span id="home-pos" style="font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 3px;">PG</span>
+                        <strong id="home-name">名前</strong> (<span id="home-age">18</span>)
+                    </div>
+                </div>
+            </div>
+
+            <table class="stats-summary-table">
+                <tr><th>試合</th><th>平均得点</th><th>ｱｼｽﾄ</th><th>ﾘﾊﾞｳﾝﾄﾞ</th><th>ｽﾃｨｰﾙ</th><th>ﾌﾞﾛｯｸ</th></tr>
+                <tr><td>0</td><td>成績不明</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td></tr>
+            </table>
+            <p style="font-size: 12px; color: #666; margin-top: 5px;">※タップで選手詳細ステータスを表示</p>
+        </div>
+
+        <!-- 2. 練習画面 -->
+        <div id="practice-view" class="content-area" style="display: none;">
+            <h2>練習メニュー</h2>
+            <div class="gauge-container">
+                <div>疲労度 (行動で増加)</div>
+                <div class="gauge-bar"><div id="fatigue-fill" class="gauge-fill" style="width: 0%;"></div></div>
+            </div>
+            <p>行動残数: <span id="prac-ap" style="font-weight:bold; color:#ff6600;"></span></p>
+            
+            <div class="action-area">
+                <button class="action-btn" onclick="doPractice('three', 1)">スリー (小) <br><small>疲労+3</small></button>
+                <button class="action-btn btn-large" onclick="doPractice('three', 3)">スリー (大) <br><small>疲労+8</small></button>
+                <button class="action-btn" onclick="doPractice('shootDribble', 1)">ドリブルS (小) <br><small>疲労+3</small></button>
+                <button class="action-btn btn-large" onclick="doPractice('shootDribble', 3)">ドリブルS (大) <br><small>疲労+8</small></button>
+                <button class="action-btn" style="background:#2980b9;" onclick="goToHospital()">🏥 片酢病院 <br><small>治療/休養</small></button>
+            </div>
+        </div>
+
+        <!-- 3. チーム一覧画面 -->
+        <div id="team-list-view" class="content-area" style="display: none;">
+            <h2>チーム一覧 (全30球団)</h2>
+            <h3 style="font-size: 14px; margin-bottom: 5px;">■ リーグ 1</h3>
+            <div class="team-list-grid" id="league1-grid"></div>
+            <h3 style="font-size: 14px; margin-top: 15px; margin-bottom: 5px;">■ リーグ 2</h3>
+            <div class="team-list-grid" id="league2-grid"></div>
+        </div>
+
+        <!-- 4. ロスター画面 -->
+        <div id="roster-view" class="content-area" style="display: none;">
+            <button onclick="changeView('team-list')" style="margin-bottom: 10px; padding: 5px;">← 戻る</button>
+            <h2 id="roster-team-name">チーム名 ロスター</h2>
+            <table class="roster-table" id="roster-table">
+                <tr class="roster-header">
+                    <th>役割</th><th>Pos</th><th>選手名</th><th>年齢</th><th>ｼｭｰﾄ</th><th>ｽﾘｰ</th><th>俊敏</th><th>守備</th>
+                </tr>
+                <!-- JSで生成 -->
+            </table>
+        </div>
+
+        <!-- 5. 選手詳細ポップアップ風 -->
+        <div id="player-detail-view">
+            <button class="detail-close" onclick="document.getElementById('player-detail-view').style.display='none'">✖ 閉じる</button>
+            <h2 id="detail-name" style="margin-top:0;">選手名</h2>
+            <table class="stats-summary-table" style="font-size:12px;">
+                <tr><th>シュートD</th><th>レイ/ダン</th><th>ミドル</th><th>スリー</th></tr>
+                <tr><td id="d-shootDribble"></td><td id="d-layupDunk"></td><td id="d-middle"></td><td id="d-three"></td></tr>
+            </table>
+            <table class="stats-summary-table" style="font-size:12px; margin-top: 5px;">
+                <tr><th>俊敏</th><th>フィジ</th><th>リバ</th><th>プレイM</th><th>守備</th></tr>
+                <tr><td id="d-agility"></td><td id="d-physical"></td><td id="d-rebound"></td><td id="d-playmaking"></td><td id="d-defense"></td></tr>
+            </table>
+            <table class="stats-summary-table" style="font-size:12px; margin-top: 5px;">
+                <tr><th>メンタル</th><th>ケガ耐性</th><th>スタミナ</th></tr>
+                <tr><td id="d-mental"></td><td id="d-injuryResist"></td><td id="d-stamina"></td></tr>
+            </table>
+        </div>
+
     </div>
-
-    <!-- 能力値 -->
-    <h2>選手能力</h2>
-    
-    <!-- シュート系 (MAX150) -->
-    <table class="stat-table">
-        <tr>
-            <th colspan="4">シュート能力 (MAX:150)</th>
-        </tr>
-        <tr>
-            <th>シュートオブドリブル</th>
-            <th>レイアップ&ダンク</th>
-            <th>ミドル</th>
-            <th>スリー</th>
-        </tr>
-        <tr>
-            <td id="cell-shootDribble"></td>
-            <td id="cell-layupDunk"></td>
-            <td id="cell-middle"></td>
-            <td id="cell-three"></td>
-        </tr>
-    </table>
-
-    <!-- 身体・技術系 (MAX100) -->
-    <table class="stat-table">
-        <tr>
-            <th colspan="5">身体・技術 (MAX:100)</th>
-        </tr>
-        <tr>
-            <th>俊敏性</th>
-            <th>フィジカル</th>
-            <th>リバウンド</th>
-            <th>プレイメイキング</th>
-            <th>ディフェンス</th>
-        </tr>
-        <tr>
-            <td id="cell-agility"></td>
-            <td id="cell-physical"></td>
-            <td id="cell-rebound"></td>
-            <td id="cell-playmaking"></td>
-            <td id="cell-defense"></td>
-        </tr>
-    </table>
-
-    <!-- その他 -->
-    <table class="stat-table">
-        <tr>
-            <th colspan="3">その他 (メンタル/ケガ MAX:100, スタミナ MAX:50)</th>
-        </tr>
-        <tr>
-            <th>メンタル</th>
-            <th>ケガ耐性</th>
-            <th>スタミナ</th>
-        </tr>
-        <tr>
-            <td id="cell-mental"></td>
-            <td id="cell-injuryResist"></td>
-            <td id="cell-stamina"></td>
-        </tr>
-    </table>
-
-    <!-- アクション -->
-    <h2>行動 (1回につき行動残数-1)</h2>
-    <div class="action-area">
-        <button class="action-btn" onclick="doPractice('three', 1)">スリー練習 (小)<br><small>疲労+3</small></button>
-        <button class="action-btn btn-large" onclick="doPractice('three', 3)">スリー練習 (大)<br><small>疲労+8</small></button>
-        <button class="action-btn" onclick="doPractice('playmaking', 1)">パス練習 (小)<br><small>疲労+3</small></button>
-        <button class="action-btn hospital-btn" onclick="goToHospital()">片酢病院<br><small>ケガ治療</small></button>
-    </div>
-
-    <!-- ログ -->
-    <h2>システムログ</h2>
-    <div id="log-area"></div>
 </div>
 
 <script>
@@ -330,28 +272,14 @@
     const MAX_SHOOT = 150;
     const MAX_STAMINA = 50;
     const MAX_NORMAL = 100;
+    const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
 
-    let player = {
-        name: "", pos: "", age: 18,
-        ap: 15, fatigue: 0, stress: 0, isInjured: false,
-        stats: {} // 登録時に初期化
-    };
+    let teams = [];
+    let allPlayers = [];
+    let currentUser = null;
+    let playerIdCounter = 1;
 
-    // --- ランダム生成用 (最小値10、大体F〜E、上振れでD) ---
-    function rollStat(max) {
-        // G(〜24%), F(25〜39%), E(40〜54%), D(55〜69%)
-        // F〜E〜低D になるように乱数幅を調整
-        let minPercent = 0.25; // 25% (Fの底)
-        let maxPercent = 0.58; // 58% (Dの下位)
-        
-        let minVal = Math.floor(max * minPercent);
-        let maxVal = Math.floor(max * maxPercent);
-        
-        let val = Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal;
-        return Math.max(10, val); // 最低値は10
-    }
-
-    // --- ランク判定 ---
+    // --- ユーティリティ ---
     function getRank(val, max) {
         let ratio = val / max;
         if (ratio >= 1.00) return 'S';
@@ -364,113 +292,249 @@
         return 'G';
     }
 
+    function rollUserStat(max) {
+        // F(25%) 〜 D(58%)
+        let minVal = Math.floor(max * 0.25);
+        let maxVal = Math.floor(max * 0.58);
+        let val = Math.floor(Math.random() * (maxVal - minVal + 1)) + minVal;
+        return Math.max(10, val);
+    }
+
+    function getComStat(max) {
+        // COMは一律 Eランク (40%〜54%の中間くらい)
+        return Math.floor(max * 0.45);
+    }
+
+    function createStats(isUser, appealPoint = null) {
+        let stats = {};
+        if (isUser) {
+            stats = {
+                shootDribble: rollUserStat(MAX_SHOOT), layupDunk: rollUserStat(MAX_SHOOT), middle: rollUserStat(MAX_SHOOT), three: rollUserStat(MAX_SHOOT),
+                agility: rollUserStat(MAX_NORMAL), physical: rollUserStat(MAX_NORMAL), rebound: rollUserStat(MAX_NORMAL), playmaking: rollUserStat(MAX_NORMAL), defense: rollUserStat(MAX_NORMAL),
+                mental: rollUserStat(MAX_NORMAL), injuryResist: rollUserStat(MAX_NORMAL), stamina: rollUserStat(MAX_STAMINA)
+            };
+            if(appealPoint && stats[appealPoint]) stats[appealPoint] += 15; // アピールボーナス
+        } else {
+            // COM E一律
+            stats = {
+                shootDribble: getComStat(MAX_SHOOT), layupDunk: getComStat(MAX_SHOOT), middle: getComStat(MAX_SHOOT), three: getComStat(MAX_SHOOT),
+                agility: getComStat(MAX_NORMAL), physical: getComStat(MAX_NORMAL), rebound: getComStat(MAX_NORMAL), playmaking: getComStat(MAX_NORMAL), defense: getComStat(MAX_NORMAL),
+                mental: getComStat(MAX_NORMAL), injuryResist: getComStat(MAX_NORMAL), stamina: getComStat(MAX_STAMINA)
+            };
+        }
+        return stats;
+    }
+
+    // --- ゲーム初期化 (チームとCOM生成) ---
+    function initWorld() {
+        for (let i = 1; i <= 30; i++) {
+            let league = i <= 15 ? 1 : 2;
+            let team = { id: i, name: `チーム ${i}`, league: league, roster: [] };
+            
+            // 各チーム15人 (各ポジ3人ずつ)
+            let comCount = 1;
+            POSITIONS.forEach(pos => {
+                for (let j = 0; j < 3; j++) {
+                    let player = {
+                        id: playerIdCounter++,
+                        teamId: i,
+                        isUser: false,
+                        name: `COM-${team.id}-${comCount++}`,
+                        age: Math.floor(Math.random() * 10) + 20, // 20〜29歳
+                        pos: pos,
+                        stats: createStats(false),
+                        ap: 15, fatigue: 0
+                    };
+                    team.roster.push(player);
+                    allPlayers.push(player);
+                }
+            });
+            teams.push(team);
+        }
+    }
+
     // --- 登録処理 ---
     function registerPlayer() {
-        let nameInput = document.getElementById('reg-name').value;
-        if (!nameInput) nameInput = "名無しルーキー";
-        
-        player.name = nameInput;
-        player.pos = document.getElementById('reg-pos').value;
+        let nameInput = document.getElementById('reg-name').value || "名無しルーキー";
+        let pos = document.getElementById('reg-pos').value;
         let appeal = document.getElementById('reg-appeal').value;
 
-        // ステータスの初期振り分け
-        player.stats = {
-            shootDribble: rollStat(MAX_SHOOT),
-            layupDunk: rollStat(MAX_SHOOT),
-            middle: rollStat(MAX_SHOOT),
-            three: rollStat(MAX_SHOOT),
-            agility: rollStat(MAX_NORMAL),
-            physical: rollStat(MAX_NORMAL),
-            rebound: rollStat(MAX_NORMAL),
-            playmaking: rollStat(MAX_NORMAL),
-            defense: rollStat(MAX_NORMAL),
-            mental: rollStat(MAX_NORMAL),
-            injuryResist: rollStat(MAX_NORMAL),
-            stamina: rollStat(MAX_STAMINA)
+        currentUser = {
+            id: playerIdCounter++,
+            isUser: true,
+            name: nameInput,
+            age: 18,
+            pos: pos,
+            stats: createStats(true, appeal),
+            ap: 15, fatigue: 0, isInjured: false
         };
 
-        // アピールポイントにボーナス（少し高めに出るように）
-        if(player.stats[appeal]) {
-            player.stats[appeal] += 10; 
+        // ランダムなチームに配属し、同ポジションのCOMを1人削除
+        let randomTeamIndex = Math.floor(Math.random() * 30);
+        let targetTeam = teams[randomTeamIndex];
+        currentUser.teamId = targetTeam.id;
+
+        let comIndex = targetTeam.roster.findIndex(p => p.pos === pos && !p.isUser);
+        if(comIndex !== -1) {
+            targetTeam.roster.splice(comIndex, 1, currentUser); // 入れ替え
+        } else {
+            targetTeam.roster.push(currentUser); // 万が一無ければ追加
         }
+        allPlayers.push(currentUser);
 
-        // 画面切り替え
-        document.getElementById('registration-screen').style.display = 'none';
-        document.getElementById('game-screen').style.display = 'block';
-
-        updateUI();
-        addLog(`志望届を受理しました。BBLへようこそ、${player.name}選手！`);
+        // UI切り替え
+        document.getElementById('reg-view').style.display = 'none';
+        document.getElementById('game-ui').style.display = 'block';
+        changeView('home');
     }
 
-    // --- UI更新 ---
-    function updateStatCell(cellId, val, max) {
-        let rank = getRank(val, max);
-        document.getElementById(cellId).innerHTML = 
-            `<span class="stat-val">${val}</span> <span class="stat-rank rank-${rank}">${rank}</span>`;
-    }
+    // --- 画面切り替え ---
+    function changeView(viewId) {
+        document.getElementById('home-view').style.display = 'none';
+        document.getElementById('practice-view').style.display = 'none';
+        document.getElementById('team-list-view').style.display = 'none';
+        document.getElementById('roster-view').style.display = 'none';
+        document.getElementById('player-detail-view').style.display = 'none';
 
-    function updateUI() {
-        document.getElementById('player-name').innerText = player.name;
-        document.getElementById('player-pos').innerText = player.pos;
-        document.getElementById('player-age').innerText = player.age;
-        document.getElementById('action-points').innerText = player.ap;
+        if(viewId === 'home') renderHome();
+        if(viewId === 'practice') renderPractice();
+        if(viewId === 'team-list') renderTeamList();
         
-        document.getElementById('fatigue-fill').style.width = player.fatigue + '%';
-        document.getElementById('fatigue-text').innerText = player.fatigue + '%';
-        document.getElementById('stress-fill').style.width = player.stress + '%';
-        document.getElementById('stress-text').innerText = player.stress + '%';
+        document.getElementById(viewId + '-view').style.display = 'block';
+        document.getElementById('nav-menu').style.display = 'none'; // メニュー閉じる
+    }
 
-        // ステータス表更新
-        updateStatCell('cell-shootDribble', player.stats.shootDribble, MAX_SHOOT);
-        updateStatCell('cell-layupDunk', player.stats.layupDunk, MAX_SHOOT);
-        updateStatCell('cell-middle', player.stats.middle, MAX_SHOOT);
-        updateStatCell('cell-three', player.stats.three, MAX_SHOOT);
+    function toggleMenu() {
+        let menu = document.getElementById('nav-menu');
+        menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+    }
 
-        updateStatCell('cell-agility', player.stats.agility, MAX_NORMAL);
-        updateStatCell('cell-physical', player.stats.physical, MAX_NORMAL);
-        updateStatCell('cell-rebound', player.stats.rebound, MAX_NORMAL);
-        updateStatCell('cell-playmaking', player.stats.playmaking, MAX_NORMAL);
-        updateStatCell('cell-defense', player.stats.defense, MAX_NORMAL);
-        updateStatCell('cell-mental', player.stats.mental, MAX_NORMAL);
-        updateStatCell('cell-injuryResist', player.stats.injuryResist, MAX_NORMAL);
+    // --- 描画処理 ---
+    function renderHome() {
+        let myTeam = teams.find(t => t.id === currentUser.teamId);
+        document.getElementById('home-league').innerText = `リーグ ${myTeam.league} / BBL機構`;
+        document.getElementById('home-team').innerText = myTeam.name;
+        document.getElementById('home-pos').innerText = currentUser.pos;
+        document.getElementById('home-name').innerText = currentUser.name;
+        document.getElementById('home-age').innerText = currentUser.age;
+        document.getElementById('top-ap').innerText = `行動: ${currentUser.ap}`;
+    }
+
+    function renderPractice() {
+        document.getElementById('prac-ap').innerText = currentUser.ap;
+        document.getElementById('fatigue-fill').style.width = currentUser.fatigue + '%';
+    }
+
+    function renderTeamList() {
+        let grid1 = document.getElementById('league1-grid');
+        let grid2 = document.getElementById('league2-grid');
+        grid1.innerHTML = ''; grid2.innerHTML = '';
+
+        teams.forEach(team => {
+            let btn = document.createElement('div');
+            btn.className = 'team-btn';
+            btn.innerText = team.name;
+            btn.onclick = () => showRoster(team.id);
+            
+            if(team.league === 1) grid1.appendChild(btn);
+            else grid2.appendChild(btn);
+        });
+    }
+
+    function showRoster(teamId) {
+        let team = teams.find(t => t.id === teamId);
+        document.getElementById('roster-team-name').innerText = `${team.name} ロスター`;
         
-        updateStatCell('cell-stamina', player.stats.stamina, MAX_STAMINA);
+        let table = document.getElementById('roster-table');
+        // ヘッダー残してクリア
+        table.innerHTML = `<tr class="roster-header">
+            <th>役割</th><th>Pos</th><th>選手名</th><th>年齢</th><th>ｼｭｰﾄD</th><th>ｽﾘｰ</th><th>俊敏</th><th>守備</th>
+        </tr>`;
+
+        // PG, SG, SF, PF, Cの順に並び替え
+        let sortedRoster = [...team.roster].sort((a, b) => POSITIONS.indexOf(a.pos) - POSITIONS.indexOf(b.pos));
+
+        sortedRoster.forEach((p, index) => {
+            let role = index % 3 === 0 ? "先発" : "控"; // 簡易的に各ポジ1人目を先発扱い
+            let row = document.createElement('tr');
+            if(p.isUser) row.style.backgroundColor = '#fff0f0'; // プレイヤーは色変え
+
+            let rankSD = getRank(p.stats.shootDribble, MAX_SHOOT);
+            let rank3P = getRank(p.stats.three, MAX_SHOOT);
+            let rankAgi = getRank(p.stats.agility, MAX_NORMAL);
+            let rankDef = getRank(p.stats.defense, MAX_NORMAL);
+
+            row.innerHTML = `
+                <td>${role}</td>
+                <td>${p.pos}</td>
+                <td class="roster-name-cell" onclick="showPlayerDetail(${p.id})">${p.name}</td>
+                <td>${p.age}</td>
+                <td><span class="rank rank-${rankSD}">${rankSD}</span></td>
+                <td><span class="rank rank-${rank3P}">${rank3P}</span></td>
+                <td><span class="rank rank-${rankAgi}">${rankAgi}</span></td>
+                <td><span class="rank rank-${rankDef}">${rankDef}</span></td>
+            `;
+            table.appendChild(row);
+        });
+
+        document.getElementById('team-list-view').style.display = 'none';
+        document.getElementById('roster-view').style.display = 'block';
     }
 
-    function addLog(msg) {
-        const logArea = document.getElementById('log-area');
-        const time = new Date().toLocaleTimeString('ja-JP', { hour12: false });
-        logArea.innerHTML = `[${time}] ${msg}<br>` + logArea.innerHTML;
+    function showPlayerDetail(playerId) {
+        let p = allPlayers.find(x => x.id === playerId);
+        document.getElementById('detail-name').innerText = `${p.name} (${p.pos})`;
+
+        const setStat = (id, val, max) => {
+            let r = getRank(val, max);
+            document.getElementById(id).innerHTML = `${val} <span class="rank rank-${r}">${r}</span>`;
+        };
+
+        setStat('d-shootDribble', p.stats.shootDribble, MAX_SHOOT);
+        setStat('d-layupDunk', p.stats.layupDunk, MAX_SHOOT);
+        setStat('d-middle', p.stats.middle, MAX_SHOOT);
+        setStat('d-three', p.stats.three, MAX_SHOOT);
+        setStat('d-agility', p.stats.agility, MAX_NORMAL);
+        setStat('d-physical', p.stats.physical, MAX_NORMAL);
+        setStat('d-rebound', p.stats.rebound, MAX_NORMAL);
+        setStat('d-playmaking', p.stats.playmaking, MAX_NORMAL);
+        setStat('d-defense', p.stats.defense, MAX_NORMAL);
+        setStat('d-mental', p.stats.mental, MAX_NORMAL);
+        setStat('d-injuryResist', p.stats.injuryResist, MAX_NORMAL);
+        setStat('d-stamina', p.stats.stamina, MAX_STAMINA);
+
+        document.getElementById('player-detail-view').style.display = 'block';
     }
 
-    // --- 仮のアクション（練習・病院） ---
+    // --- 練習アクション ---
     function doPractice(statKey, gain) {
-        if (player.ap <= 0) return addLog("行動残数が足りません！");
-        if (player.isInjured) return addLog("ケガ中！病院へ行ってください。");
-        if (player.fatigue >= 100) return addLog("疲労限界！");
+        if (currentUser.ap <= 0) return alert("行動残数が足りません！");
+        if (currentUser.fatigue >= 100) return alert("疲労限界！ケガのリスクがあります。休養してください。");
 
-        player.ap -= 1;
-        player.stats[statKey] += gain;
-        
-        let fatigueCost = (gain > 1) ? 8 : 3;
-        player.fatigue += fatigueCost;
-        if(player.fatigue > 100) player.fatigue = 100;
+        currentUser.ap -= 1;
+        currentUser.stats[statKey] += gain;
+        currentUser.fatigue += (gain > 1) ? 8 : 3;
+        if(currentUser.fatigue > 100) currentUser.fatigue = 100;
 
-        addLog(`練習を実施。（${statKey} +${gain}）`);
-        updateUI();
+        renderPractice();
+        // APが変わったのでホームの表示も裏で更新しておく
+        document.getElementById('top-ap').innerText = `行動: ${currentUser.ap}`;
     }
 
     function goToHospital() {
-        if (player.ap <= 0) return addLog("行動残数が足りません！");
-        player.ap -= 1;
-        if (player.isInjured) {
-            player.isInjured = false;
-            addLog("病院で治療し、ケガが治りました。");
-        } else {
-            addLog("ケガはしていません。");
-        }
-        updateUI();
+        if (currentUser.ap <= 0) return alert("行動残数が足りません！");
+        currentUser.ap -= 1;
+        currentUser.fatigue = 0; // ひとまず疲労全回復
+        alert("病院で休養・治療し、疲労が回復しました！");
+        renderPractice();
+        document.getElementById('top-ap').innerText = `行動: ${currentUser.ap}`;
     }
+
+    // 起動時
+    window.onload = () => {
+        initWorld();
+    };
+
 </script>
 </body>
 </html>
