@@ -104,7 +104,11 @@
     <div class="header">
         <div class="header-top">
             <h1 onclick="goHome()">BASKETBALL LIFE</h1>
-            <button class="menu-btn" onclick="toggleMenu()">MENU ▼</button>
+            <div>
+                <!-- 更新ボタンの追加 -->
+                <button class="menu-btn" onclick="location.reload()" style="background:#3498db; margin-right: 5px;">更新 ↺</button>
+                <button class="menu-btn" onclick="toggleMenu()">MENU ▼</button>
+            </div>
         </div>
         <div class="server-status" id="server-status-bar" style="display: none;">
             <span>📅 第 <span id="round-display">1</span> 節</span>
@@ -222,10 +226,23 @@
         if(dataStr) {
             try {
                 const data = JSON.parse(dataStr);
-                teams = data.teams; allPlayers = data.allPlayers;
+                
+                allPlayers = data.allPlayers;
+                teams = data.teams;
+                
+                // バグ修正: チームロスター内の選手オブジェクトと全選手オブジェクトの参照を結び直す
+                // これを行わないと更新時にデータが解離し、エラーにより新規作成画面に飛ばされていました
+                teams.forEach(t => {
+                    t.roster = t.roster.map(rp => allPlayers.find(p => p.id === rp.id) || rp);
+                });
+
                 currentUser = allPlayers.find(p => p.id === data.currentUserId);
-                playerIdCounter = data.playerIdCounter; currentRound = data.currentRound;
-                schedule = data.schedule; userAP = data.userAP;
+                if (!currentUser) return false;
+
+                playerIdCounter = data.playerIdCounter; 
+                currentRound = data.currentRound;
+                schedule = data.schedule; 
+                userAP = data.userAP;
                 gameStartTimeEpoch = data.gameStartTimeEpoch || Date.now();
                 return true;
             } catch(e) { console.error("セーブデータ破損", e); return false; }
@@ -478,7 +495,11 @@
     function generateDetailProfile(p) {
         let t = teams.find(x => x.id === p.teamId); let b = p.box;
         let avg = (v) => b.g > 0 ? (v/b.g).toFixed(1) : "0.0";
-        let min = b.g > 0 ? `${Math.floor((b.min/b.g)/60)}:${Math.floor((b.min/b.g)%60).toString().padStart(2,'0')}` : "0:00";
+        
+        // バグ修正: 時間算出（秒数を正確に割り出して計算）
+        let avgMinSec = b.g > 0 ? Math.floor(b.min / b.g) : 0;
+        let minText = b.g > 0 ? `${Math.floor(avgMinSec / 60)}:${(avgMinSec % 60).toString().padStart(2,'0')}` : "0:00";
+        
         return `
         <div class="player-banner" style="background: linear-gradient(135deg, ${t.color}, #2f3640);">
             <div class="banner-info">
@@ -490,7 +511,7 @@
         <h3 style="margin-top:15px; font-size:16px;">詳細スタッツ</h3>
         <table class="stats-table">
             <tr><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th></tr>
-            <tr><td>${min}</td><td><strong>${avg(b.pts)}</strong></td><td>${avg(b.reb)}</td><td>${avg(b.ast)}</td><td>${avg(b.stl)}</td><td>${avg(b.blk)}</td><td>${avg(b.to)}</td></tr>
+            <tr><td>${minText}</td><td><strong>${avg(b.pts)}</strong></td><td>${avg(b.reb)}</td><td>${avg(b.ast)}</td><td>${avg(b.stl)}</td><td>${avg(b.blk)}</td><td>${avg(b.to)}</td></tr>
         </table>`;
     }
 
@@ -611,7 +632,12 @@
             let clock = 720;
             while(clock > 0) {
                 let timeSpent = Math.floor(Math.random()*14) + 10; // 10〜24秒消費
-                clock -= timeSpent; if(clock < 0) clock = 0;
+                
+                // バグ修正: 消費時間が残り時間を超えないよう制御（プレイタイムの過剰加算防止）
+                if (clock - timeSpent < 0) {
+                    timeSpent = clock;
+                }
+                clock -= timeSpent;
 
                 let offData = isHomeOffense ? hData : aData;
                 let defData = isHomeOffense ? aData : hData;
