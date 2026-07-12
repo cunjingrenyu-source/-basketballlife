@@ -39,16 +39,17 @@
         .reg-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .reg-table th, .reg-table td { border: 1px solid #dcdde1; padding: 12px; }
         .reg-table th { background-color: #f5f6fa; width: 30%; font-size: 14px; text-align: left; }
-        .reg-table input[type="text"], .reg-table select { width: 100%; padding: 10px; font-size: 15px; border: 1px solid #ccc; border-radius: 4px; }
-        .reg-table input[type="file"] { width: 100%; padding: 5px; font-size: 14px; }
+        .reg-table input, .reg-table select { width: 100%; padding: 10px; font-size: 15px; border: 1px solid #ccc; border-radius: 4px; }
         .submit-btn { background-color: #2ecc71; color: white; border: none; padding: 12px 50px; font-size: 18px; font-weight: bold; border-radius: 4px; display: block; margin: 20px auto 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
 
         /* ================= プロフィール・スタッツ表示 ================= */
         .player-banner { color: #fff; padding: 20px; border-radius: 6px; display: flex; align-items: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
-        .banner-avatar { width: 65px; height: 65px; background: #dfe4ea; border-radius: 50%; display: flex; justify-content: center; align-items: center; margin-right: 20px; border: 3px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); overflow: hidden; }
-        .banner-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .banner-info .team-name { font-size: 14px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 3px 8px; border-radius: 3px; display: inline-block; margin-bottom: 6px; cursor: pointer; text-decoration: underline; }
-        .banner-info .player-detail { font-size: 24px; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); }
+        .banner-avatar { width: 65px; height: 65px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 36px; margin-right: 20px; border: 3px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); overflow: hidden; }
+        .banner-info .team-name { font-size: 14px; font-weight: bold; background: rgba(0,0,0,0.3); padding: 3px 8px; border-radius: 3px; display: inline-block; margin-bottom: 6px; cursor: pointer; text-decoration: underline; color: #fff !important; }
+        .banner-info .player-detail { font-size: 24px; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.6); color: #fff !important; }
+        /* バナー内文字色バグ修正用防壁 */
+        .banner-info .clickable-player { color: #fff !important; text-decoration: none; }
+        .banner-info .clickable-player:hover { color: #ff6600 !important; text-decoration: underline; }
 
         .stats-wrapper { width: 100%; overflow-x: auto; margin-top: 15px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #dcdde1; }
         .stats-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 12px; white-space: nowrap; background: #fff; }
@@ -140,18 +141,21 @@
         <button onclick="resetSave()" style="background:#7f8c8d; border-color:#95a5a6;">データリセット</button>
     </div>
 
-    <!-- 登録画面（バグ修正＆画像アップロード・年齢選択追加） -->
+    <!-- 登録画面（画像選択の復活と年齢の追加） -->
     <div id="reg-view" class="content-area" style="display: none;">
         <h2>プロバスケ志望届 (新規作成)</h2>
         <table class="reg-table">
             <tr><th>選手名</th><td><input type="text" id="reg-name" placeholder="例: マイプレイヤー"></td></tr>
-            <tr><th>年齢</th><td>
+            <tr><th>ポジション</th><td><select id="reg-pos"><option value="PG">PG</option><option value="SG">SG</option><option value="SF">SF</option><option value="PF">PF</option><option value="C">C</option></select></td></tr>
+            <tr><th>年齢選択</th><td>
                 <select id="reg-age">
-                    <option value="18">18歳 (大学での育成前提/初期値低)</option>
-                    <!-- 将来的に22, 23, 24, 25歳を追加予定 -->
+                    <option value="18">18歳 (大学育成ルート向き・初期値低め)</option>
                 </select>
             </td></tr>
-            <tr><th>ポジション</th><td><select id="reg-pos"><option value="PG">PG</option><option value="SG">SG</option><option value="SF">SF</option><option value="PF">PF</option><option value="C">C</option></select></td></tr>
+            <tr><th>プロフィール画像</th><td>
+                <input type="file" id="reg-img" accept="image/*" onchange="handleImageSelect(event)">
+                <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">※自分で好きな画像を選択できます。未選択の場合はポジションごとの絵文字になります。</div>
+            </td></tr>
             <tr><th>アピールポイント</th><td>
                 <select id="reg-appeal">
                     <option value="layup">レイアップ</option><option value="dunk">ダンク</option><option value="middle">ミドル</option><option value="three">3P</option>
@@ -159,10 +163,6 @@
                     <option value="rebound">リバウンド</option><option value="speed">スピード</option><option value="defense">守備</option>
                     <option value="mental">メンタル</option><option value="stamina">スタミナ</option>
                 </select>
-            </td></tr>
-            <tr><th>プロフィール画像</th><td>
-                <input type="file" id="reg-avatar" accept="image/*">
-                <p style="font-size:11px; color:#777; margin:4px 0 0;">※未選択の場合はデフォルトアイコンになります。</p>
             </td></tr>
         </table>
         <button class="submit-btn" onclick="registerPlayer()">ドラフト参入</button>
@@ -238,15 +238,28 @@
         { k: 'rebound', n: 'リバウンド' }, { k: 'defense', n: '守備' }, { k: 'mental', n: 'メンタル' }, { k: 'stamina', n: 'スタミナ' }
     ];
     const SAVE_KEY = "BASKETBALL_LIFE_SAVE";
-    
-    // 絵文字のジジイ廃止 -> デフォルトのシルエット画像(Base64)を使用
-    const DEFAULT_AVATAR = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjQ1IiByPSIyNCIgZmlsbD0iI2I1YjViNSIvPjxwYXRoIGQ9Ik0xNSw5NSBDMTUsNjUgODUsNjUgODUsOTUiIGZpbGw9IiNiNWI1YjUiLz48L3N2Zz4=";
 
     let teams = []; let allPlayers = []; let currentUser = null; 
     let playerIdCounter = 1; let currentRound = 1; let totalRounds = 82;
     let schedule = []; let userAP = 15; let maxAP = 15;
     let gameStartTimeEpoch = 0;
     let previousView = 'home'; 
+    let uploadedAvatarData = null; // 画像データの一次保持用
+
+    // ポジションごとのビジュアル絵文字マッピング
+    const POS_AVATARS = { "PG": "🧙‍♂️", "SG": "🎯", "SF": "⚡", "PF": "⛰️", "C": "🦖" };
+
+    // --- 画像読み込み処理 ---
+    function handleImageSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedAvatarData = e.target.result; // Base64の文字列として一時保存
+            };
+            reader.readAsDataURL(file);
+        }
+    }
 
     // --- セーブ＆ロード ---
     function saveGame() {
@@ -271,7 +284,7 @@
                 });
 
                 currentUser = allPlayers.find(p => p.id === data.currentUserId);
-                if (!currentUser) return false; // データ破損時はfalseを返して初期化へ
+                if (!currentUser) return false;
 
                 playerIdCounter = data.playerIdCounter; 
                 currentRound = data.currentRound;
@@ -291,49 +304,42 @@
         }
     }
 
-    // --- 画像読み込みユーティリティ ---
-    function getBase64Image(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = error => reject(error);
-        });
-    }
-    // --- ランク・UI生成（パワプロ・BBL風） ---
+    // --- ランク・UI生成 ---
     function getRankHtml(val) {
         let p = (val / MAX_STAT) * 100;
-        let r = 'F'; 
-        if(p>=90) r='S'; else if(p>=75) r='A'; else if(p>=60) r='B'; 
-        else if(p>=45) r='C'; else if(p>=30) r='D'; else if(p>=15) r='E';
+        let r = 'F'; if(p>=90) r='S'; else if(p>=75) r='A'; else if(p>=60) r='B'; else if(p>=45) r='C'; else if(p>=30) r='D'; else if(p>=15) r='E';
         return `<span class="rank rank-${r}">${r}</span><span class="ability-value">${val}</span>`;
     }
 
-    // --- 年齢・育成設計に基づいたガチャ初期値 ---
+    // 年齢選択の将来拡張を見据えた初期スタッツ生成ロジック
     function rollStat(isAppeal = false, age = 18) {
-        let min, max;
-        if (isAppeal) {
-            // アピールポイントは年齢に関わらず一定の強さを保証 (C〜D)
-            min = Math.floor(MAX_STAT * 0.35); max = Math.floor(MAX_STAT * 0.55);
-        } else {
-            // 18歳は初期値が低め (伸びしろ重視) 中心はF〜E
-            if (age == 18) {
-                min = Math.floor(MAX_STAT * 0.10); max = Math.floor(MAX_STAT * 0.28);
-            } else {
-                // 将来用：22〜25歳は即戦力として少し高めからスタート
-                min = Math.floor(MAX_STAT * 0.20); max = Math.floor(MAX_STAT * 0.40);
-            }
+        let min = isAppeal ? Math.floor(MAX_STAT*0.45) : Math.floor(MAX_STAT*0.10);
+        let max = isAppeal ? Math.floor(MAX_STAT*0.59) : Math.floor(MAX_STAT*0.29);
+        let base = Math.floor(Math.random() * (max - min + 1)) + min;
+        
+        // 【今後の展望用】年齢による年功序列・即戦力補正の組み込み
+        if(age === 22 || age === 23) {
+            base += Math.floor(Math.random() * 15) + 10; // 大卒即戦力（若干多め）
+        } else if(age === 24 || age === 25) {
+            base += Math.floor(Math.random() * 20) + 20; // 年功序列（高めの初期値だが伸び代小）
         }
-        return Math.floor(Math.random() * (max - min + 1)) + min;
+        // 18歳は基本そんなに高くない（そのまま）が、後の育成で化ける
+        
+        return Math.min(MAX_STAT, base);
     }
 
     function createStats(appealPoint = null, age = 18) {
-        let s = {}; 
-        STAT_KEYS.forEach(sk => { s[sk.k] = rollStat(appealPoint === sk.k, age); }); 
-        return s;
+        let s = {}; STAT_KEYS.forEach(sk => { s[sk.k] = rollStat(appealPoint === sk.k, age); }); return s;
     }
 
-    // --- 初期設定・世界構築 ---
+    function createBoxScore() {
+        return { 
+            g:0, gs:0, min:0, pts:0, ast:0, stl:0, blk:0, to:0, pf:0,
+            fgm:0, fga:0, tpm:0, tpa:0, ftm:0, fta:0, orb:0, drb:0, reb:0,
+            plusMinus: 0
+        };
+    }
+
     function initWorld() {
         teams = []; allPlayers = []; currentRound = 1;
         const teamNames = [
@@ -354,14 +360,24 @@
         ];
 
         for (let i = 1; i <= 30; i++) {
-            let team = { id: i, name: teamNames[i-1], conference: (i<=15)?"East":"West", color: teamColors[i-1], roster: [], w: 0, l: 0 };
+            let team = { 
+                id: i, 
+                name: teamNames[i-1] || `${i}`, 
+                conference: (i<=15)?"East":"West", 
+                color: teamColors[i-1] || `#34495e`, 
+                roster: [], w: 0, l: 0 
+            };
             POSITIONS.forEach((pos) => {
                 for (let j = 1; j <= 3; j++) {
+                    // ボットはシンプルな初期名生成ロジックで統一
+                    let rand = Math.random();
+                    let comAge = rand < 0.5 ? 22 : (rand < 0.8 ? 23 : (rand < 0.9 ? 24 : 25)); // COMは22〜23中心
+                    let comStats = createStats(null, comAge);
+                    STAT_KEYS.forEach(sk => { if(Math.random() > 0.5) comStats[sk.k] += Math.floor(Math.random() * 20); });
                     let p = { 
                         id: playerIdCounter++, teamId: team.id, isUser: false, 
-                        name: `${team.name.substring(0,2)}-${pos}${j}`, pos: pos, 
-                        num: Math.floor(Math.random()*99), stats: createStats(null, 22), 
-                        box: createBoxScore(), gameLog: [], avatar: DEFAULT_AVATAR
+                        name: `${team.name.substring(0,2)}-${pos}${j}`, pos: pos, age: comAge,
+                        avatar: null, num: Math.floor(Math.random()*99), stats: comStats, box: createBoxScore(), gameLog: [] 
                     };
                     team.roster.push(p); allPlayers.push(p);
                 }
@@ -380,44 +396,37 @@
         }
     }
 
-    // --- プレイヤー登録処理（画像と年齢対応） ---
-    async function registerPlayer() {
+    function registerPlayer() {
         let name = document.getElementById('reg-name').value || "マイプレイヤー";
-        let age = parseInt(document.getElementById('reg-age').value);
         let pos = document.getElementById('reg-pos').value;
         let appeal = document.getElementById('reg-appeal').value;
-        let avatarFile = document.getElementById('reg-avatar').files[0];
-        let avatarData = DEFAULT_AVATAR;
-
-        if (avatarFile) {
-            avatarData = await getBase64Image(avatarFile);
-        }
+        let age = parseInt(document.getElementById('reg-age').value) || 18;
 
         currentUser = {
-            id: playerIdCounter++, isUser: true, name: name, age: age, pos: pos, 
-            avatar: avatarData, stats: createStats(appeal, age), 
-            box: createBoxScore(), gameLog: [], teamId: null
+            id: playerIdCounter++, isUser: true, name: name, pos: pos, age: age,
+            avatar: uploadedAvatarData || null, // アップロードされた画像(Base64)を格納
+            expMultiplier: age === 18 ? 1.5 : 1.0, // 18歳から大学育成を経た場合の経験値優遇用フラグ
+            stats: createStats(appeal, age), box: createBoxScore(), gameLog: [], teamId: null
         };
 
-        // ランダムなチームに所属（同ポジションのCOMを削除）
         let targetTeam = teams[Math.floor(Math.random() * 30)];
         currentUser.teamId = targetTeam.id;
         let comIdx = targetTeam.roster.findIndex(p => p.pos === pos);
         currentUser.num = targetTeam.roster[comIdx].num; 
+        
         allPlayers = allPlayers.filter(p => p.id !== targetTeam.roster[comIdx].id);
         targetTeam.roster.splice(comIdx, 1, currentUser);
         allPlayers.push(currentUser);
 
         gameStartTimeEpoch = Date.now();
         saveGame();
+        
+        document.getElementById('reg-view').style.display = 'none';
         setupGameUI();
     }
 
     function setupGameUI() {
-        // 全てのビューを一旦隠し、登録画面を封印
-        ['reg-view', 'home-view','practice-view','standings-view','roster-view','match-view','player-detail-view'].forEach(v => {
-            document.getElementById(v).style.display = 'none';
-        });
+        document.getElementById('reg-view').style.display = 'none'; 
         document.getElementById('server-status-bar').style.display = 'flex';
         renderPracticeGrid();
         goHome();
@@ -425,7 +434,6 @@
         startServerClock();
     }
 
-    // --- オフラインオート進行・時計 ---
     function processOfflineProgress() {
         if(currentRound > totalRounds) return;
         let msPerRound = 10 * 60 * 1000;
@@ -435,12 +443,15 @@
         if(expectedRound > currentRound) {
             let diff = expectedRound - currentRound;
             let simCount = Math.min(diff, totalRounds - currentRound + 1);
-            for(let i=0; i<simCount; i++) {
-                playCurrentRound(false);
-                userAP = Math.min(maxAP, userAP + 3);
+            if(simCount > 0) {
+                for(let i=0; i<simCount; i++) {
+                    playCurrentRound(false);
+                    userAP = Math.min(maxAP, userAP + 3);
+                }
+                saveGame();
+                alert(`オフライン中の時間経過により、${simCount}試合が自動進行しました。`);
+                goHome();
             }
-            saveGame();
-            alert(`オフライン中に ${simCount} 試合が自動進行しました。`);
         }
         updateAP();
     }
@@ -451,16 +462,22 @@
             let m = now.getMinutes(); let s = now.getSeconds();
             let nextM = Math.ceil((m + 1) / 10) * 10;
             if(nextM === m + 1 && s === 0) nextM = m; 
+            
             let remainSec = (nextM * 60) - (m * 60 + s);
             if(remainSec <= 0) remainSec = 600; 
-            document.getElementById('timer-display').innerText = `${Math.floor(remainSec/60)}:${(remainSec%60).toString().padStart(2,'0')}`;
+
+            let rm = Math.floor(remainSec / 60); let rs = remainSec % 60;
+            document.getElementById('timer-display').innerText = `${rm}:${rs.toString().padStart(2,'0')}`;
 
             let msPerRound = 10 * 60 * 1000;
-            let expectedRound = Math.floor((Date.now() - gameStartTimeEpoch) / msPerRound) + 1;
+            let elapsedMs = Date.now() - gameStartTimeEpoch;
+            let expectedRound = Math.floor(elapsedMs / msPerRound) + 1;
+            
             if(expectedRound > currentRound && currentRound <= totalRounds) {
                 playCurrentRound(true);
                 userAP = Math.min(maxAP, userAP + 3);
-                updateAP(); saveGame();
+                updateAP();
+                saveGame();
             }
         }, 1000);
     }
@@ -473,9 +490,11 @@
         }
     }
 
-    // --- 画面遷移制御 ---
+    function goHome() { changeView('home'); }
+    function toggleMenu() { let m = document.getElementById('nav-menu'); m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; }
+    
     function changeView(viewName) {
-        ['reg-view', 'home-view', 'practice-view', 'standings-view', 'roster-view', 'match-view', 'player-detail-view'].forEach(v => {
+        ['reg-view', 'home-view','practice-view','standings-view','roster-view','match-view','player-detail-view'].forEach(v => {
             let el = document.getElementById(v); if(el) el.style.display = 'none';
         });
         ['btn-nav-home','btn-nav-practice','btn-nav-standings'].forEach(id => {
@@ -488,14 +507,16 @@
             document.getElementById('btn-nav-home').classList.add('active');
         } else if(viewName === 'practice') {
             document.getElementById('btn-nav-practice').classList.add('active');
+            updateAP();
         } else if(viewName === 'standings') {
             renderStandings(); 
             document.getElementById('btn-nav-standings').classList.add('active');
         } else if(viewName === 'player-detail') {
-            // 詳細ページは呼び出し元でinnerHTMLをセット済み
+            document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(currentUser);
         }
         
-        document.getElementById(viewName + '-view').style.display = 'block';
+        let targetView = document.getElementById(viewName+'-view');
+        if(targetView) targetView.style.display = 'block';
         document.getElementById('nav-menu').style.display = 'none';
         document.getElementById('round-display').innerText = currentRound <= totalRounds ? currentRound : "終了";
     }
@@ -509,99 +530,156 @@
         let grid = document.getElementById('practice-grid'); grid.innerHTML = "";
         STAT_KEYS.forEach(sk => {
             let btn = document.createElement('button'); btn.className = 'practice-btn';
-            btn.innerHTML = `<div class="practice-name">${sk.n}</div><div>↑ 鍛える</div>`;
+            btn.innerHTML = `<div class="practice-name">${sk.n}</div><div>↑ UP</div>`;
             btn.onclick = () => {
                 if(userAP > 0 && currentUser.stats[sk.k] < MAX_STAT) {
                     userAP--;
                     currentUser.stats[sk.k] += Math.floor(Math.random() * 3) + 1; 
                     if(currentUser.stats[sk.k] > MAX_STAT) currentUser.stats[sk.k] = MAX_STAT;
-                    updateAP(); saveGame(); alert(`${sk.n}が向上した！`);
-                    if(document.getElementById('player-detail-view').style.display === 'block') showPlayerDetail(currentUser.id);
+                    updateAP(); saveGame(); alert(`${sk.n}が成長した！`);
+                    if(document.getElementById('player-detail-view').style.display === 'block'){
+                         document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(currentUser);
+                    }
                 }
             };
             grid.appendChild(btn);
         });
     }
 
-    // --- スタッツ算出・表示ユーティリティ ---
-    function formatMIN(sec) {
-        let m = Math.floor(sec / 60); let s = sec % 60;
-        return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    function generateAbilityGrid(stats) {
+        let h1="", v1="", h2="", v2="";
+        for(let i=0; i<6; i++) {
+            h1 += `<div class="ability-cell"><div class="ability-header">${STAT_KEYS[i].n}</div></div>`;
+            v1 += `<div class="ability-cell">${getRankHtml(stats[STAT_KEYS[i].k])}</div>`;
+        }
+        for(let i=6; i<12; i++) {
+            h2 += `<div class="ability-cell"><div class="ability-header">${STAT_KEYS[i].n}</div></div>`;
+            v2 += `<div class="ability-cell">${getRankHtml(stats[STAT_KEYS[i].k])}</div>`;
+        }
+        return `
+        <div class="ability-grid">
+            <div class="ability-row" style="background:#f5f6fa;">${h1}</div>
+            <div class="ability-row">${v1}</div>
+            <div class="ability-row" style="background:#f5f6fa; border-top:2px solid #2f3640;">${h2}</div>
+            <div class="ability-row">${v2}</div>
+        </div>`;
     }
-    function formatPCT(m, a) { return a > 0 ? ((m / a) * 100).toFixed(1) + "%" : "0.0%"; }
 
+    function formatMIN(sec) {
+        if(!sec) return "00:00";
+        let m = Math.floor(sec / 60); let s = sec % 60;
+        return `${m}:${s.toString().padStart(2,'0')}`;
+    }
+    function formatPCT(m, a) {
+        return a > 0 ? ((m / a) * 100).toFixed(1) + "%" : "0.0%";
+    }
     function calcAdvanced(b) {
-        let div = b.g || 1;
-        let ts = b.pts / (2 * ((b.fga/div) + 0.44 * (b.fta/div)));
-        let eff = ((b.pts/div) + (b.reb/div) + (b.ast/div) + (b.stl/div) + (b.blk/div)) - (((b.fga-b.fgm)/div) + ((b.fta-b.ftm)/div) + (b.to/div));
+        let ts = b.pts / (2 * (b.fga + 0.44 * b.fta));
+        let eff = (b.pts + b.reb + b.ast + b.stl + b.blk) - ((b.fga - b.fgm) + (b.fta - b.ftm) + b.to);
         let usg = ((b.fga + 0.44 * b.fta + b.to) / Math.max(1, (b.min / 5))) * 100;
-        if(b.g > 0) usg = usg / b.g;
+        if(b.g > 0) usg = usg / b.g; 
         return {
             ts: isNaN(ts) || !isFinite(ts) ? "0.0%" : (ts * 100).toFixed(1) + "%",
-            eff: eff.toFixed(1),
+            eff: b.g > 0 ? (eff / b.g).toFixed(1) : eff.toFixed(1),
             usg: isNaN(usg) || !isFinite(usg) ? "0.0%" : Math.min(100, Math.max(0, usg)).toFixed(1) + "%"
         };
     }
 
     function generateTableHeaderHtml() {
-        return `<tr><th>PLAYER</th><th>MIN</th><th>PTS</th><th>FG</th><th>FG%</th><th>3P</th><th>3P%</th><th>FT</th><th>FT%</th><th>ORB</th><th>DRB</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>PF</th><th>+/-</th><th>USG%</th><th>EFF</th></tr>`;
+        return `<tr><th>PLAYER</th><th>MIN</th><th>PTS</th><th>FG</th><th>FG%</th><th>3P</th><th>3P%</th><th>FT</th><th>FT%</th><th>ORB</th><th>DRB</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>PF</th><th>+/-</th><th>USG%</th><th>TS%</th><th>EFF</th></tr>`;
     }
 
     function generatePlayerRowHtml(p, b, isSeasonAvg = false) {
         let div = isSeasonAvg ? (b.g || 1) : 1;
         let adv = calcAdvanced(b);
-        let minText = isSeasonAvg ? formatMIN(Math.floor(b.min/div)) : formatMIN(b.min);
+        let minDisplay = isSeasonAvg ? formatMIN(Math.floor(b.min / div)) : formatMIN(b.min);
+        let fgText = isSeasonAvg ? (b.fgm/div).toFixed(1) + "-" + (b.fga/div).toFixed(1) : `${b.fgm}-${b.fga}`;
+        let tpText = isSeasonAvg ? (b.tpm/div).toFixed(1) + "-" + (b.tpa/div).toFixed(1) : `${b.tpm}-${b.tpa}`;
+        let ftText = isSeasonAvg ? (b.ftm/div).toFixed(1) + "-" + (b.fta/div).toFixed(1) : `${b.ftm}-${b.fta}`;
+
         return `
             <td><span class="clickable-player" onclick="showPlayerDetail(${p.id})">#${p.num} ${p.name}</span></td>
-            <td>${minText}</td>
+            <td>${minDisplay}</td>
             <td><strong>${(b.pts/div).toFixed(isSeasonAvg?1:0)}</strong></td>
-            <td>${(b.fgm/div).toFixed(isSeasonAvg?1:0)}-${(b.fga/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${formatPCT(b.fgm, b.fga)}</td>
-            <td>${(b.tpm/div).toFixed(isSeasonAvg?1:0)}-${(b.tpa/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${formatPCT(b.tpm, b.tpa)}</td>
-            <td>${(b.ftm/div).toFixed(isSeasonAvg?1:0)}-${(b.fta/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${formatPCT(b.ftm, b.fta)}</td>
-            <td>${(b.orb/div).toFixed(isSeasonAvg?1:0)}</td><td>${(b.drb/div).toFixed(isSeasonAvg?1:0)}</td><td><strong>${(b.reb/div).toFixed(isSeasonAvg?1:0)}</strong></td>
-            <td>${(b.ast/div).toFixed(isSeasonAvg?1:0)}</td><td>${(b.stl/div).toFixed(isSeasonAvg?1:0)}</td><td>${(b.blk/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${(b.to/div).toFixed(isSeasonAvg?1:0)}</td><td>${(b.pf/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${fgText}</td><td>${formatPCT(b.fgm, b.fga)}</td>
+            <td>${tpText}</td><td>${formatPCT(b.tpm, b.tpa)}</td>
+            <td>${ftText}</td><td>${formatPCT(b.ftm, b.fta)}</td>
+            <td>${(b.orb/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${(b.drb/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td><strong>${(b.reb/div).toFixed(isSeasonAvg?1:0)}</strong></td>
+            <td>${(b.ast/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${(b.stl/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${(b.blk/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${(b.to/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${(b.pf/div).toFixed(isSeasonAvg?1:0)}</td>
             <td style="color:${b.plusMinus>=0?'#2ecc71':'#e74c3c'}; font-weight:bold;">${b.plusMinus > 0 ? '+' : ''}${(b.plusMinus/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${adv.usg}</td><td>${adv.eff}</td>
+            <td>${adv.usg}</td><td>${adv.ts}</td><td>${adv.eff}</td>
         `;
     }
 
+    // 基本プロフ表示（画像アバターおよび年齢対応・文字色バグを完全修正）
     function generateBasicProfile(p) {
-        let t = teams.find(x => x.id === p.teamId);
+        let t = teams.find(x => x.id === p.teamId); let b = p.box;
+        let avatarHtml = p.avatar 
+            ? `<img src="${p.avatar}" style="width:100%; height:100%; object-fit:cover;">` 
+            : (POS_AVATARS[p.pos] || "🏀");
+        
+        let ageBonusText = p.age === 18 ? `<div style="font-size:11px; color:#f1c40f; margin-top:3px; font-weight:bold;">✨ 18歳始動ボーナス：将来の獲得経験値1.5倍適用予定</div>` : '';
+
         return `
         <div class="player-banner" style="background: linear-gradient(135deg, ${t.color}, #2f3640);">
-            <div class="banner-avatar"><img src="${p.avatar || DEFAULT_AVATAR}"></div>
+            <div class="banner-avatar">${avatarHtml}</div>
             <div class="banner-info">
                 <div class="team-name" onclick="showRoster(${t.id})">${t.name}</div>
-                <div class="player-detail clickable-player" onclick="showPlayerDetail(${p.id})">#${p.num} ${p.pos} | ${p.name}</div>
+                <div class="player-detail">
+                    <span class="clickable-player" onclick="showPlayerDetail(${p.id})">#${p.num} ${p.pos} | ${p.name}</span>
+                    <span style="font-size:15px; margin-left:10px; background:rgba(0,0,0,0.4); padding:2px 8px; border-radius:4px; vertical-align:middle;">${p.age}歳</span>
+                </div>
+                ${ageBonusText}
             </div>
         </div>
-        <div class="stats-wrapper"><table class="stats-table">${generateTableHeaderHtml()}<tr>${generatePlayerRowHtml(p, p.box, true)}</tr></table></div>`;
+        <div class="stats-wrapper">
+            <table class="stats-table">
+                ${generateTableHeaderHtml()}
+                <tr>${generatePlayerRowHtml(p, b, true)}</tr>
+            </table>
+        </div>`;
     }
 
+    // 詳細表示（文字色バグ完全修正）
     function generateDetailProfile(p) {
-        let t = teams.find(x => x.id === p.teamId);
+        let t = teams.find(x => x.id === p.teamId); let b = p.box;
+        let avatarHtml = p.avatar 
+            ? `<img src="${p.avatar}" style="width:100%; height:100%; object-fit:cover;">` 
+            : (POS_AVATARS[p.pos] || "🏀");
+
         return `
         <div class="player-banner" style="background: linear-gradient(135deg, ${t.color}, #2f3640);">
-            <div class="banner-avatar"><img src="${p.avatar || DEFAULT_AVATAR}"></div>
+            <div class="banner-avatar">${avatarHtml}</div>
             <div class="banner-info">
                 <div class="team-name" onclick="showRoster(${t.id})">${t.name}</div>
-                <div class="player-detail">#${p.num} ${p.pos} | ${p.name}</div>
+                <div class="player-detail">
+                    #${p.num} ${p.pos} | ${p.name}
+                    <span style="font-size:15px; margin-left:10px; background:rgba(0,0,0,0.4); padding:2px 8px; border-radius:4px; vertical-align:middle;">${p.age}歳</span>
+                </div>
             </div>
         </div>
         ${generateAbilityGrid(p.stats)}
-        <h3 style="margin-top:20px; font-size:16px; border-left:5px solid #ff6600; padding-left:10px;">通算アベレージ</h3>
-        <div class="stats-wrapper"><table class="stats-table">${generateTableHeaderHtml()}<tr>${generatePlayerRowHtml(p, p.box, true)}</tr></table></div>`;
+        <h3 style="margin-top:20px; font-size:16px; border-left:5px solid #ff6600; padding-left:10px;">通算アベレージスタッツ</h3>
+        <div class="stats-wrapper">
+            <table class="stats-table">
+                ${generateTableHeaderHtml()}
+                <tr>${generatePlayerRowHtml(p, b, true)}</tr>
+            </table>
+        </div>`;
     }
 
     function renderGameHistory() {
         let list = document.getElementById('game-history-list'); list.innerHTML = "";
-        if(currentUser.gameLog.length === 0) { list.innerHTML = "<p style='padding:10px;'>データがありません</p>"; return; }
+        if(currentUser.gameLog.length === 0) { list.innerHTML = "<p style='padding:10px;'>試合データがありません</p>"; return; }
         currentUser.gameLog.slice().reverse().forEach(log => {
-            list.innerHTML += `<div class="history-item">
+            list.innerHTML += `
+            <div class="history-item">
                 <div><strong>第${log.round}節</strong> vs <span class="clickable-team" onclick="showRosterByName('${log.oppName}')">${log.oppName}</span></div>
                 <div style="font-weight:bold; color:${log.result==='WIN'?'#2ecc71':'#e74c3c'}">${log.result} ${log.teamScore} - ${log.oppScore}</div>
                 <div style="color:#555;">${log.pts}点 ${log.reb}REB ${log.ast}AST</div>
@@ -612,19 +690,26 @@
     function showPlayerDetail(id) {
         let p = allPlayers.find(x => x.id === id);
         if(!p) return;
+        
         let currentActiveView = 'home';
-        ['home','practice','standings','roster','match'].forEach(v => { if(document.getElementById(v+'-view').style.display === 'block') currentActiveView = v; });
+        ['home','practice','standings','roster','match'].forEach(v => {
+            if(document.getElementById(v+'-view').style.display === 'block') currentActiveView = v;
+        });
         if(currentActiveView !== 'player-detail') previousView = currentActiveView;
-        document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(p);
+
         changeView('player-detail');
+        document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(p);
     }
 
-    function goBackFromDetail() { changeView(previousView); }
+    function goBackFromDetail() {
+        changeView(previousView);
+    }
+
     function renderStandings() {
         const makeTable = (tId, conf) => {
             let tbl = document.getElementById(tId);
             tbl.innerHTML = `<tr><th>順位</th><th>チーム</th><th>勝</th><th>敗</th><th>勝率</th></tr>`;
-            teams.filter(t => t.conference === conf).sort((a,b) => b.w - a.w || a.id - b.id).forEach((t, i) => {
+            teams.filter(t => t.conference === conf).sort((a,b) => b.w - a.w || (a.id - b.id)).forEach((t, i) => {
                 let wp = (t.w+t.l)>0 ? (t.w/(t.w+t.l)).toFixed(3) : ".000";
                 tbl.innerHTML += `<tr><td><strong>${i+1}</strong></td><td class="clickable-team" onclick="showRoster(${t.id})">${t.name}</td><td><strong>${t.w}</strong></td><td>${t.l}</td><td>${wp}</td></tr>`;
             });
@@ -634,172 +719,367 @@
 
     function showRoster(teamId) {
         let t = teams.find(x => x.id === teamId);
+        if(!t) return;
         document.getElementById('roster-team-name').innerText = `${t.name} ロスター`;
         let tbl = document.getElementById('roster-table');
-        tbl.innerHTML = `<tr><th>Pos</th><th>名前</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>EFF</th></tr>`;
-        POSITIONS.forEach(pos => {
-            t.roster.filter(p=>p.pos===pos).forEach(p => {
-                let b = p.box; let div = b.g || 1;
-                let tr = document.createElement('tr');
-                if(p.id === currentUser.id) tr.style.background = "#fff0f0";
-                tr.innerHTML = `<td>${POS_AVATARS[p.pos]} ${p.pos}</td><td><span class="clickable-player" onclick="showPlayerDetail(${p.id})">#${p.num} ${p.name}</span></td><td>${formatMIN(Math.floor(b.min/div))}</td><td><strong>${(b.pts/div).toFixed(1)}</strong></td><td>${(b.reb/div).toFixed(1)}</td><td>${(b.ast/div).toFixed(1)}</td><td>${calcAdvanced(b).eff}</td>`;
-                tbl.appendChild(tr);
-            });
+        tbl.innerHTML = `<tr><th>Pos</th><th>名前</th><th>年齢</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>EFF</th></tr>`;
+        
+        let sorted = []; POSITIONS.forEach(pos => { sorted.push(...t.roster.filter(p=>p.pos===pos)); });
+        sorted.forEach(p => {
+            let b = p.box; let div = b.g || 1;
+            let adv = calcAdvanced(b);
+            let tr = document.createElement('tr');
+            if(p.id === currentUser.id) tr.style.background = "#fff0f0";
+            tr.innerHTML = `<td>${POS_AVATARS[p.pos]} ${p.pos}</td><td><span class="clickable-player" onclick="showPlayerDetail(${p.id})">#${p.num} ${p.name}</span></td><td>${p.age}歳</td><td>${formatMIN(Math.floor(b.min/div))}</td><td><strong>${(b.pts/div).toFixed(1)}</strong></td><td>${(b.reb/div).toFixed(1)}</td><td>${(b.ast/div).toFixed(1)}</td><td>${(b.stl/div).toFixed(1)}</td><td>${(b.blk/div).toFixed(1)}</td><td>${adv.eff}</td>`;
+            tbl.appendChild(tr);
         });
         changeView('roster');
     }
 
-    function showRosterByName(name) { let t = teams.find(x => x.name === name); if(t) showRoster(t.id); }
+    function showRosterByName(name) {
+        let t = teams.find(x => x.name === name);
+        if(t) showRoster(t.id);
+    }
 
-    // --- 試合エンジン: AI監督・ハイスコア・脳汁実況・48分完全計算 ---
+    // --- コアエンジン: AI監督＆ハイスコア＆脳汁実況型シミュレーター (完全維持) ---
     function playCurrentRound(showMatchView = true) {
         let roundMatches = schedule[currentRound - 1];
         let userMatch = null;
+
         roundMatches.forEach(m => {
             let hTeam = teams.find(t=>t.id===m.home); let aTeam = teams.find(t=>t.id===m.away);
-            if(m.home === currentUser.teamId || m.away === currentUser.teamId) {
-                userMatch = { hTeam, aTeam }; simulateGame(hTeam, aTeam, true);
-            } else { simulateGame(hTeam, aTeam, false); }
+            let isUserGame = (m.home === currentUser.teamId || m.away === currentUser.teamId);
+            if(isUserGame) { 
+                userMatch = { hTeam, aTeam }; 
+                simulateGame(hTeam, aTeam, true); 
+            } else { 
+                simulateGame(hTeam, aTeam, false); 
+            }
         });
+
         if(userMatch && showMatchView) changeView('match');
         currentRound++;
+        document.getElementById('round-display').innerText = currentRound <= totalRounds ? currentRound : "終了";
     }
 
     function simulateGame(hTeam, aTeam, isVisual) {
-        let logs = []; let score = { home: 0, away: 0 };
-        let qScores = { home: [0,0,0,0], away: [0,0,0,0] };
-
+        let logs = []; 
+        let score = { home: 0, away: 0 };
+        let qScores = { home: [0,0,0,0], away: [0,0,0,0] }; 
+        
         const evalPlayer = (p) => {
-            let s = p.stats; let c = (p._cond || 1.0);
-            if(p.pos==="PG") return (s.pass*1.5 + s.dribble*1.5 + s.speed) * c;
-            if(p.pos==="SG") return (s.three*1.5 + s.middle*1.5 + s.speed) * c;
-            if(p.pos==="SF") return (s.layup + s.middle + s.defense + s.physical) * c;
-            if(p.pos==="PF") return (s.rebound*1.5 + s.physical*1.5 + s.layup) * c;
-            if(p.pos==="C")  return (s.rebound*1.5 + s.defense*1.5 + s.physical + s.layup) * c;
+            let s = p.stats;
+            let condBonus = (p._condition || 1.0); 
+            if(p.pos==="PG") return (s.pass*1.5 + s.dribble*1.5 + s.speed) * condBonus;
+            if(p.pos==="SG") return (s.three*1.5 + s.middle*1.5 + s.speed) * condBonus;
+            if(p.pos==="SF") return (s.layup + s.middle + s.defense + s.physical) * condBonus;
+            if(p.pos==="PF") return (s.rebound*1.5 + s.physical*1.5 + s.dunk) * condBonus;
+            if(p.pos==="C")  return (s.rebound*1.5 + s.defense*1.5 + s.physical + s.dunk) * condBonus;
             return 0;
         };
 
-        allPlayers.forEach(p => { p._cond = 0.9 + Math.random()*0.2; p._stam = 100; p._box = createBoxScore(); });
+        allPlayers.forEach(p => { p._condition = 0.9 + Math.random() * 0.2; });
 
-        const setupTeam = (t) => {
+        const setupTeamState = (team) => {
             let court = []; let bench = [];
             POSITIONS.forEach(pos => {
-                let sorted = t.roster.filter(p=>p.pos===pos).sort((a,b)=>evalPlayer(b)-evalPlayer(a));
-                court.push(sorted[0]); sorted[0]._box.gs = 1;
-                bench.push(...sorted.slice(1));
+                let sorted = team.roster.filter(p=>p.pos===pos).sort((a,b) => evalPlayer(b) - evalPlayer(a));
+                court.push(sorted[0]); 
+                bench.push(...sorted.slice(1)); 
+                sorted[0]._box = createBoxScore(); sorted[0]._box.gs = 1; sorted[0]._stamina = 100;
+                sorted.slice(1).forEach(bp => { bp._box = createBoxScore(); bp._stamina = 100; });
             });
-            return { team:t, court, bench };
+            return { team, court, bench };
         };
 
-        let hD = setupTeam(hTeam); let aD = setupTeam(aTeam);
-        const writeLog = (time, tName, html) => {
+        let hData = setupTeamState(hTeam); let aData = setupTeamState(aTeam);
+        
+        const formatClock = (sec) => {
+            let m = Math.floor(sec/60); let s = sec%60;
+            return `残り${m}:${s.toString().padStart(2,'0')}`;
+        };
+        const getNames = (arr) => arr.map(p=>`#${p.num} ${p.name}`).join(", ");
+        
+        const writeLog = (timeSec, teamName, html) => {
             if(!isVisual) return;
-            logs.push(`<div class="log-entry"><span class="log-time">残り${Math.floor(time/60)}:${(time%60).toString().padStart(2,'0')}</span><span class="log-team">${tName}</span><span class="log-action">${html}</span></div>`);
+            logs.push(`<div class="log-entry"><span class="log-time">${formatClock(timeSec)}</span><span class="log-team">${teamName}</span><span class="log-action">${html}</span></div>`);
+        };
+
+        const checkSubstitution = (teamData, clockSec, isHomeTeam) => {
+            let tName = teamData.team.name;
+            teamData.court.forEach((p, idx) => {
+                let stamLoss = 3 - (p.stats.stamina / 150) * 1.5;
+                p._stamina = Math.max(0, p._stamina - (stamLoss * 0.08));
+
+                if(p._stamina < 65) {
+                    let subCandidates = teamData.bench.filter(bp => bp.pos === p.pos && bp._stamina > 75);
+                    if(subCandidates.length > 0) {
+                        subCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
+                        let subIn = subCandidates[0];
+                        
+                        teamData.court[idx] = subIn;
+                        teamData.bench = teamData.bench.filter(bp => bp.id !== subIn.id);
+                        teamData.bench.push(p);
+                        
+                        writeLog(clockSec, tName, `<span class="log-sub">[メンバーチェンジ] #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN (${p.pos}交代)</span>`);
+                    } else {
+                        let fallbackCandidates = teamData.bench.filter(bp => bp._stamina > 70);
+                        if(fallbackCandidates.length > 0) {
+                            fallbackCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
+                            let subIn = fallbackCandidates[0];
+                            teamData.court[idx] = subIn;
+                            teamData.bench = teamData.bench.filter(bp => bp.id !== subIn.id);
+                            teamData.bench.push(p);
+                            writeLog(clockSec, tName, `<span class="log-sub">[メンバーチェンジ] ロールプレイヤー起用！ #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN (3ガード等の変則編成)</span>`);
+                        }
+                    }
+                }
+            });
+            teamData.bench.forEach(bp => { bp._stamina = Math.min(100, bp._stamina + 2.5); });
         };
 
         let isHomeOffense = Math.random() > 0.5;
-        let curQ = 1; let maxQ = 4; let isOT = false;
+        let currentQ = 1;
+        let maxQ = 4;
+        let isOverTime = false;
 
-        while(curQ <= maxQ) {
-            let clock = isOT ? 300 : 720;
-            if(isVisual) logs.push(`<div class="log-entry"><span class="log-highlight">🏀 ${isOT?'延長戦':'第'+curQ+'Q'} 開始 🏀</span></div>`);
+        while (currentQ <= maxQ) {
+            let clock = (isOverTime) ? 300 : 720; 
+            let qName = isOverTime ? `延長第${currentQ - 4}Q(OT)` : `第${currentQ}Q`;
             
+            if(isVisual) {
+                logs.push(`<div class="log-entry"><span class="log-time">残り--:--</span><span class="log-highlight">🏀 ${qName} 開始 🏀</span></div>`);
+                if(currentQ === 1) {
+                    writeLog(clock, hTeam.name, `【スターティング5】 ${getNames(hData.court)}`);
+                    writeLog(clock, aTeam.name, `【スターティング5】 ${getNames(aData.court)}`);
+                    writeLog(clock, "両チーム", `ティップオフ！試合開始！`);
+                }
+            }
+
             while(clock > 0) {
-                let timeSpent = Math.floor(Math.random()*12) + 8;
-                if(clock - timeSpent < 0) timeSpent = clock;
+                let timeSpent = Math.floor(Math.random()*12) + 8; 
+                if (clock - timeSpent < 0) timeSpent = clock;
                 clock -= timeSpent;
 
-                let offD = isHomeOffense ? hD : aD; let defD = isHomeOffense ? aD : hD;
-                offD.court.forEach(p => { p._box.min += timeSpent; p._stam -= (0.25 - (p.stats.stamina/1000)); });
-                defD.court.forEach(p => { p._box.min += timeSpent; p._stam -= (0.25 - (p.stats.stamina/1000)); });
-                offD.bench.forEach(p => p._stam = Math.min(100, p._stam + 0.6));
-                defD.bench.forEach(p => p._stam = Math.min(100, p._stam + 0.6));
+                let offData = isHomeOffense ? hData : aData;
+                let defData = isHomeOffense ? aData : hData;
+                let isHome = isHomeOffense;
 
-                // AI監督交代
-                [offD, defD].forEach(td => {
-                    td.court.forEach((p, i) => {
-                        if(p._stam < 60) {
-                            let sub = td.bench.find(b => b.pos === p.pos && b._stam > 85);
-                            if(sub) {
-                                td.court[i] = sub; td.bench = td.bench.filter(x=>x.id!==sub.id); td.bench.push(p);
-                                if(isVisual) writeLog(clock, td.team.name, `<span class="log-sub">#${p.num} ${p.name} OUT ⇄ #${sub.num} ${sub.name} IN</span>`);
-                            }
-                        }
-                    });
-                });
+                offData.court.forEach(p => p._box.min += timeSpent);
+                defData.court.forEach(p => p._box.min += timeSpent);
 
-                let evals = offD.court.map(p => evalPlayer(p));
-                let totalEv = evals.reduce((a,b)=>a+b, 0);
-                let r = Math.random(); let cum = 0; let shooter = offD.court[4];
-                for(let i=0; i<5; i++) { cum += evals[i]/totalEv; if(r<cum){ shooter=offD.court[i]; break; } }
-                let defender = defD.court[Math.floor(Math.random()*5)];
-
-                // ターンオーバー判定
-                if(Math.random() < 0.12 - (shooter.stats.dribble/1500)) {
-                    shooter._box.to++; isHomeOffense = !isHomeOffense; continue;
+                if(Math.random() < 0.15) {
+                    checkSubstitution(hData, clock, true);
+                    checkSubstitution(aData, clock, false);
                 }
 
-                // シュート判定（ハイスコア仕様）
-                let shotType = Math.random() < 0.45 ? "layup" : (Math.random()<0.4?"three":"middle");
-                let base = shotType==="layup"?0.50:(shotType==="three"?0.30:0.40);
-                let rate = base + ((shooter.stats[shotType]-30)/400) - (defender.stats.defense*0.05/150);
-                
-                shooter._box.fga++; if(shotType==="three") shooter._box.tpa++;
-                if(Math.random() < Math.max(0.20, rate)) {
-                    shooter._box.fgm++; let pts = shotType==="three"?3:2;
-                    shooter._box.pts += pts; if(shotType==="three") shooter._box.tpm++;
-                    if(isHomeOffense) { score.home += pts; qScores.home[Math.min(3, curQ-1)] += pts; }
-                    else { score.away += pts; qScores.away[Math.min(3, curQ-1)] += pts; }
-                    offD.court.forEach(p => p._box.plusMinus += pts); defD.court.forEach(p => p._box.plusMinus -= pts);
-                    
-                    let playText = shotType==="three" ? `${shooter.name}のディープスリー！決まった！！！` : `${shooter.name}がリングへアタック！決まった！`;
-                    writeLog(clock, offD.team.name, `${playText} [${hTeam.name.substring(0,2)} ${score.home}-${score.away} ${aTeam.name.substring(0,2)}]`);
-                    isHomeOffense = !isHomeOffense;
-                } else {
-                    // リバウンド（ORB 28%）
-                    if(Math.random() < 0.28) {
-                        let rb = offD.court.sort((a,b)=>b.stats.rebound-a.stats.rebound)[0];
-                        rb._box.orb++; rb._box.reb++; writeLog(clock, offD.team.name, `${rb.name}がオフェンスリバウンド！`);
+                let courtEvals = offData.court.map(p => Math.max(1, evalPlayer(p)));
+                let totalEval = courtEvals.reduce((a,b)=>a+b, 0);
+                let r = Math.random(); let cum = 0; let shooter = offData.court[4];
+                for(let i=0; i<5; i++) {
+                    cum += (courtEvals[i] / totalEval);
+                    if(r < cum) { shooter = offData.court[i]; break; }
+                }
+
+                let defender = defData.court[Math.floor(Math.random()*5)];
+                let defensePressure = (defender.stats.defense * 0.35) / 150; 
+
+                let toRisk = 0.18 - ((shooter.stats.dribble + shooter.stats.pass) / 400);
+                if(Math.random() < Math.max(0.04, toRisk)) {
+                    shooter._box.to++;
+                    if(Math.random() < (defender.stats.speed / 200)) {
+                        defender._box.stl++;
+                        writeLog(clock, offData.team.name, `${shooter.name}がトップで仕掛けるも、${defender.name}が電光石火のスティール！ボールを強奪！`);
                     } else {
-                        let rb = defD.court.sort((a,b)=>b.stats.rebound-a.stats.rebound)[0];
-                        rb._box.drb++; rb._box.reb++; isHomeOffense = !isHomeOffense;
+                        writeLog(clock, offData.team.name, `${shooter.name}からインサイドへのパスが乱れ、そのままアウトオブバウンズ。ターンオーバー。`);
+                    }
+                    isHomeOffense = !isHomeOffense; continue;
+                }
+
+                let foulRisk = 0.06 + (defender.stats.physical / 1000);
+                if(Math.random() < Math.min(0.12, foulRisk)) {
+                    defender._box.pf++;
+                    let ftCount = (Math.random() < 0.25) ? 3 : 2; 
+                    writeLog(clock, defData.team.name, `${defender.name}がシュートモーション中の${shooter.name}に対してファウル！FT獲得！`);
+                    
+                    let ftMade = 0;
+                    shooter._box.fta += ftCount;
+                    for(let f=1; f<=ftCount; f++) {
+                        let ftRate = 0.60 + ((shooter.stats.middle - 30) / 120) * 0.25;
+                        if(Math.random() < Math.max(0.40, ftRate)) {
+                            ftMade++; shooter._box.ftm++; shooter._box.pts++;
+                            if(isHome) { score.home++; qScores.home[Math.min(3, currentQ-1)]++; } 
+                            else { score.away++; qScores.away[Math.min(3, currentQ-1)]++; }
+                            writeLog(clock, shooter.name, `フリースロー ${f}本目：成功！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`);
+                        } else {
+                            writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`);
+                        }
+                    }
+                    offData.court.forEach(p => p._box.plusMinus += ftMade);
+                    defData.court.forEach(p => p._box.plusMinus -= ftMade);
+                    isHomeOffense = !isHomeOffense; continue; 
+                }
+
+                let shotType = "layup"; 
+                let randShot = Math.random();
+                if(shooter.pos === "C" || shooter.pos === "PF") {
+                    shotType = (randShot < 0.4) ? "dunk" : "layup";
+                } else {
+                    if(randShot < 0.45) { shotType = "layup"; } 
+                    else if(randShot < 0.75) { shotType = "three"; } 
+                    else { shotType = "middle"; }
+                }
+
+                let baseRate = 0.40; let statUsed = shooter.stats.middle;
+                if(shotType === "layup") { baseRate = 0.50; statUsed = shooter.stats.layup; }
+                else if(shotType === "dunk") { baseRate = 0.65; statUsed = shooter.stats.dunk; }
+                else if(shotType === "middle") { baseRate = 0.40; statUsed = shooter.stats.middle; }
+                else if(shotType === "three") { baseRate = 0.30; statUsed = shooter.stats.three; }
+
+                let abilityBonus = ((statUsed - 30) / 120) * 0.30;
+                let successRate = baseRate + abilityBonus - defensePressure;
+
+                if(!isOverTime && currentQ === 4 && clock < 180 && Math.abs(score.home - score.away) <= 5) {
+                    successRate += (shooter.stats.mental / 150) * 0.12;
+                }
+
+                shooter._box.fga++;
+                if(shotType === "three") shooter._box.tpa++;
+
+                let blockChance = (defender.stats.defense / 150) * 0.08;
+                if(shotType === "dunk") blockChance -= 0.04;
+                
+                if(Math.random() < Math.max(0.01, blockChance)) {
+                    defender._box.blk++;
+                    writeLog(clock, defData.team.name, `${shooter.name}のシュートを${defender.name}が叩き落とすブロック！！！`);
+                    isHomeOffense = !isHomeOffense;
+                }
+                else if(Math.random() < Math.max(0.15, successRate)) {
+                    shooter._box.fgm++;
+                    let pts = (shotType === "three") ? 3 : 2;
+                    shooter._box.pts += pts;
+                    if(shotType === "three") shooter._box.tpm++;
+                    
+                    if(isHome) { score.home += pts; qScores.home[Math.min(3, currentQ-1)] += pts; } 
+                    else { score.away += pts; qScores.away[Math.min(3, currentQ-1)] += pts; }
+
+                    offData.court.forEach(p => p._box.plusMinus += pts);
+                    defData.court.forEach(p => p._box.plusMinus -= pts);
+
+                    let playText = "";
+                    if(shotType === "three") {
+                        playText = Math.random() > 0.5 
+                            ? `${shooter.name}のディープスリーが決まった！！！`
+                            : `${shooter.name}がキャッチ＆シュートで放つ3ポイント！ネットを揺らす！！！`;
+                    } else if(shotType === "dunk") {
+                        playText = `${shooter.name}がドライブから豪快なポスタライズダンクを決めたーーーっ！！！`;
+                    } else if(shotType === "layup") {
+                        playText = `${shooter.name}が鋭く抜き去り、ダブルクラッチで華麗にレイアップを沈めた！`;
+                    } else {
+                        playText = `${shooter.name}がステップバックジャンプシュートを綺麗に射抜いた！`;
+                    }
+
+                    let passer = offData.court[Math.floor(Math.random()*5)];
+                    if(passer.id !== shooter.id && Math.random() < (passer.stats.pass / 150) * 0.65) {
+                        passer._box.ast++;
+                        writeLog(clock, offData.team.name, `<span class="log-assist">#${passer.num} ${passer.name}のパス ➔ ${playText} [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]</span>`);
+                    } else {
+                        writeLog(clock, offData.team.name, `${playText} [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`);
+                    }
+                    isHomeOffense = !isHomeOffense;
+                } 
+                else {
+                    writeLog(clock, offData.team.name, `${shooter.name}のシュートはリングに弾かれる！`);
+                    let offReber = offData.court[Math.floor(Math.random()*5)];
+                    let defReber = defData.court[Math.floor(Math.random()*5)];
+                    
+                    if(Math.random() < 0.28) { // 28%の高確率オフェンスリバウンド
+                        offReber._box.orb++; offReber._box.reb++;
+                        writeLog(clock, offData.team.name, `${offReber.name}が執念でオフェンスリバウンドをもぎ取りセカンドチャンス！`);
+                        isHomeOffense = isHomeOffense; 
+                    } else {
+                        defReber._box.drb++; defReber._box.reb++;
+                        writeLog(clock, defData.team.name, `${defReber.name}がディフェンスリバウンドを回収。`);
+                        isHomeOffense = !isHomeOffense; 
                     }
                 }
             }
-            if(curQ === maxQ && score.home === score.away) { curQ++; maxQ++; isOT = true; qScores.home.push(0); qScores.away.push(0); }
-            else curQ++;
+
+            if (currentQ === maxQ) {
+                if (score.home === score.away) {
+                    currentQ++; maxQ++; isOverTime = true;
+                    if(isVisual) {
+                        logs.push(`<div class="log-entry"><span class="log-time">試合終了直後</span><span class="log-highlight">🚨 同点！【${score.home} - ${score.away}】5分間の延長戦(OT)へ突入！！！🚨</span></div>`);
+                    }
+                    qScores.home.push(0); qScores.away.push(0);
+                } else { break; }
+            } else { currentQ++; }
         }
 
         if(score.home > score.away) { hTeam.w++; aTeam.l++; } else { aTeam.w++; hTeam.l++; }
-        [hD, aD].forEach((d, isH) => {
-            d.team.roster.forEach(p => {
-                let gb = p._box; p.box.g++; if(gb.gs) p.box.gs++;
+
+        const commitToGlobalStats = (teamState, isH) => {
+            [...teamState.team.roster].forEach(p => {
+                let gb = p._box; if(!gb) return;
+                p.box.g++; if(gb.gs) p.box.gs++;
                 Object.keys(gb).forEach(k => { if(k!=='g'&&k!=='gs') p.box[k] += gb[k]; });
-                p.gameLog.push({ round: currentRound, oppName: isH?aTeam.name:hTeam.name, result: (isH?score.home>score.away:score.away>score.home)?"WIN":"LOSE", teamScore: isH?score.home:score.away, oppScore: isH?score.away:score.home, pts: gb.pts, reb: gb.reb, ast: gb.ast });
+                p.gameLog.push({
+                    round: currentRound, oppName: isH ? aTeam.name : hTeam.name,
+                    result: (isH && score.home > score.away) || (!isH && score.away > score.home) ? "WIN" : "LOSE",
+                    teamScore: isH ? score.home : score.away, oppScore: isH ? score.away : score.home,
+                    pts: gb.pts||0, reb: gb.reb||0, ast: gb.ast||0
+                });
             });
-        });
+        };
+        commitToGlobalStats(hData, true); commitToGlobalStats(aData, false);
 
         if(isVisual) {
             document.getElementById('match-score').innerText = `${score.home} - ${score.away}`;
-            document.getElementById('match-team1').innerText = hTeam.name; document.getElementById('match-team2').innerText = aTeam.name;
-            let sbHtml = `<tr><th>TEAM</th>${qScores.home.map((_,i)=>`<th>${i<4?i+1+'Q':'OT'}</th>`).join('')}<th>TOT</th></tr>`;
-            sbHtml += `<tr><td>${hTeam.name}</td>${qScores.home.map(s=>`<td>${s}</td>`).join('')}<td>${score.home}</td></tr>`;
-            sbHtml += `<tr><td>${aTeam.name}</td>${qScores.away.map(s=>`<td>${s}</td>`).join('')}<td>${score.away}</td></tr>`;
+            document.getElementById('match-team1').innerText = hTeam.name;
+            document.getElementById('match-team2').innerText = aTeam.name;
+            
+            let sbHtml = `<tr><th>TEAM</th>`;
+            for(let i=0; i<qScores.home.length; i++) sbHtml += `<th>${i<4 ? (i+1)+'Q' : 'OT'+(i-3)}</th>`;
+            sbHtml += `<th>TOT</th></tr>`;
+            
+            sbHtml += `<tr><td class="clickable-team" onclick="showRoster(${hTeam.id})">${hTeam.name}</td>`;
+            qScores.home.forEach(qs => sbHtml += `<td>${qs}</td>`);
+            sbHtml += `<td style="color:#e74c3c; font-weight:bold;">${score.home}</td></tr>`;
+            
+            sbHtml += `<tr><td class="clickable-team" onclick="showRoster(${aTeam.id})">${aTeam.name}</td>`;
+            qScores.away.forEach(qs => sbHtml += `<td>${qs}</td>`);
+            sbHtml += `<td style="color:#e74c3c; font-weight:bold;">${score.away}</td></tr>`;
             document.getElementById('match-scoreboard').innerHTML = sbHtml;
+
+            // 時系列（正順）のままログを出力
             document.getElementById('match-log').innerHTML = logs.join('');
-            const fillBox = (id, ros) => {
-                let t = document.getElementById(id); t.innerHTML = generateTableHeaderHtml();
-                ros.sort((a,b)=>b._box.pts-a._box.pts).forEach(p => t.innerHTML += `<tr>${generatePlayerRowHtml(p, p._box, false)}</tr>`);
+
+            document.getElementById('boxscore-title-home').innerText = `🏠 ${hTeam.name} 個人スタッツ`;
+            document.getElementById('boxscore-title-away').innerText = `🚀 ${aTeam.name} 個人スタッツ`;
+
+            const fillBoxScoreTable = (targetTableId, roster) => {
+                let t = document.getElementById(targetTableId);
+                t.innerHTML = generateTableHeaderHtml();
+                roster.sort((a,b) => b._box.pts - a._box.pts).forEach(p => {
+                    t.innerHTML += `<tr>${generatePlayerRowHtml(p, p._box, false)}</tr>`;
+                });
             };
-            fillBox('match-box-home', hTeam.roster); fillBox('match-box-away', aTeam.roster);
+            fillBoxScoreTable('match-box-home', hTeam.roster);
+            fillBoxScoreTable('match-box-away', aTeam.roster);
         }
     }
 
     window.onload = function() {
-        if(loadGame()) { setupGameUI(); } 
-        else { initWorld(); document.getElementById('reg-view').style.display = 'block'; }
+        if(loadGame()) {
+            setupGameUI();
+        } else {
+            initWorld();
+            document.getElementById('reg-view').style.display = 'block';
+            ['home-view','practice-view','standings-view','roster-view','match-view','player-detail-view'].forEach(v => {
+                let el = document.getElementById(v); if(el) el.style.display = 'none';
+            });
+        }
     };
 </script>
 </body>
 </html>
-
