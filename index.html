@@ -511,30 +511,32 @@
     }
 
     function startServerClock() {
-        setInterval(() => {
-            let now = new Date();
-            let m = now.getMinutes(); let s = now.getSeconds();
-            let nextM = Math.ceil((m + 1) / 10) * 10;
-            if(nextM === m + 1 && s === 0) nextM = m; 
-            
-            let remainSec = (nextM * 60) - (m * 60 + s);
-            if(remainSec <= 0) remainSec = 600; 
+    setInterval(() => {
+        let now = new Date();
+        let m = now.getMinutes(); let s = now.getSeconds();
+        let nextM = Math.ceil((m + 1) / 10) * 10;
+        if(nextM === m + 1 && s === 0) nextM = m; 
+        
+        let remainSec = (nextM * 60) - (m * 60 + s);
+        if(remainSec <= 0) remainSec = 600; 
 
-            let rm = Math.floor(remainSec / 60); let rs = remainSec % 60;
-            document.getElementById('timer-display').innerText = `${rm}:${rs.toString().padStart(2,'0')}`;
+        let rm = Math.floor(remainSec / 60); let rs = remainSec % 60;
+        document.getElementById('timer-display').innerText = `${rm}:${rs.toString().padStart(2,'0')}`;
 
-            let msPerRound = 10 * 60 * 1000;
-            let elapsedMs = Date.now() - gameStartTimeEpoch;
-            let expectedRound = Math.floor(elapsedMs / msPerRound) + 1;
-            
-            if(expectedRound > currentRound && currentRound <= totalRounds) {
-                playCurrentRound(true);
-                userAP = Math.min(maxAP, userAP + 3);
-                updateAP();
-                saveGame();
-            }
-        }, 1000);
-    }
+        let msPerRound = 10 * 60 * 1000;
+        let elapsedMs = Date.now() - gameStartTimeEpoch;
+        let expectedRound = Math.floor(elapsedMs / msPerRound) + 1;
+        
+        // オート時は playCurrentRound(false) で画面遷移を防止
+        if(expectedRound > currentRound && currentRound <= totalRounds) {
+            playCurrentRound(false); 
+            userAP = Math.min(maxAP, userAP + 3);
+            updateAP();
+            saveGame();
+            if(document.getElementById('home-view').style.display === 'block') renderGameHistory();
+        }
+    }, 1000);
+}
 
     function forceSimulate() {
         if(currentRound <= totalRounds) {
