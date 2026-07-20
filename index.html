@@ -293,59 +293,102 @@ const userId = "player_1"; // 今は仮のプレイヤーID
     let gameStartTimeEpoch = 0;
     let previousView = 'home'; 
 
-    // --- セーブ＆ロード ---
-            function saveGame() {
-        if(!currentUser) return;
-        const saveData = {
-            teams, allPlayers, currentUserId: currentUser.id, playerIdCounter, 
-            currentRound, schedule, userAP, gameStartTimeEpoch, lastSavedTime: Date.now()
-        };
-        try {
-            localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
-            isSaveWarningShown = false; // 成功したらフラグをリセット
-        } catch(e) {
-            console.error("セーブ失敗", e);
-            if (!isSaveWarningShown) {
-                alert("【警告】セーブデータの容量が限界に近づいています。古い試合のテキストデータは自動的に削除されます。");
-                isSaveWarningShown = true;
-            }
+ // --- セーブ＆ロード (Firebase対応版) ---
+
+// 🔑 自分専用のユーザーID（端末ごとに自動生成して記憶）
+let userId = localStorage.getItem("my_firebase_uid");
+if (!userId) {
+    userId = "user_" + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem("my_firebase_uid", userId);
+}
+
+// 💾 1. セーブ機能
+function saveGame() {
+    if (!currentUser) return;
+    const saveData = {
+        teams, allPlayers, currentUserId: currentUser.id, playerIdCounter, 
+        currentRound, schedule, userAP, gameStartTimeEpoch, lastSavedTime: Date.now()
+    };
+    
+    db.collection("save_slots").doc(userId).set(saveData)
+    .then(() => {
+        console.log("サーバーセーブ成功！");
+        isSaveWarningShown = false;
+    })
+    .catch((e) => {
+        console.error("サーバーセーブ失敗", e);
+        if (!isSaveWarningShown) {
+            alert("【エラー】サーバーへのセーブに失敗しました。通信環境を確認してください。");
+            isSaveWarningShown = true;
         }
-    }
+    });
+}
 
+// 🔄 2. ロード機能
+async function loadGame() {
+    try {
+        const doc = await db.collection("save_slots").doc(userId).get();
+        if (doc.exists) {
+            const data = doc.data();
+            allPlayers = data.allPlayers || [];
+            teams = data.teams || [];
+            
+            teams.forEach(t => {
+                t.roster = t.roster.map(rp => allPlayers.find(p => p.id === rp.id) || rp);
+            });
 
+            currentUser = allPlayers.find(p => p.id === data.currentUserId);
+            if (!currentUser) return false;
 
-    function loadGame() {
-        const dataStr = localStorage.getItem(SAVE_KEY);
-        if(dataStr) {
-            try {
-                const data = JSON.parse(dataStr);
-                allPlayers = data.allPlayers;
-                teams = data.teams;
-                
-                teams.forEach(t => {
-                    t.roster = t.roster.map(rp => allPlayers.find(p => p.id === rp.id) || rp);
-                });
+            playerIdCounter = data.playerIdCounter; 
+            currentRound = data.currentRound;
+            schedule = data.schedule; 
+            userAP = data.userAP;
+            gameStartTimeEpoch = data.gameStartTimeEpoch || Date.now();
 
-                currentUser = allPlayers.find(p => p.id === data.currentUserId);
-                if (!currentUser) return false;
-
-                playerIdCounter = data.playerIdCounter; 
-                currentRound = data.currentRound;
-                schedule = data.schedule; 
-                userAP = data.userAP;
-                gameStartTimeEpoch = data.gameStartTimeEpoch || Date.now();
-                return true;
-            } catch(e) { console.error("セーブデータ破損", e); return false; }
+            console.log("サーバーからのロード成功！");
+            return true;
         }
         return false;
+    } catch(e) {
+        console.error("サーバーデータ読み込み失敗", e);
+        return false;
     }
+}
 
-    function resetSave() {
-        if(confirm("データを完全に削除して最初からやり直しますか？")) {
-            localStorage.removeItem(SAVE_KEY);
+// 🗑️ 3. リセット機能
+async function resetSave() {
+    if (confirm("データを完全に削除して最初からやり直しますか？")) {
+        try {
+            await db.collection("save_slots").doc(userId).delete();
+            localStorage.removeItem("my_firebase_uid");
             location.reload();
+        } catch(e) {
+            console.error("データ削除失敗", e);
+            alert("データの削除に失敗しました。");
         }
     }
+}
+
+// 🚀 4. 初期化・画面表示の制御（非同期通信に対応）
+window.onload = async function() {
+    const hasData = await loadGame();
+
+    if (hasData) {
+        setupGameUI();
+    } else {
+        initWorld();
+        document.getElementById('reg-view').style.display = 'block';
+        document.getElementById('nav-menu').style.display = 'none';
+        document.getElementById('server-status-bar').style.display = 'none';
+        
+        ['home-view','practice-view','standings-view','roster-view','match-view','player-detail-view'].forEach(v => {
+            let el = document.getElementById(v);
+            if (el) el.style.display = 'none';
+        });
+    }
+};
+
 
     // --- ランク・UI生成 ---
     function getRankHtml(val) {
