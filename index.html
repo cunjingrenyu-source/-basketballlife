@@ -274,14 +274,20 @@
     let previousView = 'home'; 
 
     // --- セーブ＆ロード ---
-    function saveGame() {
+        function saveGame() {
         if(!currentUser) return;
         const saveData = {
             teams, allPlayers, currentUserId: currentUser.id, playerIdCounter, 
             currentRound, schedule, userAP, gameStartTimeEpoch, lastSavedTime: Date.now()
         };
-        localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+        try {
+            localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+        } catch(e) {
+            console.error("セーブ失敗", e);
+            alert("【警告】セーブデータの容量限界です！画像が大きすぎるか、試合履歴が溜まりすぎています。");
+        }
     }
+
 
     function loadGame() {
         const dataStr = localStorage.getItem(SAVE_KEY);
