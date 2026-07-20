@@ -268,6 +268,7 @@
     const SAVE_KEY = "BASKETBALL_LIFE_SAVE";
 
     let teams = []; let allPlayers = []; let currentUser = null; 
+    let isSaveWarningShown = false; // 無限警告ループを防ぐためのフラグ
     let playerIdCounter = 1; let currentRound = 1; let totalRounds = 82;
     let schedule = []; let userAP = 15; let maxAP = 15;
     let gameStartTimeEpoch = 0;
