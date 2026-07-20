@@ -255,7 +255,26 @@
         <div id="detail-profile-target"></div>
     </div>
 </div>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
+<script>
+// ★ 「Basketball Life」専用の接続コード
+const firebaseConfig = {
+  apiKey: "AIzaSyAL0guVfUyZxISUcpELp4t0QeyfT_A8bNQ",
+  authDomain: "basketball-life-db9cd.firebaseapp.com",
+  projectId: "basketball-life-db9cd",
+  storageBucket: "basketball-life-db9cd.firebasestorage.app",
+  messagingSenderId: "438435667579",
+  appId: "1:438435667579:web:9bf1b6e20bf1fb45a28cde",
+  measurementId: "G-VTF07YEG3K"
+};
+
+// Firebaseの初期化とデータベース（Firestore）の有効化
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const userId = "player_1"; // 今は仮のプレイヤーID
+</script>
 <script>
     // --- 定数・能力値定義 ---
     const MAX_STAT = 150;
