@@ -550,11 +550,11 @@
     function goHome() { changeView('home'); }
     function toggleMenu() { let m = document.getElementById('nav-menu'); m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; }
     
-    function changeView(viewName) {
-        // 重なり防止
-        ['reg-view', 'home-view','practice-view','standings-view','roster-view','match-view','player-detail-view'].forEach(v => {
-            let el = document.getElementById(v); if(el) el.style.display = 'none';
-        });
+  function changeView(viewName) {
+    ['reg-view', 'home-view','practice-view','standings-view','roster-view','match-view','player-detail-view', 'historical-match-view'].forEach(v => {
+        let el = document.getElementById(v); if(el) el.style.display = 'none';
+    });
+    // ...以下そのまま...
         ['btn-nav-home','btn-nav-practice','btn-nav-standings'].forEach(id => {
             let el = document.getElementById(id); if(el) el.classList.remove('active');
         });
