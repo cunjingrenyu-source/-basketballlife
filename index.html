@@ -1263,22 +1263,25 @@ function showHistoricalMatch(logIndex) {
     }
 
     // ★重要: 初期化・画面表示の完全制御
-    window.onload = function() {
-        if(loadGame()) {
-            setupGameUI(); // セーブデータがあれば即座にゲーム画面へ
-        } else {
-            initWorld();
-            // データがなければ「完全に」登録画面だけを表示する
-            document.getElementById('reg-view').style.display = 'block';
-            document.getElementById('nav-menu').style.display = 'none';
-            document.getElementById('server-status-bar').style.display = 'none';
-            
-            ['home-view','practice-view','standings-view','roster-view','match-view','player-detail-view'].forEach(v => {
-                let el = document.getElementById(v);
-                if (el) el.style.display = 'none';
-            });
-        }
-    };
+    window.onload = async function() {
+    // サーバーからのデータ読み込みが終わるまで await で待機する
+    const hasData = await loadGame();
+
+    if (hasData) {
+        setupGameUI(); // セーブデータがあればゲーム画面へ
+    } else {
+        initWorld();
+        // データがなければ「完全に」登録画面だけを表示する
+        document.getElementById('reg-view').style.display = 'block';
+        document.getElementById('nav-menu').style.display = 'none';
+        document.getElementById('server-status-bar').style.display = 'none';
+        
+        ['home-view','practice-view','standings-view','roster-view','match-view','player-detail-view'].forEach(v => {
+            let el = document.getElementById(v);
+            if (el) el.style.display = 'none';
+        });
+    }
+};
 </script>
 </body>
 </html>
