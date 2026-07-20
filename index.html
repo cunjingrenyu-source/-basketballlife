@@ -1083,19 +1083,31 @@
 
         if(score.home > score.away) { hTeam.w++; aTeam.l++; } else { aTeam.w++; hTeam.l++; }
 
-        const commitToGlobalStats = (teamState, isH) => {
+                const commitToGlobalStats = (teamState, isH) => {
             [...teamState.team.roster].forEach(p => {
                 let gb = p._box; if(!gb) return;
                 p.box.g++; if(gb.gs) p.box.gs++;
                 Object.keys(gb).forEach(k => { if(k!=='g'&&k!=='gs') p.box[k] += gb[k]; });
-                p.gameLog.push({
+                
+                let logData = {
                     round: currentRound, 
                     oppName: isH ? aTeam.name : hTeam.name,
                     result: (isH && score.home > score.away) || (!isH && score.away > score.home) ? "WIN" : "LOSE",
                     teamScore: isH ? score.home : score.away, 
                     oppScore: isH ? score.away : score.home,
                     pts: gb.pts||0, reb: gb.reb||0, ast: gb.ast||0
-                });
+                };
+
+                // 【追加】マイプレイヤーのみ、試合詳細（テキスト速報とスコア）を保存する
+                if (p.isUser) {
+                    logData.matchDetails = {
+                        hTeamName: hTeam.name, aTeamName: aTeam.name,
+                        hScore: score.home, aScore: score.away,
+                        logsHtml: logs.join(''),
+                        qScoresHome: qScores.home, qScoresAway: qScores.away
+                    };
+                }
+                p.gameLog.push(logData);
             });
         };
         commitToGlobalStats(hData, true); commitToGlobalStats(aData, false);
