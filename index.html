@@ -718,17 +718,49 @@
     }
 
     function renderGameHistory() {
-        let list = document.getElementById('game-history-list'); list.innerHTML = "";
-        if(currentUser.gameLog.length === 0) { list.innerHTML = "<p style='padding:10px;'>試合データがありません</p>"; return; }
-        currentUser.gameLog.slice().reverse().forEach(log => {
-            list.innerHTML += `
-            <div class="history-item">
-                <div><strong>第${log.round}節</strong> vs <span class="clickable-team" onclick="showRosterByName('${log.oppName}')">${log.oppName}</span></div>
-                <div style="font-weight:bold; color:${log.result==='WIN'?'#2ecc71':'#e74c3c'}">${log.result} ${log.teamScore} - ${log.oppScore}</div>
-                <div style="color:#555;">${log.pts}点 ${log.reb}REB ${log.ast}AST</div>
-            </div>`;
-        });
+    let list = document.getElementById('game-history-list'); list.innerHTML = "";
+    if(currentUser.gameLog.length === 0) { list.innerHTML = "<p style='padding:10px;'>試合データがありません</p>"; return; }
+    
+    let totalGames = currentUser.gameLog.length;
+    currentUser.gameLog.slice().reverse().forEach((log, reversedIndex) => {
+        let originalIndex = totalGames - 1 - reversedIndex;
+        list.innerHTML += `
+        <div class="history-item" style="cursor:pointer;" onclick="showHistoricalMatch(${originalIndex})">
+            <div><strong>第${log.round}節</strong> vs <span class="clickable-team" onclick="event.stopPropagation(); showRosterByName('${log.oppName}')">${log.oppName}</span></div>
+            <div style="font-weight:bold; color:${log.result==='WIN'?'#2ecc71':'#e74c3c'}; text-decoration:underline;">${log.result} ${log.teamScore} - ${log.oppScore}</div>
+            <div style="color:#555;">${log.pts}点 ${log.reb}REB ${log.ast}AST</div>
+        </div>`;
+    });
+}
+
+// 過去の試合詳細を表示する新規関数
+function showHistoricalMatch(logIndex) {
+    let log = currentUser.gameLog[logIndex];
+    if(!log || !log.matchDetails) {
+        alert("この試合の詳細データ（テキスト速報）はありません。");
+        return;
     }
+    let d = log.matchDetails;
+    
+    let html = `
+    <div class="match-header">
+        <span class="clickable-team">${d.hTeamName}</span>
+        <span class="match-score">${d.hScore} - ${d.aScore}</span>
+        <span class="clickable-team">${d.aTeamName}</span>
+    </div>
+    <table class="scoreboard-mini">
+        <tr><th>TEAM</th><th>1Q</th><th>2Q</th><th>3Q</th><th>4Q</th>${d.qScoresHome.length>4?'<th>OT</th>':''}<th>TOT</th></tr>
+        <tr><td>${d.hTeamName}</td>${d.qScoresHome.map(q=>`<td>${q}</td>`).join('')}<td style="font-weight:bold; color:#e74c3c;">${d.hScore}</td></tr>
+        <tr><td>${d.aTeamName}</td>${d.qScoresAway.map(q=>`<td>${q}</td>`).join('')}<td style="font-weight:bold; color:#e74c3c;">${d.aScore}</td></tr>
+    </table>
+    <div class="match-log-box" style="margin-top:15px; height:400px;">
+        ${d.logsHtml || "テキスト速報データがありません"}
+    </div>
+    `;
+    
+    document.getElementById('historical-match-content').innerHTML = html;
+    changeView('historical-match');
+}
 
     function showPlayerDetail(id) {
         let p = allPlayers.find(x => x.id === id);
