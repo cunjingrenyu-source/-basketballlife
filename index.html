@@ -300,19 +300,41 @@ if (!userId) {
     localStorage.setItem("my_firebase_uid", userId);
 }
 
-// 💾 1. セーブ機能 (Promiseを返すように修正)
+// 💾 1. セーブ機能 (Firestore制約クリア＆軽量化の極み)
 function saveGame() {
     if (!currentUser) return Promise.reject("ユーザーデータがありません");
     
-    // データ容量を圧縮する処理（省略せずに全て記述）
+    // ① チームの圧縮（所属選手はIDのみ保存）
     const compressedTeams = teams.map(t => {
         return {
             ...t,
-            // チームの所属選手はデータが重くなるため、IDだけを保存する
             roster: t.roster.map(p => ({ id: p.id }))
         };
     });
-    const compressedPlayers = allPlayers;
+
+    // ② 選手の完全圧縮（時限爆弾と不要メモリのパージ）
+    const compressedPlayers = allPlayers.map(p => {
+        let cp = { ...p };
+        
+        // 試合シミュレーション中に付与される一時データ(_boxなど)はセーブ不要なため削除
+        delete cp._box; delete cp._stamina; delete cp._cond; delete cp._condStr;
+        
+        // 【重要】膨大な容量を食う実況ログHTMLをセーブ直前に確実に削除
+        if (cp.gameLog && cp.gameLog.length > 0) {
+            cp.gameLog = cp.gameLog.map(log => {
+                let cLog = { ...log };
+                if (cLog.matchDetails && cLog.matchDetails.logsHtml) {
+                    delete cLog.matchDetails.logsHtml;
+                }
+                return cLog;
+            });
+        }
+        return cp;
+    });
+
+    // ③ Firestoreの「ネストされた配列禁止」エラーを回避
+    // schedule (二次元配列) を { matches: [...] } のオブジェクトにラップして安全化
+    const safeSchedule = schedule.map(roundMatches => ({ matches: roundMatches }));
 
     const saveData = {
         teams: compressedTeams, 
@@ -320,7 +342,7 @@ function saveGame() {
         currentUserId: currentUser.id, 
         playerIdCounter, 
         currentRound, 
-        schedule, 
+        schedule: safeSchedule, // 安全化したスケジュール
         userAP, 
         gameStartTimeEpoch, 
         lastSavedTime: Date.now()
@@ -329,13 +351,12 @@ function saveGame() {
     // 📊 保存前にデータ容量を確認する
     const byteSize = new Blob([JSON.stringify(saveData)]).size;
     const mbSize = (byteSize / 1024 / 1024).toFixed(3);
-    console.log(`💾 セーブデータ容量: ${mbSize} MB`);
+    console.log(`💾 セーブデータ容量 (圧縮後): ${mbSize} MB`);
 
     if (mbSize > 0.9) {
         console.warn("⚠️ Firestoreの1MB制限に近づいています！");
     }
 
-    // ▼ return を追加して非同期処理の完了を外部から待てるようにする
     return db.collection("save_slots").doc(userId).set(saveData)
     .then(() => {
         console.log("サーバーセーブ成功！");
@@ -345,15 +366,16 @@ function saveGame() {
     .catch((e) => {
         console.error("サーバーセーブ失敗", e);
         if (!isSaveWarningShown) {
-            alert("【エラー】サーバーへのセーブに失敗しました。容量オーバーか通信エラーです。");
+            alert("【エラー】サーバーへのセーブに失敗しました。通信状況を確認してください。");
             isSaveWarningShown = true;
         }
-        throw e; // エラーを呼び出し元（finalizeRegistration）に投げる
+        throw e;
     });
 }
 
+
     
-// 🔄 2. ロード機能
+// 🔄 2. ロード機能 (ラップされたスケジュールの安全な復元)
 async function loadGame() {
     try {
         const doc = await db.collection("save_slots").doc(userId).get();
@@ -371,7 +393,14 @@ async function loadGame() {
 
             playerIdCounter = data.playerIdCounter; 
             currentRound = data.currentRound;
-            schedule = data.schedule; 
+            
+            // 【重要】ラップして保存した schedule を元の二次元配列の形に復元する
+            if (data.schedule && data.schedule.length > 0 && data.schedule[0].matches) {
+                schedule = data.schedule.map(round => round.matches);
+            } else {
+                schedule = data.schedule || [];
+            }
+            
             userAP = data.userAP;
             gameStartTimeEpoch = data.gameStartTimeEpoch || Date.now();
 
@@ -384,7 +413,6 @@ async function loadGame() {
         return false;
     }
 }
-
 // 🗑️ 3. リセット機能
 async function resetSave() {
     if (confirm("データを完全に削除して最初からやり直しますか？")) {
