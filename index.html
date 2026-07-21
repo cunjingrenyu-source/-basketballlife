@@ -1311,74 +1311,123 @@ function showHistoricalMatch(logIndex) {
 
 
     <!-- ========================================== -->
-    <!-- ▼▼ エラー特定用：特製オンスクリーンコンソール ▼▼ -->
+    <!-- ▼▼ エラー特定用：特製オンスクリーンコンソール (改良版) ▼▼ -->
     <!-- ========================================== -->
-    <div id="custom-debug-console" style="position: fixed; bottom: 0; left: 0; width: 100%; height: 200px; background: rgba(0,0,0,0.85); font-family: monospace; font-size: 11px; overflow-y: scroll; z-index: 99999; padding: 10px; box-sizing: border-box; border-top: 2px solid #ff6600;">
-        <div style="color: #f1c40f; margin-bottom: 5px; font-weight: bold;">🛠 デバッグコンソール（起動中）- ここにエラーが出ます</div>
-        <div id="custom-debug-log"></div>
+    <div id="custom-debug-container" style="position: fixed; bottom: 0; left: 0; width: 100%; z-index: 99999; font-family: monospace; font-size: 11px; box-sizing: border-box;">
+        <!-- 折りたたみトグルヘッダー -->
+        <div id="custom-debug-toggle" style="background: #1e272e; color: #f1c40f; padding: 8px 10px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #ff6600;">
+            <span>🛠 デバッグコンソール（タップで開閉）</span>
+            <span id="custom-debug-arrow" style="font-size: 14px;">▼</span>
+        </div>
+        <!-- ログ表示エリア -->
+        <div id="custom-debug-console" style="height: 250px; background: rgba(0,0,0,0.9); overflow-y: scroll; padding: 10px; transition: height 0.2s, padding 0.2s;">
+            <div id="custom-debug-log"></div>
+        </div>
     </div>
 
     <script>
     (function() {
+        // --- 1. 折りたたみ制御 ---
+        const container = document.getElementById('custom-debug-container');
+        const toggleBtn = document.getElementById('custom-debug-toggle');
+        const consoleArea = document.getElementById('custom-debug-console');
+        const arrow = document.getElementById('custom-debug-arrow');
+        let isOpen = true;
+
+        toggleBtn.addEventListener('click', () => {
+            isOpen = !isOpen;
+            consoleArea.style.height = isOpen ? "250px" : "0px";
+            consoleArea.style.padding = isOpen ? "10px" : "0px";
+            arrow.textContent = isOpen ? "▼" : "▲";
+        });
+
+        // --- 2. ログ記録・精度向上制御 ---
         const logger = document.getElementById('custom-debug-log');
         const oldLog = console.log;
         const oldError = console.error;
         const oldWarn = console.warn;
 
+        // 安全にオブジェクトを文字列化する（循環参照対策・エラー詳細抽出）
+        function safeStringify(obj) {
+            if (obj === null) return "null";
+            if (typeof obj === "undefined") return "undefined";
+            if (typeof obj !== "object") return String(obj);
+            
+            // Firebaseの特殊なErrorオブジェクトや標準エラーを綺麗に展開
+            if (obj instanceof Error || obj.code || obj.message) {
+                let errStr = `[${obj.code || obj.name || 'Error'}] ${obj.message || '不明なエラー'}`;
+                if (obj.stack) errStr += `\n${obj.stack}`;
+                return errStr;
+            }
+
+            try {
+                const seen = new WeakSet();
+                return JSON.stringify(obj, (key, value) => {
+                    if (typeof value === "object" && value !== null) {
+                        if (seen.has(value)) return "[Circular Reference]";
+                        seen.add(value);
+                    }
+                    return value;
+                }, 2);
+            } catch (err) {
+                return Object.prototype.toString.call(obj) + " (Unserializable Object)";
+            }
+        }
+
         function appendLog(msg, color) {
             const div = document.createElement('div');
             div.style.color = color;
             div.style.borderBottom = "1px dashed #444";
-            div.style.padding = "4px 0";
+            div.style.padding = "6px 0";
             div.style.wordBreak = "break-all";
+            div.style.whiteSpace = "pre-wrap"; // ★オブジェクトの改行構造を保持
             div.textContent = msg;
             logger.appendChild(div);
-            logger.parentElement.scrollTop = logger.parentElement.scrollHeight;
+            // スクロールを最下部へ
+            consoleArea.scrollTop = consoleArea.scrollHeight;
+        }
+
+        function processArgs(args) {
+            return args.map(a => safeStringify(a)).join(" ");
         }
 
         // 通常のログ
         console.log = function(...args) {
             oldLog.apply(console, args);
-            appendLog("[LOG] " + args.join(" "), "#2ecc71");
+            appendLog("[LOG] " + processArgs(args), "#2ecc71");
         };
 
         // 警告
         console.warn = function(...args) {
             oldWarn.apply(console, args);
-            appendLog("[WARN] " + args.join(" "), "#f39c12");
+            appendLog("[WARN] " + processArgs(args), "#f39c12");
         };
 
-        // ★本命：エラーログ（Firebaseのエラー詳細も文字列化して強制表示）
+        // ★エラーログ（エラー発生時は自動で開く）
         console.error = function(...args) {
             oldError.apply(console, args);
-            const msg = args.map(a => {
-                if (a && typeof a === 'object') {
-                    // Firebaseの特殊なエラーオブジェクトを展開
-                    return a.message ? a.message + " (" + a.code + ")" : JSON.stringify(a, Object.getOwnPropertyNames(a));
-                }
-                return a;
-            }).join(" ");
-            appendLog("❌ [ERROR] " + msg, "#e74c3c");
+            appendLog("❌ [ERROR] " + processArgs(args), "#e74c3c");
+            if (!isOpen) toggleBtn.click();
         };
 
-        // 予期せぬ構文エラーなどを捕捉
-        window.onerror = function(msg, url, line) {
-            appendLog("💥 [FATAL] " + msg + " (行: " + line + ")", "#ff4757");
+        // 予期せぬ構文エラーなど
+        window.onerror = function(msg, url, line, col, error) {
+            const details = error ? safeStringify(error) : "";
+            appendLog(`💥 [FATAL] ${msg} (行: ${line})\n${details}`, "#ff4757");
+            if (!isOpen) toggleBtn.click();
             return false;
         };
         
-        // ★大本命：Firebase通信などの非同期エラーを捕捉
+        // ★Firebase通信などの非同期エラー（Promiseエラー）
         window.addEventListener("unhandledrejection", function(event) {
             const reason = event.reason;
-            let errorMsg = "不明なエラー";
-            if (reason) {
-                errorMsg = reason.message ? (reason.message + (reason.code ? " ["+reason.code+"]" : "")) : String(reason);
-            }
-            appendLog("🔥 [FIREBASE/PROMISE ERROR] " + errorMsg, "#ff6b81");
+            let errorMsg = safeStringify(reason);
+            appendLog("🔥 [PROMISE ERROR] " + errorMsg, "#ff6b81");
+            if (!isOpen) toggleBtn.click();
         });
     })();
     </script>
-    <!-- ▲▲ 特製オンスクリーンコンソール ここまで ▲▲ -->
+    <!-- ▲▲ 特製オンスクリーンコンソール (改良版) ここまで ▲▲ -->
 
 
 
