@@ -247,7 +247,7 @@
         </div>
     </div>
 
-    <div id="match-view" class="content-area" style="display: none;">
+        <div id="match-view" class="content-area" style="display: none;">
         <button onclick="goHome()" style="margin-bottom: 15px; padding: 6px 15px; font-weight:bold;">← ホームへ戻る</button>
         <div class="match-header">
             <span id="match-team1" class="clickable-team">Team A</span>
@@ -257,15 +257,27 @@
         
         <table class="scoreboard-mini" id="match-scoreboard"></table>
 
+        <!-- スポナビ風タブ -->
+        <div class="match-tabs">
+            <button class="match-tab-btn" id="tab-btn-highlight" onclick="switchMatchTab('highlight')">トッププレイ</button>
+            <button class="match-tab-btn" id="tab-btn-myplay" onclick="switchMatchTab('myplay')">自分のプレイ</button>
+            <button class="match-tab-btn active" id="tab-btn-full" onclick="switchMatchTab('full')">全プレイ速報</button>
+            <button class="match-tab-btn" id="tab-btn-stats" onclick="switchMatchTab('stats')">個人スタッツ</button>
+        </div>
+
+        <!-- ログエリア -->
         <div class="match-log-box" id="match-log"></div>
 
-        <h3 style="margin-top:20px; border-left:4px solid #e74c3c; padding-left:8px; font-size:16px;" id="boxscore-title-home">HOMEスタッツ</h3>
-        <div class="stats-wrapper">
-            <table class="stats-table" id="match-box-home"></table>
-        </div>
-        <h3 style="margin-top:15px; border-left:4px solid #3498db; padding-left:8px; font-size:16px;" id="boxscore-title-away">AWAYスタッツ</h3>
-        <div class="stats-wrapper">
-            <table class="stats-table" id="match-box-away"></table>
+        <!-- スタッツエリア (初期非表示) -->
+        <div id="match-stats-area" style="display: none;">
+            <h3 style="margin-top:20px; border-left:4px solid #e74c3c; padding-left:8px; font-size:16px;" id="boxscore-title-home">HOMEスタッツ</h3>
+            <div class="stats-wrapper">
+                <table class="stats-table" id="match-box-home"></table>
+            </div>
+            <h3 style="margin-top:15px; border-left:4px solid #3498db; padding-left:8px; font-size:16px;" id="boxscore-title-away">AWAYスタッツ</h3>
+            <div class="stats-wrapper">
+                <table class="stats-table" id="match-box-away"></table>
+            </div>
         </div>
     </div>
     
