@@ -850,11 +850,16 @@ window.onload = async function() {
 function showHistoricalMatch(logIndex) {
     let log = currentUser.gameLog[logIndex];
     if(!log || !log.matchDetails) {
-        alert("この試合の詳細データ（テキスト速報）はありません。");
+        alert("この試合の詳細データはありません。");
         return;
     }
     let d = log.matchDetails;
     
+    // セーブ後はlogsHtmlが削られているため、代替メッセージを表示
+    let logBoxContent = d.logsHtml 
+        ? d.logsHtml 
+        : "<div style='color:#f1c40f; text-align:center; padding: 20px;'>※データ軽量化のため、この試合のテキスト速報アーカイブは削除されています。<br>スコアボードとスタッツをご確認ください。</div>";
+
     let html = `
     <div class="match-header">
         <span class="clickable-team">${d.hTeamName}</span>
@@ -866,8 +871,8 @@ function showHistoricalMatch(logIndex) {
         <tr><td>${d.hTeamName}</td>${d.qScoresHome.map(q=>`<td>${q}</td>`).join('')}<td style="font-weight:bold; color:#e74c3c;">${d.hScore}</td></tr>
         <tr><td>${d.aTeamName}</td>${d.qScoresAway.map(q=>`<td>${q}</td>`).join('')}<td style="font-weight:bold; color:#e74c3c;">${d.aScore}</td></tr>
     </table>
-    <div class="match-log-box" style="margin-top:15px; height:400px;">
-        ${d.logsHtml || "テキスト速報データがありません"}
+    <div class="match-log-box" style="margin-top:15px; height:400px; display:flex; flex-direction:column; justify-content:center;">
+        ${logBoxContent}
     </div>
     `;
     
