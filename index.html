@@ -328,6 +328,83 @@ const db = firebase.firestore();
     let schedule = []; let userAP = 15; let maxAP = 15;
     let gameStartTimeEpoch = 0;
     let previousView = 'home'; 
+    // --- ステータス定義データ ---
+    const STAT_DEFINITIONS = {
+        'layup': "【レイアップ＆ダンク】\nレイアップの精度やクラッチプレイの成功率が向上し、稀にトリプルクラッチ等の高度な技も発動。ブロックを躱すプレイが増えます。ダンクは副産物となり、ステータスを上げれば低身長でもダンク可能に。プットバックやウィンドミル、フリースローラインダンクなど、難しい状況や流れを変える白熱のプレイを生み出します。アリウープのフィニッシュにも影響します。",
+        'middle': "【ミドル】\nタフショットやジャンプシュートなど、難しい体勢からのミドルシュート成功率がシンプルに向上します。ドリブルムーブからの組み合わせと相性が抜群です。",
+        'three': "【3P】\n3Pシュートの成功率が劇的に上昇します。ロゴ付近からのディープスリーの成功や、ディフェンスがガチガチに密着している厳しい状況下でもシュートを沈めやすくなります。",
+        'dribble': "【ドリブル】\nドリブル技術が向上し、スピンムーブ、ステップバック、アンクルブレイクなど多彩な技が発動するようになります。ドリブル中のターンオーバーが減少し、俊敏性(スピード)との相性も抜群。ボールキープ力が強化されます。",
+        'pass': "【パス】\nプレイメイキング力が爆発的に向上。ターンオーバーのリスクを抑えつつ、エキセントリックなパスやアリウープなど、神がかったアシストを量産できるようになります。",
+        'physical': "【フィジカル】\nあらゆるプレイに付加価値をもたらす重要な土台。レイアップで強引に押し込んだり、ポスタライズダンクになりやすくなります。ディフェンス面やリバウンドにも恩恵があり、強固なスクリーンマンとしても活躍できます。",
+        'rebound': "【リバウンド】\nオフェンス・ディフェンス問わず、シンプルにリバウンド獲得数が増加し、ゴール下の覇権を握ります。",
+        'speed': "【スピード】\nドライブで相手を抜き去るプレイや、速攻（ファストブレイク）が可能になります。動きのキレが増し、ディフェンス時の反応速度にも恩恵があります。",
+        'defense': "【守備】\n守備技術が向上し、スティールやブロックの発動率が上がります。能力が低いとファウルを犯しやすくなりますが、守備を上げることで不用意なファウルを減らし、相手の脅威となります。",
+        'mental': "【メンタル】\n逆境や絶対的局面に強くなります。スコアや状況（クラッチタイムなど）に応じて、自身の全ステータスにバフがかかるようになり、勝負強さに直結します。",
+        'stamina': "【スタミナ】\n体力の上限。体力が増えるとプレイ時間(出場時間)が増加します。スタミナが切れると力が落ち不調になりやすく、限界が来ると監督に交代させられます。"
+    };
+
+    function openStatModal(statKey, event) {
+        if(event) event.stopPropagation();
+        let statObj = STAT_KEYS.find(s => s.k === statKey);
+        if(!statObj) return;
+        document.getElementById('stat-modal-title').innerText = statObj.n + " (能力定義)";
+        // 改行を <br> に変換して表示
+        document.getElementById('stat-modal-desc').innerHTML = STAT_DEFINITIONS[statKey].replace(/\n/g, '<br>');
+        document.getElementById('stat-modal').style.display = 'flex';
+    }
+
+    function closeStatModal(event) {
+        if (event && event.target.id !== 'stat-modal') return;
+        document.getElementById('stat-modal').style.display = 'none';
+    }
+
+    // --- 試合画面タブ切り替え関数 ---
+    function switchMatchTab(tabType) {
+        document.querySelectorAll('.match-tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-btn-' + tabType).classList.add('active');
+
+        let logBox = document.getElementById('match-log');
+        let statsArea = document.getElementById('match-stats-area');
+        
+        if (tabType === 'stats') {
+            logBox.style.display = 'none';
+            statsArea.style.display = 'block';
+        } else {
+            logBox.style.display = 'block';
+            statsArea.style.display = 'none';
+            
+            let entries = logBox.querySelectorAll('.log-entry');
+            let visibleCount = 0;
+            
+            entries.forEach(el => {
+                if (tabType === 'full') {
+                    el.classList.remove('log-hidden');
+                    visibleCount++;
+                } else if (tabType === 'highlight') {
+                    if (el.classList.contains('log-type-highlight')) {
+                        el.classList.remove('log-hidden');
+                        visibleCount++;
+                    } else el.classList.add('log-hidden');
+                } else if (tabType === 'myplay') {
+                    if (el.classList.contains('log-type-myplay')) {
+                        el.classList.remove('log-hidden');
+                        visibleCount++;
+                    } else el.classList.add('log-hidden');
+                }
+            });
+
+            // 空の場合のメッセージ制御
+            let existingEmptyMsg = logBox.querySelector('.empty-log-msg');
+            if (existingEmptyMsg) existingEmptyMsg.remove();
+            
+            if (visibleCount === 0) {
+                let msg = document.createElement('div');
+                msg.className = 'empty-log-msg log-entry';
+                msg.innerText = tabType === 'highlight' ? '該当するトッププレイはありませんでした。' : 'あなたのプレイヤースタッツ記録はありませんでした。';
+                logBox.appendChild(msg);
+            }
+        }
+    }
 
  // --- セーブ＆ロード (Firebase対応版) ---
 
