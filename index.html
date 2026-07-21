@@ -303,9 +303,25 @@ if (!userId) {
 // 💾 1. セーブ機能
 function saveGame() {
     if (!currentUser) return;
+    
+    // 【修正】チームのrosterは「IDだけ」にしてデータ重複によるパンクを防ぐ
+    const compressedTeams = teams.map(t => {
+        return {
+            ...t,
+            roster: t.roster.map(p => ({ id: p.id }))
+        };
+    });
+
     const saveData = {
-        teams, allPlayers, currentUserId: currentUser.id, playerIdCounter, 
-        currentRound, schedule, userAP, gameStartTimeEpoch, lastSavedTime: Date.now()
+        teams: compressedTeams, // 圧縮したチームデータを保存
+        allPlayers, 
+        currentUserId: currentUser.id, 
+        playerIdCounter, 
+        currentRound, 
+        schedule, 
+        userAP, 
+        gameStartTimeEpoch, 
+        lastSavedTime: Date.now()
     };
     
     db.collection("save_slots").doc(userId).set(saveData)
