@@ -1307,6 +1307,75 @@ function showHistoricalMatch(logIndex) {
             fillBoxScoreTable('match-box-away', aTeam.roster);
         }
     }
+    <!-- ========================================== -->
+    <!-- ▼▼ エラー特定用：特製オンスクリーンコンソール ▼▼ -->
+    <!-- ========================================== -->
+    <div id="custom-debug-console" style="position: fixed; bottom: 0; left: 0; width: 100%; height: 200px; background: rgba(0,0,0,0.85); font-family: monospace; font-size: 11px; overflow-y: scroll; z-index: 99999; padding: 10px; box-sizing: border-box; border-top: 2px solid #ff6600;">
+        <div style="color: #f1c40f; margin-bottom: 5px; font-weight: bold;">🛠 デバッグコンソール（起動中）- ここにエラーが出ます</div>
+        <div id="custom-debug-log"></div>
+    </div>
+
+    <script>
+    (function() {
+        const logger = document.getElementById('custom-debug-log');
+        const oldLog = console.log;
+        const oldError = console.error;
+        const oldWarn = console.warn;
+
+        function appendLog(msg, color) {
+            const div = document.createElement('div');
+            div.style.color = color;
+            div.style.borderBottom = "1px dashed #444";
+            div.style.padding = "4px 0";
+            div.style.wordBreak = "break-all";
+            div.textContent = msg;
+            logger.appendChild(div);
+            logger.parentElement.scrollTop = logger.parentElement.scrollHeight;
+        }
+
+        // 通常のログ
+        console.log = function(...args) {
+            oldLog.apply(console, args);
+            appendLog("[LOG] " + args.join(" "), "#2ecc71");
+        };
+
+        // 警告
+        console.warn = function(...args) {
+            oldWarn.apply(console, args);
+            appendLog("[WARN] " + args.join(" "), "#f39c12");
+        };
+
+        // ★本命：エラーログ（Firebaseのエラー詳細も文字列化して強制表示）
+        console.error = function(...args) {
+            oldError.apply(console, args);
+            const msg = args.map(a => {
+                if (a && typeof a === 'object') {
+                    // Firebaseの特殊なエラーオブジェクトを展開
+                    return a.message ? a.message + " (" + a.code + ")" : JSON.stringify(a, Object.getOwnPropertyNames(a));
+                }
+                return a;
+            }).join(" ");
+            appendLog("❌ [ERROR] " + msg, "#e74c3c");
+        };
+
+        // 予期せぬ構文エラーなどを捕捉
+        window.onerror = function(msg, url, line) {
+            appendLog("💥 [FATAL] " + msg + " (行: " + line + ")", "#ff4757");
+            return false;
+        };
+        
+        // ★大本命：Firebase通信などの非同期エラーを捕捉
+        window.addEventListener("unhandledrejection", function(event) {
+            const reason = event.reason;
+            let errorMsg = "不明なエラー";
+            if (reason) {
+                errorMsg = reason.message ? (reason.message + (reason.code ? " ["+reason.code+"]" : "")) : String(reason);
+            }
+            appendLog("🔥 [FIREBASE/PROMISE ERROR] " + errorMsg, "#ff6b81");
+        });
+    })();
+    </script>
+    <!-- ▲▲ 特製オンスクリーンコンソール ここまで ▲▲ -->
 
 
 </script>
