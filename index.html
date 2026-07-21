@@ -841,12 +841,14 @@ async function finalizeRegistration(name, pos, appeal, age, nationality, avatarD
         document.querySelectorAll('.practice-btn').forEach(b => b.disabled = (userAP <= 0));
     }
 
-    function renderPracticeGrid() {
+        function renderPracticeGrid() {
         let grid = document.getElementById('practice-grid'); grid.innerHTML = "";
         STAT_KEYS.forEach(sk => {
             let btn = document.createElement('button'); btn.className = 'practice-btn';
-            btn.innerHTML = `<div class="practice-name">${sk.n}</div><div>↑ UP</div>`;
-            btn.onclick = () => {
+            // 文字部分に onclick を追加
+            btn.innerHTML = `<div class="practice-name" onclick="openStatModal('${sk.k}', event)" style="color:#2980b9; text-decoration:underline;">${sk.n} ℹ️</div><div>↑ UP</div>`;
+            btn.onclick = (e) => {
+                if(e.target.classList.contains('practice-name')) return; // ℹ️クリック時は練習させない
                 if(userAP > 0 && currentUser.stats[sk.k] < MAX_STAT) {
                     userAP--;
                     currentUser.stats[sk.k] += Math.floor(Math.random() * 3) + 1; 
@@ -861,14 +863,14 @@ async function finalizeRegistration(name, pos, appeal, age, nationality, avatarD
         });
     }
 
-    function generateAbilityGrid(stats) {
+        function generateAbilityGrid(stats) {
         let h1="", v1="", h2="", v2="";
         for(let i=0; i<6; i++) {
-            h1 += `<div class="ability-cell"><div class="ability-header">${STAT_KEYS[i].n}</div></div>`;
+            h1 += `<div class="ability-cell"><div class="ability-header" onclick="openStatModal('${STAT_KEYS[i].k}', event)" style="cursor:pointer; color:#3498db; text-decoration:underline;">${STAT_KEYS[i].n}</div></div>`;
             v1 += `<div class="ability-cell">${getRankHtml(stats[STAT_KEYS[i].k])}</div>`;
         }
         for(let i=6; i<12; i++) {
-            h2 += `<div class="ability-cell"><div class="ability-header">${STAT_KEYS[i].n}</div></div>`;
+            h2 += `<div class="ability-cell"><div class="ability-header" onclick="openStatModal('${STAT_KEYS[i].k}', event)" style="cursor:pointer; color:#3498db; text-decoration:underline;">${STAT_KEYS[i].n}</div></div>`;
             v2 += `<div class="ability-cell">${getRankHtml(stats[STAT_KEYS[i].k])}</div>`;
         }
         return `
