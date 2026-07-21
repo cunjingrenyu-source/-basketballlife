@@ -133,6 +133,15 @@
 <body>
 
 <div class="app-container">
+        <!-- ステータス定義モーダル -->
+    <div id="stat-modal" class="modal-overlay" onclick="closeStatModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header" id="stat-modal-title">ステータス名</div>
+            <div class="modal-body" id="stat-modal-desc">説明文がここに入ります。</div>
+            <button class="modal-close" onclick="closeStatModal()">閉じる</button>
+        </div>
+    </div>
+
     <div class="header">
         <div class="header-top">
             <h1 onclick="goHome()">BASKETBALL LIFE</h1>
