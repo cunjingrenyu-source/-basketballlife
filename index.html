@@ -1240,7 +1240,7 @@ function showHistoricalMatch(logIndex) {
 
         if(score.home > score.away) { hTeam.w++; aTeam.l++; } else { aTeam.w++; hTeam.l++; }
 
-                const commitToGlobalStats = (teamState, isH) => {
+                        const commitToGlobalStats = (teamState, isH) => {
             [...teamState.team.roster].forEach(p => {
                 let gb = p._box; if(!gb) return;
                 p.box.g++; if(gb.gs) p.box.gs++;
@@ -1253,22 +1253,19 @@ function showHistoricalMatch(logIndex) {
                     pts: gb.pts||0, reb: gb.reb||0, ast: gb.ast||0
                 };
 
-                // 【修正】NPCの試合ログはUIで使わないため、マイプレイヤーのみ記録する
+                // マイプレイヤーのみ試合記録を蓄積する
                 if (p.isUser) {
                     logData.matchDetails = {
                         hTeamName: hTeam.name, aTeamName: aTeam.name, hScore: score.home, aScore: score.away,
-                        logsHtml: logs.join(''), qScoresHome: qScores.home, qScoresAway: qScores.away
+                        logsHtml: logs.join(''), // 現在の画面表示用には保持（セーブ時に消えます）
+                        qScoresHome: qScores.home, qScoresAway: qScores.away
                     };
-                    // 古いテキスト速報を削除してFirestoreのパンクを防ぐ
-                    if (p.gameLog.length >= 5) {
-                        p.gameLog[p.gameLog.length - 5].matchDetails = null;
-                    }
-                    // p.isUserがtrueの時だけ配列にPushする
+                    // 5試合の制限を撤廃し、82試合分すべてpushする
                     p.gameLog.push(logData);
                 }
             });
         };
-m
+
         commitToGlobalStats(hData, true); commitToGlobalStats(aData, false);
 
         if(isVisual) {
