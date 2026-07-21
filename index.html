@@ -304,7 +304,7 @@ if (!userId) {
 function saveGame() {
     if (!currentUser) return;
     
-    // 【修正】チームのrosterは「IDだけ」にしてデータ重複によるパンクを防ぐ
+    // 【圧縮1】チームのrosterは「IDだけ」にしてデータ重複によるパンクを防ぐ
     const compressedTeams = teams.map(t => {
         return {
             ...t,
@@ -312,17 +312,44 @@ function saveGame() {
         };
     });
 
+    // 【圧縮2】allPlayersの不要データを削る（これが容量爆発の一番の原因！）
+    const compressedPlayers = allPlayers.map(p => {
+        if (!p.isUser) {
+            // NPCはgameLogを完全に空にする（念押し）
+            return { ...p, gameLog: [] };
+        } else {
+            // マイプレイヤーは82試合分の履歴を残すが、重すぎる「logsHtml」はセーブ時に削る
+            const lightGameLog = p.gameLog.map(log => {
+                let newLog = { ...log };
+                if (newLog.matchDetails && newLog.matchDetails.logsHtml) {
+                    delete newLog.matchDetails.logsHtml; // HTML速報データを削除
+                }
+                return newLog;
+            });
+            return { ...p, gameLog: lightGameLog };
+        }
+    });
+
     const saveData = {
-        teams: compressedTeams, // 圧縮したチームデータを保存
-        allPlayers, 
+        teams: compressedTeams, 
+        allPlayers: compressedPlayers, // 圧縮した選手データを保存
         currentUserId: currentUser.id, 
         playerIdCounter, 
         currentRound, 
-        schedule, 
+        schedule, // scheduleは既にIDのみの構成なので安全
         userAP, 
         gameStartTimeEpoch, 
         lastSavedTime: Date.now()
     };
+
+    // 📊 保存前にデータ容量を確認する
+    const byteSize = new Blob([JSON.stringify(saveData)]).size;
+    const mbSize = (byteSize / 1024 / 1024).toFixed(3);
+    console.log(`💾 セーブデータ容量: ${mbSize} MB`);
+
+    if (mbSize > 0.9) {
+        console.warn("⚠️ Firestoreの1MB制限に近づいています！");
+    }
     
     db.collection("save_slots").doc(userId).set(saveData)
     .then(() => {
@@ -332,12 +359,12 @@ function saveGame() {
     .catch((e) => {
         console.error("サーバーセーブ失敗", e);
         if (!isSaveWarningShown) {
-            alert("【エラー】サーバーへのセーブに失敗しました。通信環境を確認してください。");
+            alert("【エラー】サーバーへのセーブに失敗しました。容量オーバーか通信エラーです。");
             isSaveWarningShown = true;
         }
     });
 }
-
+    
 // 🔄 2. ロード機能
 async function loadGame() {
     try {
