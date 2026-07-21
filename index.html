@@ -1213,7 +1213,7 @@ function showHistoricalMatch(logIndex) {
 
         if(score.home > score.away) { hTeam.w++; aTeam.l++; } else { aTeam.w++; hTeam.l++; }
 
-        const commitToGlobalStats = (teamState, isH) => {
+                const commitToGlobalStats = (teamState, isH) => {
             [...teamState.team.roster].forEach(p => {
                 let gb = p._box; if(!gb) return;
                 p.box.g++; if(gb.gs) p.box.gs++;
@@ -1226,20 +1226,22 @@ function showHistoricalMatch(logIndex) {
                     pts: gb.pts||0, reb: gb.reb||0, ast: gb.ast||0
                 };
 
-                // マイプレイヤーの試合詳細を保存（※容量対策で過去82試合分だけ詳細を残す）
+                // 【修正】NPCの試合ログはUIで使わないため、マイプレイヤーのみ記録する
                 if (p.isUser) {
                     logData.matchDetails = {
                         hTeamName: hTeam.name, aTeamName: aTeam.name, hScore: score.home, aScore: score.away,
                         logsHtml: logs.join(''), qScoresHome: qScores.home, qScoresAway: qScores.away
                     };
-                    // 古いテキスト速報を削除してlocalStorageのパンクを防ぐ
+                    // 古いテキスト速報を削除してFirestoreのパンクを防ぐ
                     if (p.gameLog.length >= 5) {
                         p.gameLog[p.gameLog.length - 5].matchDetails = null;
                     }
+                    // p.isUserがtrueの時だけ配列にPushする
+                    p.gameLog.push(logData);
                 }
-                p.gameLog.push(logData);
             });
         };
+m
         commitToGlobalStats(hData, true); commitToGlobalStats(aData, false);
 
         if(isVisual) {
