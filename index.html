@@ -304,7 +304,7 @@ if (!userId) {
 function saveGame() {
     if (!currentUser) return Promise.reject("ユーザーデータがありません");
     
-    // 【圧縮処理は元のまま】
+    // 【圧縮処理は元のまま】※ここの中身は実際の処理に合わせてください
     const compressedTeams = teams.map(t => { /* 省略 */ });
     const compressedPlayers = allPlayers.map(p => { /* 省略 */ });
 
@@ -319,6 +319,15 @@ function saveGame() {
         gameStartTimeEpoch, 
         lastSavedTime: Date.now()
     };
+
+    // 📊 保存前にデータ容量を確認する
+    const byteSize = new Blob([JSON.stringify(saveData)]).size;
+    const mbSize = (byteSize / 1024 / 1024).toFixed(3);
+    console.log(`💾 セーブデータ容量: ${mbSize} MB`);
+
+    if (mbSize > 0.9) {
+        console.warn("⚠️ Firestoreの1MB制限に近づいています！");
+    }
 
     // ▼ return を追加して非同期処理の完了を外部から待てるようにする
     return db.collection("save_slots").doc(userId).set(saveData)
@@ -336,7 +345,6 @@ function saveGame() {
         throw e; // エラーを呼び出し元（finalizeRegistration）に投げる
     });
 }
-
     // 📊 保存前にデータ容量を確認する
     const byteSize = new Blob([JSON.stringify(saveData)]).size;
     const mbSize = (byteSize / 1024 / 1024).toFixed(3);
