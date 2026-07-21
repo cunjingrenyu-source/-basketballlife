@@ -556,31 +556,44 @@ window.onload = async function() {
         }
     }
 
-    function finalizeRegistration(name, pos, appeal, age, nationality, avatarData) {
-        currentUser = {
-            id: playerIdCounter++, isUser: true, name: name, pos: pos, age: age, nationality: nationality, avatar: avatarData,
-            stats: createStats(appeal, age), box: createBoxScore(), gameLog: [], teamId: null
-        };
+    // ▼ async を追加した新しい関数に差し替えます
+async function finalizeRegistration(name, pos, appeal, age, nationality, avatarData) {
+    currentUser = {
+        id: playerIdCounter++, isUser: true, name: name, pos: pos, age: age, nationality: nationality, avatar: avatarData,
+        stats: createStats(appeal, age), box: createBoxScore(), gameLog: [], teamId: null
+    };
 
-        let targetTeam = teams[Math.floor(Math.random() * 30)];
-        currentUser.teamId = targetTeam.id;
-        
-        let comIdx = targetTeam.roster.findIndex(p => p.pos === pos);
-        currentUser.num = targetTeam.roster[comIdx].num; 
-        
-        allPlayers = allPlayers.filter(p => p.id !== targetTeam.roster[comIdx].id);
-        targetTeam.roster.splice(comIdx, 1, currentUser);
-        allPlayers.push(currentUser);
+    let targetTeam = teams[Math.floor(Math.random() * 30)];
+    currentUser.teamId = targetTeam.id;
+    
+    let comIdx = targetTeam.roster.findIndex(p => p.pos === pos);
+    currentUser.num = targetTeam.roster[comIdx].num; 
+    
+    allPlayers = allPlayers.filter(p => p.id !== targetTeam.roster[comIdx].id);
+    targetTeam.roster.splice(comIdx, 1, currentUser);
+    allPlayers.push(currentUser);
 
-        gameStartTimeEpoch = Date.now();
-        saveGame();
+    gameStartTimeEpoch = Date.now();
+    
+    const btn = document.getElementById('reg-btn');
+    
+    try {
+        // ▼ セーブが完了するまでここで待機！
+        await saveGame();
         
-        const btn = document.getElementById('reg-btn');
         btn.disabled = false;
         btn.innerText = "ドラフト参入";
-
+        
+        // ▼ セーブに成功した場合のみUIをセットアップして次へ
         setupGameUI();
+        
+    } catch (error) {
+        // ▼ セーブ失敗時はボタンを戻して処理を止める
+        btn.disabled = false;
+        btn.innerText = "登録再試行";
+        console.error("登録完了時のセーブに失敗したため、処理を中断しました");
     }
+}
 
     function setupGameUI() {
         document.getElementById('reg-view').style.display = 'none';
@@ -1302,26 +1315,7 @@ function showHistoricalMatch(logIndex) {
         }
     }
 
-    // ★重要: 初期化・画面表示の完全制御
-    window.onload = async function() {
-    // サーバーからのデータ読み込みが終わるまで await で待機する
-    const hasData = await loadGame();
 
-    if (hasData) {
-        setupGameUI(); // セーブデータがあればゲーム画面へ
-    } else {
-        initWorld();
-        // データがなければ「完全に」登録画面だけを表示する
-        document.getElementById('reg-view').style.display = 'block';
-        document.getElementById('nav-menu').style.display = 'none';
-        document.getElementById('server-status-bar').style.display = 'none';
-        
-        ['home-view','practice-view','standings-view','roster-view','match-view','player-detail-view'].forEach(v => {
-            let el = document.getElementById(v);
-            if (el) el.style.display = 'none';
-        });
-    }
-};
 </script>
 </body>
 </html>
