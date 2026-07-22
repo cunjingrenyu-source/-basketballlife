@@ -1159,22 +1159,6 @@ function showPlayerDetail(id) {
     document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(p);
 }
 
-// 選手詳細の表示（配列メソッドを駆使してスマートに）
-function showPlayerDetail(id) {
-    const p = allPlayers.find(x => x.id === id);
-    if(!p) return;
-    
-    // findを使って最初に見つかったアクティブなビューを即座に取得（forEachより効率的）
-    const views = ['home', 'practice', 'standings', 'roster', 'match'];
-    const currentActiveView = views.find(v => document.getElementById(`${v}-view`)?.style.display === 'block') || 'home';
-    
-    if (currentActiveView !== 'player-detail') {
-        previousView = currentActiveView;
-    }
-
-    changeView('player-detail');
-    document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(p);
-}
 
 // 戻るボタン
 function goBackFromDetail() {
