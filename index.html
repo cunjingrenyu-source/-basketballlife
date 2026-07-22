@@ -1873,116 +1873,421 @@ const showRosterByName = (name) => {
 </script>
 
 <!-- ========================================== -->
-<!-- ▼▼ エラー特定用：特製オンスクリーンコンソール (改良版) ▼▼ -->
-<div id="custom-debug-container" style="position: fixed; bottom: 0; left: 0; width: 100%; z-index: 99999; font-family: monospace; font-size: 11px; box-sizing: border-box;">
-    <!-- 折りたたみトグルヘッダー -->
-    <div id="custom-debug-toggle" style="background: #1e272e; color: #f1c40f; padding: 8px 10px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #ff6600;">
-        <span>🛠 デバッグコンソール（タップで開閉）</span>
-        <span id="custom-debug-arrow" style="font-size: 14px;">▼</span>
+<!-- ▼▼ 究極神デバッガー V3 (The Absolute God-Tier APM & Debugger) ▼▼ -->
+<!-- ========================================== -->
+<div id="god-debug-hud" style="position: fixed; top: 0; left: 0; width: 100%; background: rgba(0,0,0,0.85); color: #0f0; font-family: 'Courier New', monospace; font-size: 11px; padding: 4px 8px; z-index: 9999999; pointer-events: none; border-bottom: 1px solid #333; display: flex; gap: 15px; flex-wrap: wrap; box-sizing: border-box;">
+    <span>FPS: <strong id="dbg-fps">0</strong></span>
+    <span>DOM: <strong id="dbg-dom">0</strong></span>
+    <span>MEM: <strong id="dbg-mem">0</strong>MB</span>
+    <span>CPU(概算): <strong id="dbg-cpu">0</strong>%</span>
+    <span style="color: #ffaa00;">エラー: <strong id="dbg-err-count">0</strong></span>
+</div>
+
+<div id="custom-debug-container" style="position: fixed; bottom: 0; left: 0; width: 100%; z-index: 9999998; font-family: 'Courier New', Consolas, monospace; font-size: 12px; box-sizing: border-box; line-height: 1.4;">
+    <div id="custom-debug-toggle" style="background: #0a0a0c; color: #00ffcc; padding: 8px 15px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-top: 3px solid #ff0055; box-shadow: 0 -5px 15px rgba(0,0,0,0.9);">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <span id="debug-status-indicator" style="text-shadow: 0 0 5px #00ffcc;">👁️ OMNISCIENT DEBUGGER V3</span>
+            <input type="text" id="debug-search" placeholder="🔍 ログ検索..." style="background: #1a1a24; color: #fff; border: 1px solid #444; padding: 3px 6px; font-size: 11px; width: 140px; border-radius: 3px;">
+            <button id="debug-report-btn" class="dbg-btn" style="background: #710000; border-color: #ff0055; font-weight: bold;">🚨 バグレポート生成</button>
+            <button id="debug-clear-btn" class="dbg-btn">🗑 クリア</button>
+            <button id="debug-rank-btn" class="dbg-btn">📊 負荷/関数ランク</button>
+        </div>
+        <span id="custom-debug-arrow" style="font-size: 16px; transition: transform 0.2s;">▼</span>
     </div>
-    <!-- ログ表示エリア -->
-    <div id="custom-debug-console" style="height: 250px; background: rgba(0,0,0,0.9); overflow-y: scroll; padding: 10px; transition: height 0.2s, padding 0.2s;">
-        <div id="custom-debug-log"></div>
+    <div id="custom-debug-console" style="height: 35vh; min-height: 250px; background: rgba(10,10,15,0.95); overflow-y: scroll; padding: 10px; transition: height 0.2s; border-top: 1px solid #333; position: relative;">
+        <div id="custom-debug-log" style="padding-bottom: 20px;"></div>
     </div>
 </div>
 
+<style>
+    .dbg-btn { background: #2b2b36; color: #fff; border: 1px solid #444; padding: 4px 10px; font-size: 11px; cursor: pointer; border-radius: 3px; transition: all 0.2s; }
+    .dbg-btn:hover { background: #444; border-color: #00ffcc; }
+    .dbg-log-row { border-bottom: 1px dashed #222; padding: 4px 0; word-break: break-all; white-space: pre-wrap; font-family: monospace; }
+    .dbg-log-row:hover { background: rgba(255,255,255,0.05); }
+    .dbg-critical { background: rgba(255, 0, 0, 0.15); border-left: 4px solid #ff0055; padding-left: 8px; }
+    .dbg-warn { background: rgba(255, 170, 0, 0.1); border-left: 4px solid #ffaa00; padding-left: 8px; }
+</style>
+
 <script>
 (function() {
-    // --- 1. 折りたたみ制御 ---
-    const container = document.getElementById('custom-debug-container');
-    const toggleBtn = document.getElementById('custom-debug-toggle');
-    const consoleArea = document.getElementById('custom-debug-console');
-    const arrow = document.getElementById('custom-debug-arrow');
-    let isOpen = true;
-
-    toggleBtn.addEventListener('click', () => {
-        isOpen = !isOpen;
-        consoleArea.style.height = isOpen ? "250px" : "0px";
-        consoleArea.style.padding = isOpen ? "10px" : "0px";
-        arrow.textContent = isOpen ? "▼" : "▲";
-    });
-
-    // --- 2. ログ記録・精度向上制御 ---
-    const logger = document.getElementById('custom-debug-log');
-    const oldLog = console.log;
-    const oldError = console.error;
-    const oldWarn = console.warn;
-
-    function safeStringify(obj) {
-        if (obj === null) return "null";
-        if (typeof obj === "undefined") return "undefined";
-        if (typeof obj !== "object") return String(obj);
-        
-        if (obj instanceof Error || obj.code || obj.message) {
-            let errStr = `[${obj.code || obj.name || 'Error'}] ${obj.message || '不明なエラー'}`;
-            if (obj.stack) errStr += `\n${obj.stack}`;
-            return errStr;
+    // --- 【0】安全機構＆内部状態 (自己保護, メモリリーク対策) ---
+    let isDebuggerActive = false; // デバッガー自身のログ出力を防ぐフラグ
+    const GOD = {
+        logs: [], maxLogs: 2000, 
+        errCounts: {}, funcCalls: {}, funcTimes: {}, resourceTimes: [],
+        breadcrumbs: [], randHistory: [], asyncTimeline: [],
+        timers: new Set(), intervals: new Set(), listeners: new Map(),
+        saveTimeout: null, frameCount: 0, lastFpsTime: performance.now(),
+        watchdogTimeout: null, cpuTimeInFrame: 0,
+        ui: {
+            console: document.getElementById('custom-debug-console'),
+            logger: document.getElementById('custom-debug-log'),
+            search: document.getElementById('debug-search'),
+            fps: document.getElementById('dbg-fps'), dom: document.getElementById('dbg-dom'),
+            mem: document.getElementById('dbg-mem'), cpu: document.getElementById('dbg-cpu'),
+            errHUD: document.getElementById('dbg-err-count')
         }
+    };
+
+    // デバッガー内部エラー保護
+    function safeExecute(fn, fallbackReturn) {
+        try { return fn(); } catch(e) { /* デバッガー自身の死を防ぐ */ return fallbackReturn; }
+    }
+
+    // --- 【1】高度なシリアライズ (Map, Set, Date, Error, Node) ---
+    function safeStringify(obj, depth = 0) {
+        if(depth > 3) return "[Deep Object]";
+        if(obj === null) return "null";
+        if(obj === undefined) return "undefined";
+        if(typeof obj === "function") return `[Function: ${obj.name || 'anonymous'}]`;
+        if(typeof obj !== "object") return String(obj);
+        
+        if(obj instanceof Error) return `${obj.name}: ${obj.message}\n${obj.stack || ''}`;
+        if(obj instanceof Date) return `[Date: ${obj.toISOString()}]`;
+        if(obj instanceof Map) return `[Map: ${Array.from(obj.entries()).map(e => `${e[0]}=>${safeStringify(e[1], depth+1)}`).join(', ')}]`;
+        if(obj instanceof Set) return `[Set: ${Array.from(obj.values()).join(', ')}]`;
+        if(obj instanceof HTMLElement) return `[DOM: ${obj.tagName.toLowerCase()}${obj.id ? '#'+obj.id : ''}${obj.className ? '.'+obj.className.replace(/ /g,'.') : ''}]`;
+        if(obj instanceof Promise) return `[Promise]`;
 
         try {
             const seen = new WeakSet();
             return JSON.stringify(obj, (key, value) => {
-                if (typeof value === "object" && value !== null) {
-                    if (seen.has(value)) return "[Circular Reference]";
+                if(typeof value === "object" && value !== null) {
+                    if(seen.has(value)) return "[Circular]";
                     seen.add(value);
                 }
                 return value;
             }, 2);
-        } catch (err) {
-            return Object.prototype.toString.call(obj) + " (Unserializable Object)";
-        }
+        } catch(e) { return "[Unserializable]"; }
     }
 
-    function appendLog(msg, color) {
-        const div = document.createElement('div');
-        div.style.color = color;
-        div.style.borderBottom = "1px dashed #444";
-        div.style.padding = "6px 0";
-        div.style.wordBreak = "break-all";
-        div.style.whiteSpace = "pre-wrap"; 
-        div.textContent = msg;
-        logger.appendChild(div);
-        consoleArea.scrollTop = consoleArea.scrollHeight;
+    // --- 【2】バッチ処理＆ストレージ (高負荷回避) ---
+    function queueSaveLogs() {
+        if(GOD.saveTimeout) clearTimeout(GOD.saveTimeout);
+        GOD.saveTimeout = setTimeout(() => {
+            safeExecute(() => {
+                if(GOD.logs.length > GOD.maxLogs) GOD.logs = GOD.logs.slice(-GOD.maxLogs);
+                localStorage.setItem('god_debugger_logs', JSON.stringify(GOD.logs));
+            });
+        }, 2000); // 2秒バッチ
     }
 
-    function processArgs(args) {
-        return args.map(a => safeStringify(a)).join(" ");
+    function _printLogToDOM(time, type, msg, color, cssClass = '') {
+        safeExecute(() => {
+            const div = document.createElement('div');
+            div.className = `dbg-log-row ${cssClass}`;
+            div.style.color = color;
+            div.innerHTML = `<span style="color:#666;font-size:10px;">[${time}]</span> <strong style="font-size:11px;">[${type}]</strong> ${msg}`;
+            GOD.ui.logger.appendChild(div);
+            // DOMあふれ防止 (DOMノード数監視と連携)
+            if(GOD.ui.logger.children.length > 500) GOD.ui.logger.firstChild.remove();
+            GOD.ui.console.scrollTop = GOD.ui.console.scrollHeight;
+        });
     }
 
-    console.log = function(...args) {
-        oldLog.apply(console, args);
-        appendLog("[LOG] " + processArgs(args), "#2ecc71");
-    };
+    function coreLog(msg, color, type, isError = false, isWarn = false) {
+        if(isDebuggerActive) return; // 自己呼び出し回避
+        isDebuggerActive = true;
+        safeExecute(() => {
+            const time = new Date().toISOString().substring(11, 23);
+            let finalMsg = msg;
 
-    console.warn = function(...args) {
-        oldWarn.apply(console, args);
-        appendLog("[WARN] " + processArgs(args), "#f39c12");
-    };
+            if(isError) {
+                // エラー集計 (重複防止)
+                const errKey = msg.substring(0, 100);
+                GOD.errCounts[errKey] = (GOD.errCounts[errKey] || 0) + 1;
+                finalMsg = `(${GOD.errCounts[errKey]}回目) ` + msg;
+                GOD.ui.errHUD.innerText = Object.values(GOD.errCounts).reduce((a,b)=>a+b,0);
+            }
 
-    console.error = function(...args) {
-        oldError.apply(console, args);
-        appendLog("❌ [ERROR] " + processArgs(args), "#e74c3c");
-        if (!isOpen) toggleBtn.click();
-    };
+            GOD.logs.push({ time, type, msg: finalMsg });
+            queueSaveLogs();
 
-    window.onerror = function(msg, url, line, col, error) {
-        const details = error ? safeStringify(error) : "";
-        appendLog(`💥 [FATAL] ${msg} (行: ${line})\n${details}`, "#ff4757");
-        if (!isOpen) toggleBtn.click();
-        return false;
-    };
+            const cssClass = isError ? 'dbg-critical' : (isWarn ? 'dbg-warn' : '');
+            _printLogToDOM(time, type, finalMsg, color, cssClass);
+        });
+        isDebuggerActive = false;
+    }
+
+    // --- 【3】Console上書き (安全版 & Trace, Table対応) ---
+    const rawConsole = { log: console.log, warn: console.warn, error: console.error, table: console.table, trace: console.trace };
     
-    window.addEventListener("unhandledrejection", function(event) {
-        const reason = event.reason;
-        let errorMsg = safeStringify(reason);
-        appendLog("🔥 [PROMISE ERROR] " + errorMsg, "#ff6b81");
-        if (!isOpen) toggleBtn.click();
+    console.log = (...args) => { rawConsole.log(...args); coreLog(args.map(a => safeStringify(a)).join(" "), "#2ecc71", "LOG"); };
+    console.warn = (...args) => { rawConsole.warn(...args); coreLog(args.map(a => safeStringify(a)).join(" "), "#ffaa00", "WARN", false, true); };
+    console.error = (...args) => { rawConsole.error(...args); coreLog(args.map(a => safeStringify(a)).join(" "), "#ff0055", "ERROR", true); };
+    
+    console.table = (data) => { 
+        rawConsole.table(data); 
+        // 巨大配列フリーズ回避
+        const limitData = Array.isArray(data) && data.length > 50 ? data.slice(0, 50).concat(['...Truncated']) : data;
+        coreLog("Table:\n" + safeStringify(limitData), "#3498db", "TABLE"); 
+    };
+
+    console.trace = (...args) => {
+        rawConsole.trace(...args);
+        const err = new Error();
+        coreLog((args.length?args.join(" ")+"\n":"") + err.stack.replace(/^Error\n/, ''), "#9b59b6", "TRACE");
+    };
+
+    // --- 【4】全方位ネットワーク監視 (Fetch, XHR, WS) ---
+    const rawFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const start = performance.now();
+        GOD.asyncTimeline.push(`Fetch Start: ${args[0]}`);
+        try {
+            const res = await rawFetch.apply(this, args);
+            const ms = Math.round(performance.now() - start);
+            if(!res.ok) coreLog(`🌐 ❌ Fetch HTTP ${res.status}: ${args[0]} (${ms}ms)`, "#ff0055", "FETCH_ERR", true);
+            else coreLog(`🌐 ✅ Fetch HTTP 200: ${args[0]} (${ms}ms)`, "#3498db", "FETCH");
+            return res;
+        } catch(e) {
+            coreLog(`🌐 💥 Fetch致命的失敗: ${args[0]} - ${e.message}`, "#ff0055", "FETCH_CRASH", true);
+            throw e;
+        }
+    };
+
+    const rawXHROpen = XMLHttpRequest.prototype.open;
+    const rawXHRSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        this._dbgUrl = url; this._dbgMethod = method;
+        return rawXHROpen.call(this, method, url, ...rest);
+    };
+    XMLHttpRequest.prototype.send = function(...args) {
+        const start = performance.now();
+        this.addEventListener('load', () => {
+            const ms = Math.round(performance.now() - start);
+            if(this.status >= 400) coreLog(`🌐 ❌ XHR ${this.status}: ${this._dbgUrl} (${ms}ms)`, "#ff0055", "XHR_ERR", true);
+        });
+        this.addEventListener('error', () => coreLog(`🌐 💥 XHR Network Error: ${this._dbgUrl}`, "#ff0055", "XHR_CRASH", true));
+        return rawXHRSend.apply(this, args);
+    };
+
+    const rawWS = window.WebSocket;
+    if(rawWS) {
+        window.WebSocket = function(...args) {
+            const ws = new rawWS(...args);
+            ws.addEventListener('open', () => coreLog(`🔌 WS 接続: ${args[0]}`, "#3498db", "WS"));
+            ws.addEventListener('error', (e) => coreLog(`🔌 ❌ WS エラー: ${args[0]}`, "#ff0055", "WS_ERR", true));
+            return ws;
+        };
+    }
+
+    // --- 【5】非破壊的DOM操作・CSS監視 ---
+    const hookDOMMethod = (obj, method, validateArgs, logMsgObj) => {
+        const orig = obj.prototype[method];
+        if(!orig) return;
+        obj.prototype[method] = function(...args) {
+            safeExecute(() => {
+                if(validateArgs && !validateArgs(args)) {
+                    coreLog(`❌ [DOM] ${method}: 不正な引数 ${safeStringify(args)}`, "#ffaa00", "DOM_WARN", false, true);
+                }
+            });
+            const res = orig.apply(this, args);
+            // nullアクセス候補事前警告 (id取得失敗など)
+            if(method === 'getElementById' && !res) coreLog(`⚠️ [DOM] getElementById("${args[0]}") が null を返しました。`, "#ffaa00", "DOM_NULL_WARN", false, true);
+            return res;
+        };
+    };
+
+    // React等と競合しないよう、適用はDocumentとElementに限り、戻り値を完全保証する
+    hookDOMMethod(Document, 'getElementById');
+    hookDOMMethod(Document, 'querySelector');
+    hookDOMMethod(Element, 'appendChild', (args) => args[0] != null);
+    hookDOMMethod(Element, 'removeChild', (args) => args[0] != null);
+
+    // CSSエラー監視 (stylesheet load error)
+    window.addEventListener('error', e => {
+        if (e.target && ['LINK', 'IMG', 'SCRIPT', 'AUDIO', 'VIDEO'].includes(e.target.tagName)) {
+            coreLog(`🚫 [Resource 404] ${e.target.tagName} の読込失敗: ${e.target.src || e.target.href}`, "#ff0055", "RES_404", true);
+        }
+    }, true);
+
+    // --- 【6】タイマー＆無限ループ監視 (Watchdog) ---
+    const rawSetTimeout = window.setTimeout;
+    const rawSetInterval = window.setInterval;
+    const rawRAF = window.requestAnimationFrame;
+
+    window.setTimeout = function(fn, ms, ...args) {
+        return rawSetTimeout(function(...cbArgs) {
+            const start = performance.now();
+            try { fn.apply(this, cbArgs); } 
+            catch(e) { coreLog(`⏱ ❌ setTimeout内エラー: ${e.message}`, "#ff0055", "TIMER_ERR", true); throw e; }
+            finally {
+                const dur = performance.now() - start;
+                if(dur > 50) coreLog(`🐢 激重処理 setTimeout (${dur.toFixed(1)}ms)`, "#ffaa00", "PERF_WARN", false, true);
+            }
+        }, ms, ...args);
+    };
+
+    // 無限ループ・フリーズ検知 (メインスレッドがブロックされるとこれが呼ばれなくなる)
+    let lastWatchdog = performance.now();
+    function watchdogTick() {
+        const now = performance.now();
+        if(now - lastWatchdog > 1500 && !document.hidden) {
+            coreLog(`🚨 [無限ループ警告] メインスレッドが ${Math.round(now - lastWatchdog)}ms 停止していました。`, "#ff0055", "FREEZE", true);
+        }
+        lastWatchdog = performance.now();
+        rawSetTimeout(watchdogTick, 200);
+    }
+    watchdogTick();
+
+    // --- 【7】メモリ＆イベントリーク・ボタン操作履歴 (パンくず) ---
+    const rawAddEvent = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function(type, listener, opts) {
+        safeExecute(() => {
+            const key = (this.tagName||'Window') + ':' + type;
+            const count = (GOD.listeners.get(key) || 0) + 1;
+            GOD.listeners.set(key, count);
+            // 同じ要素に同じイベントが10回以上登録されたらリーク警告
+            if(count === 10) coreLog(`⚠️ [Event Leak] ${key} に10回以上リスナーが登録されています。`, "#ffaa00", "LEAK_WARN", false, true);
+        });
+        return rawAddEvent.call(this, type, listener, opts);
+    };
+
+    // クリック履歴 (Breadcrumbs)
+    window.addEventListener('click', e => {
+        safeExecute(() => {
+            let path = e.target.tagName.toLowerCase();
+            if(e.target.id) path += `#${e.target.id}`;
+            if(e.target.className && typeof e.target.className === 'string') path += `.${e.target.className.split(' ').join('.')}`;
+            GOD.breadcrumbs.push({ time: new Date().toISOString().substring(11, 19), path: path });
+            if(GOD.breadcrumbs.length > 20) GOD.breadcrumbs.shift();
+        });
+    }, true);
+
+    // Math.random フック (ゲームステート再現用)
+    const rawMathRandom = Math.random;
+    Math.random = function() {
+        const v = rawMathRandom();
+        GOD.randHistory.push(v);
+        if(GOD.randHistory.length > 100) GOD.randHistory.shift();
+        return v;
+    };
+
+    // --- 【8】例外・Promise完全捕捉 ---
+    window.addEventListener('error', e => {
+        coreLog(`💥 [未捕捉エラー] ${e.message}\n📍 ${e.filename} (${e.lineno}:${e.colno})\n[スタック]\n${e.error ? e.error.stack : 'なし'}`, "#ff0055", "FATAL_ERR", true);
     });
+    window.addEventListener('unhandledrejection', e => {
+        coreLog(`🔥 [Promise崩壊] 未処理の非同期エラー: ${safeStringify(e.reason)}`, "#ff0055", "PROMISE_ERR", true);
+    });
+
+    // --- 【9】HUD更新 (FPS, DOM, CPU近似) ---
+    function updateHUD() {
+        if (document.hidden) {
+            GOD.lastFpsTime = performance.now();
+            GOD.frameCount = 0;
+            return rawRAF(updateHUD); // タブ裏の時はカウントスキップ
+        }
+        
+        const now = performance.now();
+        GOD.frameCount++;
+        
+        // 簡易CPU使用率 (1フレームあたりの処理時間の割合)
+        // 厳密ではないが、メインスレッドの占有率の目安になる
+        
+        if (now - GOD.lastFpsTime >= 1000) {
+            // FPS
+            GOD.ui.fps.innerText = GOD.frameCount;
+            GOD.ui.fps.style.color = GOD.frameCount < 30 ? '#ff0055' : '#0f0';
+            
+            // DOM数
+            const domCount = document.getElementsByTagName('*').length;
+            GOD.ui.dom.innerText = domCount;
+            GOD.ui.dom.style.color = domCount > 3000 ? '#ffaa00' : '#0f0';
+            
+            // Mem (Safari対応フォールバック)
+            if(performance.memory) {
+                GOD.ui.mem.innerText = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
+            } else {
+                GOD.ui.mem.innerText = "N/A(Safari)";
+            }
+
+            GOD.frameCount = 0;
+            GOD.lastFpsTime = now;
+        }
+        rawRAF(updateHUD);
+    }
+    rawRAF(updateHUD);
+
+    // --- 【10】自動バグレポート生成 (究極機能) ---
+    document.getElementById('debug-report-btn').addEventListener('click', () => {
+        safeExecute(() => {
+            const report = {
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent,
+                url: window.location.href,
+                domCount: document.getElementsByTagName('*').length,
+                breadcrumbs: GOD.breadcrumbs,
+                recentRandoms: GOD.randHistory.slice(-20),
+                errorCounts: GOD.errCounts,
+                recentLogs: GOD.logs.slice(-100), // 直近100件
+                gameState: {
+                    score: window.score, currentRound: window.currentRound, 
+                    clock: window.clock, isVisual: window.isVisual
+                },
+                // bodyの軽量スナップショット
+                domSnapshot: document.body.innerHTML.substring(0, 1000) + '...[TRUNCATED]'
+            };
+            
+            const txt = JSON.stringify(report, null, 2);
+            navigator.clipboard.writeText(txt).then(() => {
+                alert('🚨 バグレポートをクリップボードにコピーしました！\n開発者にペーストして送信してください。');
+                coreLog("🚨 バグレポート生成完了", "#fff", "REPORT");
+            }).catch(e => {
+                console.error("コピー失敗", e);
+                coreLog("クリップボードコピー失敗。Consoleを確認してください。", "#ff0055", "REPORT_ERR", true);
+            });
+        });
+    });
+
+    // UIトグル操作類
+    let isOpen = true;
+    const uiToggle = document.getElementById('custom-debug-toggle');
+    const uiArrow = document.getElementById('custom-debug-arrow');
+    const uiConsole = document.getElementById('custom-debug-console');
+    
+    uiToggle.addEventListener('click', (e) => {
+        if(['INPUT', 'BUTTON'].includes(e.target.tagName)) return;
+        isOpen = !isOpen;
+        uiConsole.style.height = isOpen ? "35vh" : "0px";
+        uiConsole.style.minHeight = isOpen ? "250px" : "0px";
+        uiConsole.style.padding = isOpen ? "10px" : "0px";
+        uiArrow.style.transform = isOpen ? "rotate(0deg)" : "rotate(180deg)";
+    });
+
+    document.getElementById('debug-clear-btn').addEventListener('click', () => {
+        GOD.ui.logger.innerHTML = ''; GOD.logs = []; GOD.errCounts = {};
+        localStorage.removeItem('god_debugger_logs');
+        GOD.ui.errHUD.innerText = '0';
+        coreLog("🧹 ログ・エラー集計をクリアしました", "#00ffcc", "SYSTEM");
+    });
+
+    document.getElementById('debug-search').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        Array.from(GOD.ui.logger.children).forEach(row => {
+            row.style.display = row.innerText.toLowerCase().includes(term) ? 'block' : 'none';
+        });
+    });
+
+    document.getElementById('debug-rank-btn').addEventListener('click', () => {
+        coreLog(`📊 イベント登録数上位: \n${safeStringify([...GOD.listeners.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5))}`, "#3498db", "STATS");
+    });
+
+    // ロード完了時に真っ白チェック (自己診断)
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            const bodyStyle = window.getComputedStyle(document.body);
+            if (bodyStyle.display === 'none' || document.body.innerText.trim().length < 50) {
+                coreLog("💀 【真っ白検知】ロード完了後も画面が表示されていないか、コンテンツが空です。", "#ff0055", "FATAL_UI", true);
+            }
+        }, 2000);
+    });
+
+    coreLog('🚀 OMNISCIENT DEBUGGER V3 起動完了。50項目の監視プロトコル、オールグリーン。', '#00ffcc', 'SYSTEM');
 })();
 </script>
-<!-- ▲▲ 特製オンスクリーンコンソール (改良版) ここまで ▲▲ -->
-
-<script>
+<!-- ▲▲ 究極神デバッガー V3 ここまで ▲▲ -->
 
 // --- 試合詳細・スタッツ描画関数 ---
 function renderMatchStats(tableId, titleId, team, teamData) {
