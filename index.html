@@ -1102,358 +1102,496 @@ function showHistoricalMatch(logIndex) {
     }
 
         function simulateGame(hTeam, aTeam, isVisual) {
-        let logs = []; 
-        let score = { home: 0, away: 0 };
-        let qScores = { home: [0,0,0,0], away: [0,0,0,0] };
-        
-        // 選手の調子（裏設定）を決定: 絶好調5% < 不調10% < 好調25% < 普通60%
-        allPlayers.forEach(p => { 
-            let r = Math.random();
-            if(r < 0.05) { p._cond = 1.20; p._condStr = "絶好調"; }
-            else if(r < 0.15) { p._cond = 0.90; p._condStr = "不調"; }
-            else if(r < 0.40) { p._cond = 1.05; p._condStr = "好調"; }
-            else { p._cond = 1.00; p._condStr = "普通"; }
-        });
+    let logs = []; 
+    let score = { home: 0, away: 0 };
+    let qScores = { home: [0,0,0,0], away: [0,0,0,0] };
 
-        const evalPlayer = (p) => {
-            let s = p.stats;
-            let c = p._cond;
-            if(p.pos==="PG") return (s.pass*1.5 + s.dribble*1.5 + s.speed) * c;
-            if(p.pos==="SG") return (s.three*1.5 + s.middle*1.5 + s.speed) * c;
-            if(p.pos==="SF") return (s.layup + s.middle + s.defense + s.physical) * c;
-            if(p.pos==="PF") return (s.rebound*1.5 + s.physical*1.5 + s.dunk) * c;
-            if(p.pos==="C")  return (s.rebound*1.5 + s.defense*1.5 + s.physical + s.dunk) * c;
-            return 0;
-        };
+    // スタッツボックスの初期化
+    let gamePlayers = [...hTeam.roster, ...aTeam.roster];
+    gamePlayers.forEach(p => {
+        p._box = { pts:0, reb:0, ast:0, stl:0, blk:0, to:0, pf:0, fta:0, ftm:0, fgm:0, fga:0, tpm:0, tpa:0, drb:0, orb:0, plusMinus:0, min:0, gs:0 };
+        // 安全のためデフォルト値を設定
+        if(!p.stats) p.stats = { speed:50, stamina:50, defense:50, dribble:50, pass:50, physical:50, layup:50, dunk:50, middle:50, three:50, mental:50 };
+    });
 
-        const setupTeamState = (team) => {
-            let court = []; let bench = [];
-            POSITIONS.forEach(pos => {
-                let sorted = team.roster.filter(p=>p.pos===pos).sort((a,b) => {
-                    // 最最優先: プレイヤーは絶対にスタメン
-                    if (a.isUser) return -1;
-                    if (b.isUser) return 1;
-                    return evalPlayer(b) - evalPlayer(a);
-                });
-                
-                if (sorted.length > 0) {
-                    court.push(sorted[0]); 
-                    bench.push(...sorted.slice(1)); 
-                    sorted[0]._box = createBoxScore(); sorted[0]._box.gs = 1; sorted[0]._stamina = 100;
-                    sorted.slice(1).forEach(bp => { bp._box = createBoxScore(); bp._stamina = 100; });
-                }
+    // 選手の調子（裏設定）を決定: 絶好調5% < 不調10% < 好調25% < 普通60%
+    gamePlayers.forEach(p => { 
+        let r = Math.random();
+        if(r < 0.05) { p._cond = 1.20; p._condStr = "絶好調"; }
+        else if(r < 0.15) { p._cond = 0.90; p._condStr = "不調"; }
+        else if(r < 0.40) { p._cond = 1.05; p._condStr = "好調"; }
+        else { p._cond = 1.00; p._condStr = "普通"; }
+    });
+
+    // プレイヤー評価関数（メンタル・スタミナの残量なども将来的に影響させやすい構造）
+    const evalPlayer = (p) => {
+        let s = p.stats;
+        let c = p._cond;
+        if(p.pos==="PG") return (s.pass*1.5 + s.dribble*1.5 + s.speed) * c;
+        if(p.pos==="SG") return (s.three*1.5 + s.middle*1.5 + s.speed) * c;
+        if(p.pos==="SF") return (s.layup + s.middle + s.defense + s.physical) * c;
+        if(p.pos==="PF") return (s.rebound*1.5 + s.physical*1.5 + s.dunk) * c;
+        if(p.pos==="C")  return (s.rebound*1.5 + s.defense*1.5 + s.physical + s.dunk) * c;
+        return 50 * c;
+    };
+
+    const setupTeamState = (team) => {
+        let court = []; let bench = [];
+        const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
+        POSITIONS.forEach(pos => {
+            let sorted = team.roster.filter(p=>p.pos===pos).sort((a,b) => {
+                if (a.isUser) return -1;
+                if (b.isUser) return 1;
+                return evalPlayer(b) - evalPlayer(a);
             });
-            return { team, court, bench };
-        };
+            
+            if (sorted.length > 0) {
+                court.push(sorted[0]); 
+                bench.push(...sorted.slice(1)); 
+                sorted[0]._box.gs = 1; sorted[0]._stamina = 100;
+                sorted.slice(1).forEach(bp => { bp._stamina = 100; });
+            }
+        });
+        return { team, court, bench };
+    };
 
-        let hData = setupTeamState(hTeam); let aData = setupTeamState(aTeam);
+    let hData = setupTeamState(hTeam); let aData = setupTeamState(aTeam);
+    
+    const formatClock = (sec) => {
+        let m = Math.floor(sec/60); let s = sec%60;
+        return `残り${m}:${s.toString().padStart(2,'0')}`;
+    };
+    const getNames = (arr) => arr.map(p=>`#${p.num} ${p.name}`).join(", ");
+    
+    // 統合版 writeLog 関数
+    const writeLog = (timeSec, teamName, html, isHighlight = false, involvedIds = []) => {
+        if(!isVisual) return;
+        let extraClass = "";
+        if (isHighlight) extraClass += " log-type-highlight";
+        if (typeof currentUser !== 'undefined' && currentUser && involvedIds.includes(currentUser.id)) extraClass += " log-type-myplay";
         
-        const formatClock = (sec) => {
-            let m = Math.floor(sec/60); let s = sec%60;
-            return `残り${m}:${s.toString().padStart(2,'0')}`;
-        };
-        const getNames = (arr) => arr.map(p=>`#${p.num} ${p.name}`).join(", ");
-        
-        const writeLog = (timeSec, teamName, html) => {
-            if(!isVisual) return;
-            logs.push(`<div class="log-entry"><span class="log-time">${formatClock(timeSec)}</span><span class="log-team">${teamName}</span><span class="log-action">${html}</span></div>`);
-        };
+        logs.push(`<div class="log-entry ${extraClass}"><span class="log-time">${formatClock(timeSec)}</span><span class="log-team">${teamName}</span><span class="log-action">${html}</span></div>`);
+    };
 
-        const checkSubstitution = (teamData, clockSec, isHomeTeam) => {
-            let tName = teamData.team.name;
-            teamData.court.forEach((p, idx) => {
-                // 不調の場合はスタミナ消費が1.2倍
-                let stamLoss = 3 - (p.stats.stamina / 150) * 1.5;
-                if(p._condStr === "不調") stamLoss *= 1.2;
-                p._stamina = Math.max(0, p._stamina - (stamLoss * 0.08));
+    // スタミナ低下と交代のロジック（スタミナ低下で不調になる要素を追加）
+    const checkSubstitution = (teamData, clockSec, isHomeTeam) => {
+        let tName = teamData.team.name;
+        teamData.court.forEach((p, idx) => {
+            let stamLoss = 3 - (p.stats.stamina / 150) * 1.5;
+            if(p._condStr === "不調") stamLoss *= 1.2;
+            p._stamina = Math.max(0, p._stamina - (stamLoss * 0.08));
 
-                if(p._stamina < 65 && !p.isUser) { // プレイヤーは交代させない優先権
-                    let subCandidates = teamData.bench.filter(bp => bp.pos === p.pos && bp._stamina > 75);
-                    if(subCandidates.length > 0) {
-                        subCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
-                        let subIn = subCandidates[0];
-                        
+            // スタミナ低下による不調デバフ
+            if (p._stamina < 30 && p._condStr !== "不調") {
+                p._condStr = "不調";
+                p._cond = 0.90;
+            }
+
+            if(p._stamina < 65 && !p.isUser) { 
+                let subCandidates = teamData.bench.filter(bp => bp.pos === p.pos && bp._stamina > 75);
+                if(subCandidates.length > 0) {
+                    subCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
+                    let subIn = subCandidates[0];
+                    
+                    teamData.court[idx] = subIn;
+                    teamData.bench = teamData.bench.filter(bp => bp.id !== subIn.id);
+                    teamData.bench.push(p);
+                    
+                    writeLog(clockSec, tName, `<span class="log-sub">[交代] #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN (${p.pos})</span>`);
+                } else {
+                    let fallbackCandidates = teamData.bench.filter(bp => bp._stamina > 70);
+                    if(fallbackCandidates.length > 0) {
+                        fallbackCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
+                        let subIn = fallbackCandidates[0];
                         teamData.court[idx] = subIn;
                         teamData.bench = teamData.bench.filter(bp => bp.id !== subIn.id);
                         teamData.bench.push(p);
-                        
-                        writeLog(clockSec, tName, `<span class="log-sub">[交代] #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN (${p.pos})</span>`);
-                    } else {
-                        // 該当ポジションがいない場合はロールプレイヤー起用（3ガード等）
-                        let fallbackCandidates = teamData.bench.filter(bp => bp._stamina > 70);
-                        if(fallbackCandidates.length > 0) {
-                            fallbackCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
-                            let subIn = fallbackCandidates[0];
-                            teamData.court[idx] = subIn;
-                            teamData.bench = teamData.bench.filter(bp => bp.id !== subIn.id);
-                            teamData.bench.push(p);
-                            writeLog(clockSec, tName, `<span class="log-sub">[変則交代] ロールプレイヤー起用！ #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN</span>`);
-                        }
+                        writeLog(clockSec, tName, `<span class="log-sub">[変則交代] ロールプレイヤー起用！ #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN</span>`);
                     }
-                }
-            });
-
-            teamData.bench.forEach(bp => { bp._stamina = Math.min(100, bp._stamina + 2.5); });
-        };
-
-        let isHomeOffense = Math.random() > 0.5;
-        let currentQ = 1;
-        let maxQ = 4;
-        let isOverTime = false;
-
-        while (currentQ <= maxQ) {
-            let clock = (isOverTime) ? 300 : 720; 
-            let qName = isOverTime ? `延長第${currentQ - 4}Q(OT)` : `第${currentQ}Q`;
-            
-            if(isVisual) {
-                logs.push(`<div class="log-entry"><span class="log-time">残り--:--</span><span class="log-highlight">🏀 ${qName} 開始 🏀</span></div>`);
-                if(currentQ === 1) {
-                    writeLog(clock, hTeam.name, `【スターティング5】 ${getNames(hData.court)}`);
-                    writeLog(clock, aTeam.name, `【スターティング5】 ${getNames(aData.court)}`);
-                    writeLog(clock, "両チーム", `ティップオフ！試合開始！`);
                 }
             }
+        });
 
-            while(clock > 0) {
-                let timeSpent = Math.floor(Math.random()*12) + 8; 
-                if (clock - timeSpent < 0) timeSpent = clock;
-                clock -= timeSpent;
+        teamData.bench.forEach(bp => { bp._stamina = Math.min(100, bp._stamina + 2.5); });
+    };
 
-                let offData = isHomeOffense ? hData : aData;
-                let defData = isHomeOffense ? aData : hData;
-                let isHome = isHomeOffense;
+    let isHomeOffense = Math.random() > 0.5;
+    let currentQ = 1;
+    let maxQ = 4;
+    let isOverTime = false;
 
-                offData.court.forEach(p => p._box.min += timeSpent);
-                defData.court.forEach(p => p._box.min += timeSpent);
+    // 試合シミュレーションループ
+    while (currentQ <= maxQ) {
+        let clock = (isOverTime) ? 300 : 720; 
+        let qName = isOverTime ? `延長第${currentQ - 4}Q(OT)` : `第${currentQ}Q`;
+        
+        if(isVisual) {
+            logs.push(`<div class="log-entry"><span class="log-time">残り--:--</span><span class="log-highlight">🏀 ${qName} 開始 🏀</span></div>`);
+            if(currentQ === 1) {
+                writeLog(clock, hTeam.name, `【スターティング5】 ${getNames(hData.court)}`);
+                writeLog(clock, aTeam.name, `【スターティング5】 ${getNames(aData.court)}`);
+                writeLog(clock, "両チーム", `ティップオフ！試合開始！`);
+            }
+        }
 
-                if(Math.random() < 0.15) {
-                    checkSubstitution(hData, clock, true);
-                    checkSubstitution(aData, clock, false);
-                }
+        while(clock > 0) {
+            let timeSpent = Math.floor(Math.random()*12) + 8; 
+            if (clock - timeSpent < 0) timeSpent = clock;
+            clock -= timeSpent;
 
-                let courtEvals = offData.court.map(p => Math.max(1, evalPlayer(p)));
-                let totalEval = courtEvals.reduce((a,b)=>a+b, 0);
-                let r = Math.random(); let cum = 0; let shooter = offData.court[4];
-                for(let i=0; i<5; i++) {
-                    cum += (courtEvals[i] / totalEval);
-                    if(r < cum) { shooter = offData.court[i]; break; }
-                }
+            let offData = isHomeOffense ? hData : aData;
+            let defData = isHomeOffense ? aData : hData;
+            let isHome = isHomeOffense;
 
-                let defender = defData.court[Math.floor(Math.random()*5)];
-                // 好調時はディフェンスの反応が半歩早い
-                let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
-                let defensePressure = ((defender.stats.defense * 0.35) / 150) + defPressureBonus; 
+            offData.court.forEach(p => p._box.min += (timeSpent / 60));
+            defData.court.forEach(p => p._box.min += (timeSpent / 60));
 
-                // 不調時はターンオーバー率上昇
-                let toRisk = 0.18 - ((shooter.stats.dribble + shooter.stats.pass) / 400);
-                if(shooter._condStr === "不調") toRisk += 0.05;
+            if(Math.random() < 0.15) {
+                checkSubstitution(hData, clock, true);
+                checkSubstitution(aData, clock, false);
+            }
 
-                if(Math.random() < Math.max(0.04, toRisk)) {
-                    shooter._box.to++;
-                    if(Math.random() < ((defender.stats.speed / 200) + defPressureBonus)) {
-                        defender._box.stl++;
-                        writeLog(clock, offData.team.name, `${shooter.name}が仕掛けるも、${defender.name}が電光石火のスティール！ボールを強奪！`);
-                    } else {
-                        writeLog(clock, offData.team.name, `${shooter.name}からのパスが乱れターンオーバー。`);
-                    }
-                    isHomeOffense = !isHomeOffense; continue;
-                }
+            // シューターの決定（能力値ベースの重み付け）
+            let courtEvals = offData.court.map(p => Math.max(1, evalPlayer(p)));
+            let totalEval = courtEvals.reduce((a,b)=>a+b, 0);
+            let r = Math.random(); let cum = 0; let shooter = offData.court[4];
+            for(let i=0; i<5; i++) {
+                cum += (courtEvals[i] / totalEval);
+                if(r < cum) { shooter = offData.court[i]; break; }
+            }
 
-                let foulRisk = 0.06 + (defender.stats.physical / 1000);
-                if(Math.random() < Math.min(0.12, foulRisk)) {
-                    defender._box.pf++;
-                    let ftCount = (Math.random() < 0.25) ? 3 : 2; 
-                    writeLog(clock, defData.team.name, `${defender.name}が${shooter.name}に激しいファウル！フリースロー獲得！`);
-                    
-                    let ftMade = 0;
-                    shooter._box.fta += ftCount;
-                    for(let f=1; f<=ftCount; f++) {
-                        let ftRate = 0.60 + ((shooter.stats.middle - 30) / 120) * 0.25;
-                        if(Math.random() < Math.max(0.40, ftRate * shooter._cond)) {
-                            ftMade++; shooter._box.ftm++; shooter._box.pts++;
-                            if(isHome) { score.home++; qScores.home[Math.min(3, currentQ-1)]++; } 
-                            else { score.away++; qScores.away[Math.min(3, currentQ-1)]++; }
-                            writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`);
-                        } else {
-                            writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`);
-                        }
-                    }
-                    offData.court.forEach(p => p._box.plusMinus += ftMade);
-                    defData.court.forEach(p => p._box.plusMinus -= ftMade);
-                    isHomeOffense = !isHomeOffense; 
-                    continue; 
-                }
+            let defender = defData.court[Math.floor(Math.random()*5)];
+            
+            // クラッチタイム判定とメンタルバフ
+            let prevDiff = isHome ? (score.home - score.away) : (score.away - score.home);
+            let isClutchTime = (currentQ >= 4 && clock < 120 && Math.abs(prevDiff) <= 5);
+            let mentalBuff = 1.0;
+            if (isClutchTime && prevDiff < 0) {
+                mentalBuff = 1.0 + (shooter.stats.mental / 500); // メンタルが高いほど逆境でステータスバフ
+            }
 
-                let shotType = "layup"; 
-                let randShot = Math.random();
-                
-                if(shooter.pos === "C" || shooter.pos === "PF") {
-                    shotType = (randShot < 0.4) ? "dunk" : "layup";
+            let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
+            let defensePressure = ((defender.stats.defense * 0.35) / 150) + defPressureBonus; 
+
+            // --- A. ターンオーバー & スティール判定 ---
+            // パス・ドリブル力が低いほどターンオーバーしやすい。スピードも若干影響。
+            let toRisk = 0.18 - (((shooter.stats.dribble + shooter.stats.pass + (shooter.stats.speed*0.5)) * mentalBuff) / 500);
+            if(shooter._condStr === "不調") toRisk += 0.05;
+
+            if(Math.random() < Math.max(0.04, toRisk)) {
+                shooter._box.to++;
+                if(Math.random() < ((defender.stats.speed / 200) + defPressureBonus)) {
+                    defender._box.stl++;
+                    let stlText = defender.stats.defense > 120 
+                        ? `${defender.name}がコースを完全によみきり、戦慄のパスカット！！ボールを強奪！`
+                        : `${shooter.name}が仕掛けるも、${defender.name}が電光石火のスティール！`;
+                    writeLog(clock, offData.team.name, stlText, true, [shooter.id, defender.id]);
                 } else {
-                    if(randShot < 0.45) shotType = "layup";
-                    else if(randShot < 0.75) shotType = "three";
-                    else shotType = "middle";
+                    let toText = shooter.stats.pass < 60 && Math.random() < 0.5 
+                        ? `${shooter.name}の無謀なパスが味方に合わずターンオーバー。`
+                        : `${shooter.name}のボールハンドリングが乱れターンオーバー。`;
+                    writeLog(clock, offData.team.name, toText, false, [shooter.id]);
                 }
+                isHomeOffense = !isHomeOffense; continue;
+            }
 
-                let baseRate = 0.40; let statUsed = shooter.stats.middle;
-                if(shotType === "layup") { baseRate = 0.50; statUsed = shooter.stats.layup; }
-                else if(shotType === "dunk") { baseRate = 0.65; statUsed = shooter.stats.dunk; }
-                else if(shotType === "middle") { baseRate = 0.40; statUsed = shooter.stats.middle; }
-                else if(shotType === "three") { baseRate = 0.30; statUsed = shooter.stats.three; }
+            // --- ファウル判定（守備力が低いと増え、フィジカルが高いと少し増える） ---
+            let foulRisk = 0.08 - (defender.stats.defense / 1000) + (defender.stats.physical / 1500);
+            if(Math.random() < Math.min(0.12, Math.max(0.02, foulRisk))) {
+                defender._box.pf++;
+                let ftCount = (Math.random() < 0.25) ? 3 : 2; 
+                writeLog(clock, defData.team.name, `${defender.name}が激しいファウル！${shooter.name}がフリースロー獲得！`, false, [shooter.id, defender.id]);
+                
+                let ftMade = 0;
+                shooter._box.fta += ftCount;
+                for(let f=1; f<=ftCount; f++) {
+                    let ftRate = 0.60 + ((shooter.stats.middle - 30) / 120) * 0.25;
+                    if(Math.random() < Math.max(0.40, ftRate * shooter._cond * mentalBuff)) {
+                        ftMade++; shooter._box.ftm++; shooter._box.pts++;
+                        if(isHome) { score.home++; qScores.home[Math.min(3, currentQ-1)]++; } 
+                        else { score.away++; qScores.away[Math.min(3, currentQ-1)]++; }
+                        writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
+                    } else {
+                        writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`, false, [shooter.id]);
+                    }
+                }
+                offData.court.forEach(p => p._box.plusMinus += ftMade);
+                defData.court.forEach(p => p._box.plusMinus -= ftMade);
+                isHomeOffense = !isHomeOffense; 
+                continue; 
+            }
 
-                let abilityBonus = ((statUsed - 30) / 120) * 0.30;
-                let successRate = (baseRate + abilityBonus) * shooter._cond - defensePressure;
+            // --- シュートタイプの決定 ---
+            let shotType = "layup"; 
+            let randShot = Math.random();
+            if(shooter.pos === "C" || shooter.pos === "PF") {
+                shotType = (randShot < 0.45 && (shooter.stats.physical > 90 || shooter.stats.dunk > 80)) ? "dunk" : "layup";
+            } else {
+                if(randShot < 0.40) shotType = "layup";
+                else if(randShot < 0.70) shotType = "three";
+                else shotType = "middle";
+                // ガード陣でもダンクステータスとスピードがあればたまにダンク
+                if(shooter.stats.dunk > 85 && shooter.stats.speed > 90 && Math.random() < 0.15) shotType = "dunk";
+            }
 
-                // 絶好調の場合はアンクルブレイク判定
-                let ankleBreak = false;
-                if(shooter._condStr === "絶好調" && (shotType === "layup" || shotType === "middle" || shotType === "three")) {
-                    if(Math.random() < 0.15) {
-                        ankleBreak = true;
-                        successRate += 0.20; // アンクルブレイク時はシュート成功率大幅UP
+            shooter._box.fga++;
+            if(shotType === "three") shooter._box.tpa++;
+
+            let statUsed = shooter.stats[shotType] || shooter.stats.middle;
+            let baseRate = shotType === "dunk" ? 0.65 : shotType === "layup" ? 0.50 : shotType === "middle" ? 0.40 : 0.30;
+            
+            let abilityBonus = ((statUsed - 30) / 120) * 0.30;
+            let successRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - defensePressure;
+
+            // スピードとドリブルが高ければアンクルブレイク判定
+            let ankleBreak = false;
+            if(shooter.stats.dribble > defender.stats.defense + 20 && Math.random() < 0.15 * shooter._cond) {
+                ankleBreak = true;
+                successRate += 0.25;
+            }
+
+            // --- B. ブロック判定（フィジカルと守備力が影響） ---
+            let blockChance = ((defender.stats.defense + defender.stats.physical) / 300) * 0.08 + defPressureBonus;
+            if(shotType === "dunk") blockChance -= 0.03; // ダンクはブロックしにくい
+            if(shotType === "layup" && shooter.stats.layup > 110) blockChance -= 0.04; // フローター等でブロック回避
+
+            if(Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
+                defender._box.blk++;
+                let blkText = (defender.stats.physical > 110 && defender.stats.defense > 100) 
+                    ? `${shooter.name}のシュートを${defender.name}がバレーボールのスパイクのように叩き落とす超絶ブロック！！`
+                    : `${shooter.name}のシュートを${defender.name}が背後からチェイスダウンブロック！！`;
+                writeLog(clock, defData.team.name, blkText, true, [shooter.id, defender.id]);
+                isHomeOffense = !isHomeOffense;
+                continue;
+            }
+
+            // --- C. シュート成功判定 ---
+            if(Math.random() < Math.max(0.15, successRate)) {
+                shooter._box.fgm++;
+                let pts = (shotType === "three") ? 3 : 2;
+                shooter._box.pts += pts;
+                if(shotType === "three") shooter._box.tpm++;
+                
+                if(isHome) { score.home += pts; qScores.home[Math.min(3, currentQ-1)] += pts; } 
+                else { score.away += pts; qScores.away[Math.min(3, currentQ-1)] += pts; }
+
+                let newDiff = isHome ? (score.home - score.away) : (score.away - score.home);
+                let isClutch = (isClutchTime && prevDiff < 0 && newDiff > 0);
+
+                offData.court.forEach(p => p._box.plusMinus += pts);
+                defData.court.forEach(p => p._box.plusMinus -= pts);
+
+                let playText = "";
+                let isHigh = false;
+                let involved = [shooter.id, defender.id];
+                let passer = offData.court[Math.floor(Math.random()*5)];
+                let assistText = "";
+
+                // アシストと連携技判定（パス能力で変態的パスやアリウープ）
+                if(passer.id !== shooter.id && Math.random() < (passer.stats.pass / 150) * 0.65) {
+                    passer._box.ast++;
+                    involved.push(passer.id);
+                    
+                    if ((shotType === "dunk" || shotType === "layup") && passer.stats.pass > 100 && (shooter.stats.dunk > 90 || shooter.stats.layup > 100) && Math.random() < 0.3) {
+                        playText = `<span style="color:#9b59b6; font-weight:bold;">【アリウープ！】</span>${passer.name}の絶妙なロブパスを、空中で受け取った${shooter.name}がそのまま豪快にリングへ叩き込んだ！！！`;
+                        isHigh = true;
+                    } else if (passer.stats.pass > 120 && Math.random() < 0.3) {
+                        assistText = `<span class="log-assist">#${passer.num} ${passer.name}の変態的なノールックパス ➔ </span>`;
+                    } else {
+                        assistText = `<span class="log-assist">#${passer.num} ${passer.name}の的確なアシスト ➔ </span>`;
                     }
                 }
 
-                shooter._box.fga++;
-                if(shotType === "three") shooter._box.tpa++;
-
-                let blockChance = ((defender.stats.defense / 150) * 0.08) + defPressureBonus;
-                if(shotType === "dunk") blockChance -= 0.04;
-                
-                if(Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
-                    defender._box.blk++;
-                    writeLog(clock, defData.team.name, `${shooter.name}のシュートを${defender.name}が叩き落とす超絶ブロック！！`);
-                    isHomeOffense = !isHomeOffense;
-                }
-                else if(Math.random() < Math.max(0.15, successRate)) {
-                    shooter._box.fgm++;
-                    let pts = (shotType === "three") ? 3 : 2;
-                    shooter._box.pts += pts;
-                    if(shotType === "three") shooter._box.tpm++;
-                    
-                    if(isHome) { score.home += pts; qScores.home[Math.min(3, currentQ-1)] += pts; } 
-                    else { score.away += pts; qScores.away[Math.min(3, currentQ-1)] += pts; }
-
-                    offData.court.forEach(p => p._box.plusMinus += pts);
-                    defData.court.forEach(p => p._box.plusMinus -= pts);
-
-                    let playText = "";
-                    if(ankleBreak) {
+                // 個人技テキストの構築
+                if (playText === "") {
+                    if (isClutch) {
+                        playText = `<span style="color:#f1c40f; font-weight:bold; font-size:14px;">🔥【大逆転クラッチ！】🔥</span>${shooter.name}が土壇場で起死回生のシュートをねじ込んだ！！！`;
+                        isHigh = true;
+                    } else if(ankleBreak) {
                         playText = `<span style="color:#e67e22; font-weight:bold;">【アンクルブレイク！】</span>${shooter.name}の鋭いクロスオーバーに${defender.name}が足をもつれて転倒！！そのまま余裕で沈めた！！！`;
+                        isHigh = true;
                     } else if(shotType === "three") {
-                        if(shooter._condStr === "絶好調" && Math.random() < 0.4) {
-                            playText = `${shooter.name}がロゴ付近から放つディープスリー！！美しい弧を描いてリングに吸い込まれた！！！`;
+                        if(shooter.stats.three > 120 && Math.random() < 0.3) {
+                            playText = `${shooter.name}がロゴ付近から放つディープスリー！！美しい弧を描きリングに吸い込まれた！！！`;
+                            isHigh = true;
+                        } else if (shooter.stats.three > 90 && defender.stats.defense > 90 && Math.random() < 0.4) {
+                            playText = `ディフェンスがガチガチに密着する厳しい状況下、${shooter.name}がタフな3Pを強引に沈めた！`;
+                            isHigh = true;
                         } else {
                             playText = Math.random() > 0.5 ? `${shooter.name}がスクリーンを使い3P！決まった！` : `${shooter.name}がキャッチ＆シュートで3Pを沈めた！`;
                         }
                     } else if(shotType === "dunk") {
-                        playText = `${shooter.name}が豪快なポスタライズダンクを決めたーーーっ！！！`;
+                        let r = Math.random();
+                        if (shooter.stats.dunk > 130 && r < 0.15) {
+                            playText = `<span style="color:#e74c3c; font-weight:bold;">【伝説級ダンク！】</span>${shooter.name}がフリースローラインから跳躍し、空を歩くようなダンクを叩き込んだ！！！`;
+                            isHigh = true;
+                        } else if (shooter.stats.dunk > 110 && r < 0.35) {
+                            playText = `${shooter.name}が空中で腕を回す豪快なウィンドミルダンク炸裂！！！`;
+                            isHigh = true;
+                        } else if (shooter.stats.physical > 100 && r < 0.6) {
+                            playText = `${shooter.name}が${defender.name}ごと吹き飛ばす強烈なポスタライズダンクを決めたーーーっ！！！`;
+                            isHigh = true;
+                        } else {
+                            playText = `${shooter.name}が豪快なボースハンドダンクを決めた！`;
+                        }
                     } else if(shotType === "layup") {
-                        playText = `${shooter.name}がダブルクラッチで華麗にレイアップを沈めた！`;
-                    } else {
-                        playText = `${shooter.name}がステップバックからジャンプシュート！綺麗に射抜いた！`;
+                        let lu = shooter.stats.layup;
+                        let r = Math.random();
+                        if (lu > 120 && r < 0.15) {
+                            playText = `ブロックを空中で2度躱す！${shooter.name}の変態的なトリプルクラッチ！！`;
+                            isHigh = true;
+                        } else if (lu > 100 && r < 0.3) {
+                            playText = `${shooter.name}がユーロステップでディフェンダーを嘲笑うかのように抜き去りレイアップ！`;
+                        } else if (lu > 90 && r < 0.45) {
+                            playText = `${shooter.name}が空中でボールを動かす優雅なジェリー・レイアップを沈めた！`;
+                        } else if (lu > 80 && r < 0.6) {
+                            playText = `${shooter.name}がビッグマンのブロックを嘲笑うかのような高い弧を描くティアドロップ（フローター）！`;
+                        } else if (lu > 80 && r < 0.7) {
+                            playText = `${shooter.name}が意表を突くワンステップ（ヴェロ・ステップ）でタイミングをずらしレイアップ！`;
+                        } else if (shooter.stats.physical > 90 && r < 0.8) {
+                            playText = `${shooter.name}がギャロップステップ（プロホップ）で強引にスペースをこじ開けレイアップ！`;
+                        } else if (r < 0.9) {
+                            playText = `${shooter.name}がゴール下を潜り抜け、リング越しにリバース・レイアップ（リーチバック）！`;
+                        } else {
+                            playText = `${shooter.name}がダブルクラッチで華麗にレイアップを沈めた！`;
+                        }
+                    } else { // middle
+                        let r = Math.random();
+                        if (shooter.stats.dribble > 100 && r < 0.3) {
+                            playText = `${shooter.name}が鮮やかなスピンムーブからフェイダウェイ！美しく射抜いた！`;
+                        } else if (shooter.stats.dribble > 90 && r < 0.6) {
+                            playText = `${shooter.name}がステップバックからジャンプシュート！綺麗に決まった！`;
+                        } else if (shooter.stats.middle > 100 && defender.stats.defense > 90 && r < 0.8) {
+                            playText = `タフな体勢から${shooter.name}がミドルシュートをねじ込む！`;
+                        } else {
+                            playText = `${shooter.name}がミドルレンジから確実なジャンプシュート！`;
+                        }
                     }
+                    playText = assistText + playText;
+                }
 
-                    let passer = offData.court[Math.floor(Math.random()*5)];
-                    if(passer.id !== shooter.id && Math.random() < (passer.stats.pass / 150) * 0.65) {
-                        passer._box.ast++;
-                        writeLog(clock, offData.team.name, `<span class="log-assist">#${passer.num} ${passer.name}の極上パス ➔ ${playText} [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]</span>`);
+                writeLog(clock, offData.team.name, `${playText} [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, isHigh, involved);
+                isHomeOffense = !isHomeOffense;
+            } 
+            // --- D. シュート失敗 & リバウンド判定 ---
+            else {
+                writeLog(clock, offData.team.name, `${shooter.name}がシュートを放つもリングに弾かれる！`, false, [shooter.id]);
+                let offReber = offData.court[Math.floor(Math.random()*5)];
+                let defReber = defData.court[Math.floor(Math.random()*5)];
+                
+                // リバウンド率（フィジカルとリバウンド能力が影響）
+                let orbChance = 0.25 + ((offReber.stats.rebound + offReber.stats.physical) / 2000) - ((defReber.stats.rebound + defReber.stats.physical) / 2000);
+                
+                if(Math.random() < Math.max(0.10, orbChance)) {
+                    offReber._box.orb++; offReber._box.reb++;
+                    // プットバックダンク判定
+                    if (offReber.stats.dunk > 90 && offReber.stats.physical > 90 && Math.random() < 0.2) {
+                        writeLog(clock, offData.team.name, `<span style="color:#e74c3c; font-weight:bold;">【プットバック！】</span>${offReber.name}がオフェンスリバウンドを空中で掴み、そのまま強烈なダンクを叩き込んだ！！`, true, [offReber.id]);
+                    } else if (offReber.stats.physical > 110 && Math.random() < 0.4) {
+                        writeLog(clock, offData.team.name, `【空中戦】${offReber.name}がフィジカルで圧倒し、強引にオフェンスリバウンドをもぎ取った！`, false, [offReber.id]);
                     } else {
-                        writeLog(clock, offData.team.name, `${playText} [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`);
+                        writeLog(clock, offData.team.name, `${offReber.name}が執念でオフェンスリバウンドを拾う！`, false, [offReber.id]);
                     }
-
-                    isHomeOffense = !isHomeOffense;
-                } 
-                else {
-                    writeLog(clock, offData.team.name, `${shooter.name}がシュートを放つもリングに弾かれる！`);
-                    let offReber = offData.court[Math.floor(Math.random()*5)];
-                    let defReber = defData.court[Math.floor(Math.random()*5)];
-                    
-                    if(Math.random() < 0.28) {
-                        offReber._box.orb++; offReber._box.reb++;
-                        writeLog(clock, offData.team.name, `${offReber.name}が執念でオフェンスリバウンドをもぎ取る！`);
-                        isHomeOffense = isHomeOffense; 
+                    isHomeOffense = isHomeOffense; 
+                } else {
+                    defReber._box.drb++; defReber._box.reb++;
+                    // スピードがある選手のリバウンドなら速攻の起点に
+                    if (defReber.stats.speed > 100 && Math.random() < 0.3) {
+                        writeLog(clock, defData.team.name, `${defReber.name}がディフェンスリバウンドを回収し、一気にスピードを上げて速攻を展開！`, false, [defReber.id]);
                     } else {
-                        defReber._box.drb++; defReber._box.reb++;
-                        writeLog(clock, defData.team.name, `${defReber.name}がディフェンスリバウンドを回収。`);
-                        isHomeOffense = !isHomeOffense; 
+                        writeLog(clock, defData.team.name, `${defReber.name}が確実にディフェンスリバウンドを回収。`, false, [defReber.id]);
                     }
+                    isHomeOffense = !isHomeOffense; 
                 }
             }
-
-            if (currentQ === maxQ) {
-                if (score.home === score.away) {
-                    currentQ++; maxQ++; isOverTime = true;
-                    if(isVisual) logs.push(`<div class="log-entry"><span class="log-time">試合終了直後</span><span class="log-highlight">🚨 同点！【${score.home} - ${score.away}】決着つかず延長戦(OVERTIME)へ！！！🚨</span></div>`);
-                    qScores.home.push(0); qScores.away.push(0);
-                } else { break; }
-            } else { currentQ++; }
         }
 
-        if(score.home > score.away) { hTeam.w++; aTeam.l++; } else { aTeam.w++; hTeam.l++; }
+        if (currentQ === maxQ) {
+            if (score.home === score.away) {
+                currentQ++; maxQ++; isOverTime = true;
+                if(isVisual) logs.push(`<div class="log-entry"><span class="log-time">試合終了直後</span><span class="log-highlight">🚨 同点！【${score.home} - ${score.away}】決着つかず延長戦(OVERTIME)へ！！！🚨</span></div>`);
+                qScores.home.push(0); qScores.away.push(0);
+            } else { break; }
+        } else { currentQ++; }
+    }
 
-                        const commitToGlobalStats = (teamState, isH) => {
-            [...teamState.team.roster].forEach(p => {
-                let gb = p._box; if(!gb) return;
-                p.box.g++; if(gb.gs) p.box.gs++;
-                Object.keys(gb).forEach(k => { if(k!=='g'&&k!=='gs') p.box[k] += gb[k]; });
-                
-                let logData = {
-                    round: currentRound, oppName: isH ? aTeam.name : hTeam.name,
-                    result: (isH && score.home > score.away) || (!isH && score.away > score.home) ? "WIN" : "LOSE",
-                    teamScore: isH ? score.home : score.away, oppScore: isH ? score.away : score.home,
-                    pts: gb.pts||0, reb: gb.reb||0, ast: gb.ast||0
+    if(score.home > score.away) { hTeam.w++; aTeam.l++; } else { aTeam.w++; hTeam.l++; }
+
+    // 個人スタッツのグローバル反映（既存のロジック完全維持）
+    const commitToGlobalStats = (teamState, isH) => {
+        [...teamState.team.roster].forEach(p => {
+            let gb = p._box; if(!gb) return;
+            p.box.g++; if(gb.gs) p.box.gs++;
+            Object.keys(gb).forEach(k => { if(k!=='g'&&k!=='gs') p.box[k] += gb[k]; });
+            
+            let logData = {
+                round: typeof currentRound !== 'undefined' ? currentRound : 1, oppName: isH ? aTeam.name : hTeam.name,
+                result: (isH && score.home > score.away) || (!isH && score.away > score.home) ? "WIN" : "LOSE",
+                teamScore: isH ? score.home : score.away, oppScore: isH ? score.away : score.home,
+                pts: gb.pts||0, reb: gb.reb||0, ast: gb.ast||0
+            };
+
+            // マイプレイヤーのみ試合記録を蓄積する
+            if (p.isUser) {
+                logData.matchDetails = {
+                    hTeamName: hTeam.name, aTeamName: aTeam.name, hScore: score.home, aScore: score.away,
+                    logsHtml: logs.join(''), 
+                    qScoresHome: qScores.home, qScoresAway: qScores.away
                 };
+                p.gameLog.push(logData);
+            }
+        });
+    };
 
-                // マイプレイヤーのみ試合記録を蓄積する
-                if (p.isUser) {
-                    logData.matchDetails = {
-                        hTeamName: hTeam.name, aTeamName: aTeam.name, hScore: score.home, aScore: score.away,
-                        logsHtml: logs.join(''), // 現在の画面表示用には保持（セーブ時に消えます）
-                        qScoresHome: qScores.home, qScoresAway: qScores.away
-                    };
-                    // 5試合の制限を撤廃し、82試合分すべてpushする
-                    p.gameLog.push(logData);
-                }
-            });
-        };
+    commitToGlobalStats(hData, true); commitToGlobalStats(aData, false);
 
-        commitToGlobalStats(hData, true); commitToGlobalStats(aData, false);
+    // ビジュアル（UI）への描画処理
+    if(isVisual) {
+        document.getElementById('match-score').innerText = `${score.home} - ${score.away}`;
+        document.getElementById('match-team1').innerText = hTeam.name;
+        document.getElementById('match-team2').innerText = aTeam.name;
+        
+        let sbHtml = `<tr><th>TEAM</th>`;
+        for(let i=0; i<qScores.home.length; i++) sbHtml += `<th>${i<4 ? (i+1)+'Q' : 'OT'+(i-3)}</th>`;
+        sbHtml += `<th>TOT</th></tr>`;
+        
+        sbHtml += `<tr><td class="clickable-team" onclick="showRoster(${hTeam.id})">${hTeam.name}</td>`;
+        qScores.home.forEach(qs => sbHtml += `<td>${qs}</td>`);
+        sbHtml += `<td style="color:#e74c3c; font-weight:bold;">${score.home}</td></tr>`;
+        
+        sbHtml += `<tr><td class="clickable-team" onclick="showRoster(${aTeam.id})">${aTeam.name}</td>`;
+        qScores.away.forEach(qs => sbHtml += `<td>${qs}</td>`);
+        sbHtml += `<td style="color:#e74c3c; font-weight:bold;">${score.away}</td></tr>`;
+        
+        let sbElem = document.getElementById('match-scoreboard');
+        if(sbElem) sbElem.innerHTML = sbHtml;
+        
+        let logContainer = document.getElementById('match-log');
+        if(logContainer) logContainer.innerHTML = logs.reverse().join('');
 
-        if(isVisual) {
-            document.getElementById('match-score').innerText = `${score.home} - ${score.away}`;
-            document.getElementById('match-team1').innerText = hTeam.name;
-            document.getElementById('match-team2').innerText = aTeam.name;
-            
-            let sbHtml = `<tr><th>TEAM</th>`;
-            for(let i=0; i<qScores.home.length; i++) sbHtml += `<th>${i<4 ? (i+1)+'Q' : 'OT'+(i-3)}</th>`;
-            sbHtml += `<th>TOT</th></tr>`;
-            
-            sbHtml += `<tr><td class="clickable-team" onclick="showRoster(${hTeam.id})">${hTeam.name}</td>`;
-            qScores.home.forEach(qs => sbHtml += `<td>${qs}</td>`);
-            sbHtml += `<td style="color:#e74c3c; font-weight:bold;">${score.home}</td></tr>`;
-            
-            sbHtml += `<tr><td class="clickable-team" onclick="showRoster(${aTeam.id})">${aTeam.name}</td>`;
-            qScores.away.forEach(qs => sbHtml += `<td>${qs}</td>`);
-            sbHtml += `<td style="color:#e74c3c; font-weight:bold;">${score.away}</td></tr>`;
-            document.getElementById('match-scoreboard').innerHTML = sbHtml;
-            document.getElementById('match-log').innerHTML = logs.join('');
+        let titleHome = document.getElementById('boxscore-title-home');
+        if(titleHome) titleHome.innerText = `🏠 ${hTeam.name} 個人スタッツ`;
+        
+        let titleAway = document.getElementById('boxscore-title-away');
+        if(titleAway) titleAway.innerText = `🚀 ${aTeam.name} 個人スタッツ`;
 
-            document.getElementById('boxscore-title-home').innerText = `🏠 ${hTeam.name} 個人スタッツ`;
-            document.getElementById('boxscore-title-away').innerText = `🚀 ${aTeam.name} 個人スタッツ`;
-
-            const fillBoxScoreTable = (targetTableId, roster) => {
-                let t = document.getElementById(targetTableId);
+        const fillBoxScoreTable = (targetTableId, roster) => {
+            let t = document.getElementById(targetTableId);
+            if(!t) return;
+            if(typeof generateTableHeaderHtml === "function" && typeof generatePlayerRowHtml === "function"){
                 t.innerHTML = generateTableHeaderHtml();
                 roster.sort((a,b) => b._box.pts - a._box.pts).forEach(p => {
                     t.innerHTML += `<tr>${generatePlayerRowHtml(p, p._box, false)}</tr>`;
                 });
-            };
-            fillBoxScoreTable('match-box-home', hTeam.roster);
-            fillBoxScoreTable('match-box-away', aTeam.roster);
-        }
+            }
+        };
+        fillBoxScoreTable('match-box-home', hTeam.roster);
+        fillBoxScoreTable('match-box-away', aTeam.roster);
+        
+        if(typeof renderMiniScoreboard === "function") renderMiniScoreboard(hTeam.name, aTeam.name, qScores, score);
+        if(typeof switchMatchTab === "function") setTimeout(() => { switchMatchTab('full'); }, 50);
     }
-    </script>
-
+}
 
     <!-- ========================================== -->
     <!-- ▼▼ エラー特定用：特製オンスクリーンコンソール (改良版) ▼▼ -->
