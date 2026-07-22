@@ -315,6 +315,47 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 </script>
 <script>
+    // --- IndexedDB (ブラウザ保存) の設定 ---
+const IDB_NAME = "BasketballLife_DB";
+const IDB_STORE = "matchHistory";
+const IDB_VERSION = 1;
+
+function getDB() {
+    return new Promise((resolve, reject) => {
+        let req = indexedDB.open(IDB_NAME, IDB_VERSION);
+        req.onupgradeneeded = (e) => {
+            let db = e.target.result;
+            if(!db.objectStoreNames.contains(IDB_STORE)) {
+                db.createObjectStore(IDB_STORE, { keyPath: "logId" });
+            }
+        };
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e.target.error);
+    });
+}
+
+function saveToIDB(logId, data) {
+    return getDB().then(db => {
+        return new Promise((resolve, reject) => {
+            let tx = db.transaction(IDB_STORE, "readwrite");
+            tx.objectStore(IDB_STORE).put({ logId, ...data });
+            tx.oncomplete = () => resolve();
+            tx.onerror = (e) => reject(e.target.error);
+        });
+    });
+}
+
+function loadFromIDB(logId) {
+    return getDB().then(db => {
+        return new Promise((resolve, reject) => {
+            let tx = db.transaction(IDB_STORE, "readonly");
+            let req = tx.objectStore(IDB_STORE).get(logId);
+            req.onsuccess = (e) => resolve(e.target.result);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    });
+}
+
     // --- 定数・能力値定義 ---
     const MAX_STAT = 150;
     const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
