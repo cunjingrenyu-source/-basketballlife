@@ -471,25 +471,29 @@ function saveGame() {
         };
     });
 
-    // ② 選手の完全圧縮（時限爆弾と不要メモリのパージ）
+       // ② 選手の完全圧縮（不要メモリのパージ ＆ 二重セーフティ）
     const compressedPlayers = allPlayers.map(p => {
         let cp = { ...p };
         
-        // 試合シミュレーション中に付与される一時データ(_boxなど)はセーブ不要なため削除
+        // 試合シミュレーション用の一時ステータスを削除
         delete cp._box; delete cp._stamina; delete cp._cond; delete cp._condStr;
         
-        // 【重要】膨大な容量を食う実況ログHTMLをセーブ直前に確実に削除
+        // 【二重セーフティ】新旧問わず、実況HTML（logsHtml）が残っていればFirebase保存前に確実にパージ
         if (cp.gameLog && cp.gameLog.length > 0) {
             cp.gameLog = cp.gameLog.map(log => {
                 let cLog = { ...log };
+                // ルート直下、または matchDetails 内に logsHtml があれば削除
+                if (cLog.logsHtml) delete cLog.logsHtml;
                 if (cLog.matchDetails && cLog.matchDetails.logsHtml) {
                     delete cLog.matchDetails.logsHtml;
                 }
                 return cLog;
             });
         }
+        
         return cp;
     });
+ 
 
     // ③ Firestoreの「ネストされた配列禁止」エラーを回避
     // schedule (二次元配列) を { matches: [...] } のオブジェクトにラップして安全化
