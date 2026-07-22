@@ -1119,6 +1119,45 @@ async function showHistoricalMatch(logIndex) {
     </div>
     `;
 }
+// 過去試合詳細用のタブ切り替え関数（新規追加）
+function switchHistoricalTab(tabType) {
+    document.querySelectorAll('#historical-match-content .match-tab-btn').forEach(b => b.classList.remove('active'));
+    let btn = document.getElementById('hist-tab-btn-' + tabType);
+    if(btn) btn.classList.add('active');
+
+    let logBox = document.querySelector('#historical-match-content .match-log-box');
+    if (!logBox) return;
+
+    let entries = logBox.querySelectorAll('.log-entry');
+    entries.forEach(el => {
+        if (tabType === 'full') {
+            el.classList.remove('log-hidden');
+        } else if (tabType === 'highlight') {
+            if (el.classList.contains('log-type-highlight')) el.classList.remove('log-hidden');
+            else el.classList.add('log-hidden');
+        } else if (tabType === 'myplay') {
+            if (el.classList.contains('log-type-myplay')) el.classList.remove('log-hidden');
+            else el.classList.add('log-hidden');
+        }
+    });
+}
+
+// showPlayerDetail 内の views 配列修正（historical-match を追加）
+function showPlayerDetail(id) {
+    const p = allPlayers.find(x => x.id === id);
+    if(!p) return;
+    
+    // 過去試合画面(historical-match)も判定対象に含める
+    const views = ['home', 'practice', 'standings', 'roster', 'match', 'historical-match'];
+    const currentActiveView = views.find(v => document.getElementById(`${v}-view`)?.style.display === 'block') || 'home';
+    
+    if (currentActiveView !== 'player-detail') {
+        previousView = currentActiveView;
+    }
+
+    changeView('player-detail');
+    document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(p);
+}
 
 // 選手詳細の表示（配列メソッドを駆使してスマートに）
 function showPlayerDetail(id) {
