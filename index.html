@@ -1719,6 +1719,45 @@ async function showHistoricalMatch(logIndex) {
     }
 }
 </script>  
+    // 過去試合用のタブ切り替え関数
+function switchHistoricalTab(tabType) {
+    document.querySelectorAll('#historical-match-view .match-tab-btn').forEach(b => b.classList.remove('active'));
+    let activeBtn = document.getElementById('hist-tab-btn-' + tabType);
+    if(activeBtn) activeBtn.classList.add('active');
+
+    let logBox = document.querySelector('#historical-match-content .match-log-box');
+    if(!logBox) return;
+
+    let entries = logBox.querySelectorAll('.log-entry');
+    let visibleCount = 0;
+    
+    entries.forEach(el => {
+        if (tabType === 'full') {
+            el.classList.remove('log-hidden');
+            visibleCount++;
+        } else if (tabType === 'highlight') {
+            if (el.classList.contains('log-type-highlight')) {
+                el.classList.remove('log-hidden');
+                visibleCount++;
+            } else el.classList.add('log-hidden');
+        } else if (tabType === 'myplay') {
+            if (el.classList.contains('log-type-myplay')) {
+                el.classList.remove('log-hidden');
+                visibleCount++;
+            } else el.classList.add('log-hidden');
+        }
+    });
+
+    let existingEmptyMsg = logBox.querySelector('.empty-log-msg');
+    if (existingEmptyMsg) existingEmptyMsg.remove();
+    
+    if (visibleCount === 0) {
+        let msg = document.createElement('div');
+        msg.className = 'empty-log-msg log-entry';
+        msg.innerText = tabType === 'highlight' ? '該当するトッププレイはありませんでした。' : 'あなたのプレイ記録はありませんでした。';
+        logBox.appendChild(msg);
+    }
+}
 
 <!-- ========================================== -->
 <!-- ▼▼ エラー特定用：特製オンスクリーンコンソール (改良版) ▼▼ -->
