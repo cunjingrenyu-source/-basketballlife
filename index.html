@@ -1439,10 +1439,43 @@ const showRosterByName = (name) => {
                 isHomeOffense = !isHomeOffense; continue;
             }
 
-            // --- ファウル判定（守備力が低いと増え、フィジカルが高いと少し増える） ---
+                        // --- ファウル判定（And-1の導入とハイライト強化） ---
             let foulRisk = 0.08 - (defender.stats.defense / 1000) + (defender.stats.physical / 1500);
             if(Math.random() < Math.min(0.12, Math.max(0.02, foulRisk))) {
                 defender._box.pf++;
+                
+                // バスカン(AND-1)判定：フィジカルとメンタルが高いと強引にねじ込める
+                let and1Chance = ((shooter.stats.physical + shooter.stats.mental) / 1000) * 0.15;
+                let isAnd1 = Math.random() < and1Chance && clock > 5; // 劇的なバザービーターAND-1も防がないが基本は通常時
+
+                if(isAnd1) {
+                    shooter._box.fgm++; 
+                    shooter._box.pts += 2; // 3P時のAND-1も簡略化のため2点+1スローとする
+                    if(isHome) { score.home += 2; qScores.home[Math.min(3, currentQ-1)] += 2; } 
+                    else { score.away += 2; qScores.away[Math.min(3, currentQ-1)] += 2; }
+                    
+                    offData.court.forEach(p => p._box.plusMinus += 2);
+                    defData.court.forEach(p => p._box.plusMinus -= 2);
+
+                    let and1Text = `<span style="color:#e74c3c; font-weight:bold; font-size:14px;">🔥【AND-1!!!】🔥</span>${shooter.name}が${defender.name}の激しいファウルを受けながらも、強靭なフィジカルでシュートをねじ込んだ！！！`;
+                    writeLog(clock, offData.team.name, and1Text, true, [shooter.id, defender.id]);
+
+                    // ボーナススロー1本
+                    shooter._box.fta += 1;
+                    let ftRate = 0.60 + ((shooter.stats.middle - 30) / 120) * 0.25;
+                    if(Math.random() < Math.max(0.40, ftRate * shooter._cond * mentalBuff)) {
+                        shooter._box.ftm++; shooter._box.pts++;
+                        if(isHome) { score.home++; qScores.home[Math.min(3, currentQ-1)]++; } else { score.away++; qScores.away[Math.min(3, currentQ-1)]++; }
+                        writeLog(clock, shooter.name, `ボーナススロー：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
+                        offData.court.forEach(p => p._box.plusMinus += 1); defData.court.forEach(p => p._box.plusMinus -= 1);
+                    } else {
+                        writeLog(clock, shooter.name, `ボーナススロー：外れる！`, false, [shooter.id]);
+                    }
+                    isHomeOffense = !isHomeOffense; 
+                    continue; 
+                }
+
+                // 通常のフリースロー
                 let ftCount = (Math.random() < 0.25) ? 3 : 2; 
                 writeLog(clock, defData.team.name, `${defender.name}が激しいファウル！${shooter.name}がフリースロー獲得！`, false, [shooter.id, defender.id]);
                 
@@ -1474,7 +1507,6 @@ const showRosterByName = (name) => {
                 if(randShot < 0.40) shotType = "layup";
                 else if(randShot < 0.70) shotType = "three";
                 else shotType = "middle";
-                // ガード陣でもダンクステータスとスピードがあればたまにダンク
                 if(shooter.stats.dunk > 85 && shooter.stats.speed > 90 && Math.random() < 0.15) shotType = "dunk";
             }
 
@@ -1487,24 +1519,31 @@ const showRosterByName = (name) => {
             let abilityBonus = ((statUsed - 30) / 120) * 0.30;
             let successRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - defensePressure;
 
-            // スピードとドリブルが高ければアンクルブレイク判定
             let ankleBreak = false;
             if(shooter.stats.dribble > defender.stats.defense + 20 && Math.random() < 0.15 * shooter._cond) {
                 ankleBreak = true;
                 successRate += 0.25;
             }
 
-            // --- B. ブロック判定（フィジカルと守備力が影響） ---
+            // --- B. ブロック判定 ---
             let blockChance = ((defender.stats.defense + defender.stats.physical) / 300) * 0.08 + defPressureBonus;
-            if(shotType === "dunk") blockChance -= 0.03; // ダンクはブロックしにくい
-            if(shotType === "layup" && shooter.stats.layup > 110) blockChance -= 0.04; // フローター等でブロック回避
+            if(shotType === "dunk") blockChance -= 0.03; 
+            if(shotType === "layup" && shooter.stats.layup > 110) blockChance -= 0.04; 
 
             if(Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
                 defender._box.blk++;
-                let blkText = (defender.stats.physical > 110 && defender.stats.defense > 100) 
-                    ? `${shooter.name}のシュートを${defender.name}がバレーボールのスパイクのように叩き落とす超絶ブロック！！`
-                    : `${shooter.name}のシュートを${defender.name}が背後からチェイスダウンブロック！！`;
-                writeLog(clock, defData.team.name, blkText, true, [shooter.id, defender.id]);
+                let isBlockHigh = false;
+                let blkText = "";
+                if (defender.stats.physical > 110 && defender.stats.defense > 100 && Math.random() < 0.3) {
+                    blkText = `<span style="color:#e74c3c; font-weight:bold;">【超絶ブロック！】</span>${shooter.name}のシュートを${defender.name}がバレーボールのスパイクのように客席へ叩き落とす！！！`;
+                    isBlockHigh = true;
+                } else if (defender.stats.speed > 100 && Math.random() < 0.3) {
+                    blkText = `<span style="color:#e74c3c; font-weight:bold;">【チェイスダウン！】</span>${shooter.name}の背後から迫った${defender.name}がボードに叩きつけるチェイスダウンブロック！！！`;
+                    isBlockHigh = true;
+                } else {
+                    blkText = `${shooter.name}のシュートを${defender.name}が見事にブロック！`;
+                }
+                writeLog(clock, defData.team.name, blkText, isBlockHigh, [shooter.id, defender.id]);
                 isHomeOffense = !isHomeOffense;
                 continue;
             }
@@ -1520,6 +1559,8 @@ const showRosterByName = (name) => {
                 else { score.away += pts; qScores.away[Math.min(3, currentQ-1)] += pts; }
 
                 let newDiff = isHome ? (score.home - score.away) : (score.away - score.home);
+                // バザービーター判定 (残り5秒以内で同点か逆転)
+                let isBuzzerBeater = (currentQ >= 4 && clock <= 5 && prevDiff <= 0 && newDiff >= 0);
                 let isClutch = (isClutchTime && prevDiff < 0 && newDiff > 0);
 
                 offData.court.forEach(p => p._box.plusMinus += pts);
@@ -1531,7 +1572,6 @@ const showRosterByName = (name) => {
                 let passer = offData.court[Math.floor(Math.random()*5)];
                 let assistText = "";
 
-                // アシストと連携技判定（パス能力で変態的パスやアリウープ）
                 if(passer.id !== shooter.id && Math.random() < (passer.stats.pass / 150) * 0.65) {
                     passer._box.ast++;
                     involved.push(passer.id);
@@ -1545,6 +1585,71 @@ const showRosterByName = (name) => {
                         assistText = `<span class="log-assist">#${passer.num} ${passer.name}の的確なアシスト ➔ </span>`;
                     }
                 }
+
+                if (playText === "") {
+                    if (isBuzzerBeater) {
+                        playText = `<span style="color:#f1c40f; font-weight:bold; font-size:14px;">🚨【ブザービーター！！！】🚨</span>時間が無い！${shooter.name}が放った劇的なシュートがブザーと同時にネットを揺らす！！！`;
+                        isHigh = true;
+                    } else if (isClutch) {
+                        playText = `<span style="color:#f1c40f; font-weight:bold; font-size:14px;">🔥【大逆転クラッチ！】🔥</span>${shooter.name}が土壇場で起死回生のシュートをねじ込んだ！！！`;
+                        isHigh = true;
+                    } else if(ankleBreak) {
+                        playText = `<span style="color:#e67e22; font-weight:bold;">【アンクルブレイク！】</span>${shooter.name}の鋭いクロスオーバーに${defender.name}が足をもつれて転倒！！そのまま余裕で沈めた！！！`;
+                        isHigh = true;
+                    } else if(shotType === "three") {
+                        if(shooter.stats.three > 120 && Math.random() < 0.3) {
+                            playText = `${shooter.name}がロゴ付近から放つディープスリー！！美しい弧を描きリングに吸い込まれた！！！`;
+                            isHigh = true;
+                        } else if (shooter.stats.three > 90 && defender.stats.defense > 90 && Math.random() < 0.4) {
+                            playText = `<span style="color:#e74c3c; font-weight:bold;">【タフショット！】</span>ディフェンスがガチガチに密着する厳しい状況下、${shooter.name}が強引に3Pを沈めた！`;
+                            isHigh = true;
+                        } else {
+                            playText = Math.random() > 0.5 ? `${shooter.name}がスクリーンを使い3P！決まった！` : `${shooter.name}がキャッチ＆シュートで3Pを沈めた！`;
+                        }
+                    } else if(shotType === "dunk") {
+                        let r = Math.random();
+                        if (shooter.stats.dunk > 130 && r < 0.15) {
+                            playText = `<span style="color:#e74c3c; font-weight:bold;">【伝説級ダンク！】</span>${shooter.name}がフリースローラインから跳躍し、空を歩くようなダンクを叩き込んだ！！！`;
+                            isHigh = true;
+                        } else if (shooter.stats.dunk > 110 && r < 0.35) {
+                            playText = `${shooter.name}が空中で腕を回す豪快なウィンドミルダンク炸裂！！！`;
+                            isHigh = true;
+                        } else if (shooter.stats.physical > 100 && r < 0.6) {
+                            playText = `<span style="color:#e74c3c; font-weight:bold;">【ポスタライズ！】</span>${shooter.name}が${defender.name}ごと吹き飛ばす強烈なダンクを決めたーーーっ！！！`;
+                            isHigh = true;
+                        } else {
+                            playText = `${shooter.name}が豪快なボースハンドダンクを決めた！`;
+                        }
+                    } else if(shotType === "layup") {
+                        let lu = shooter.stats.layup;
+                        let r = Math.random();
+                        if (lu > 120 && r < 0.15) {
+                            playText = `<span style="color:#e74c3c; font-weight:bold;">【サーカスショット！】</span>ブロックを空中で2度躱す！${shooter.name}の変態的なトリプルクラッチ！！`;
+                            isHigh = true;
+                        } else if (lu > 100 && r < 0.3) {
+                            playText = `${shooter.name}がユーロステップでディフェンダーを嘲笑うかのように抜き去りレイアップ！`;
+                            isHigh = true;
+                        } else if (lu > 90 && r < 0.45) {
+                            playText = `${shooter.name}が空中でボールを動かす優雅なジェリー・レイアップを沈めた！`;
+                        } else if (lu > 80 && r < 0.6) {
+                            playText = `${shooter.name}がビッグマンのブロックを嘲笑うかのような高い弧を描くティアドロップ（フローター）！`;
+                        } else {
+                            playText = `${shooter.name}が確実なレイアップを沈めた。`;
+                        }
+                    } else {
+                        if (shooter.stats.middle > 110 && Math.random() < 0.2) {
+                            playText = `${shooter.name}が華麗なフェイダウェイシュートを沈めた！`;
+                            isHigh = true;
+                        } else {
+                            playText = `${shooter.name}のミドルシュートが決まる。`;
+                        }
+                    }
+                }
+                writeLog(clock, offData.team.name, assistText + playText, isHigh, involved);
+            } else {
+                let missText = shotType === "three" ? `${shooter.name}の3Pシュートはリングに弾かれる。` : `${shooter.name}のシュートは外れた。`;
+                writeLog(clock, offData.team.name, missText, false, [shooter.id]);
+            }
 
                 // 個人技テキストの構築
                 if (playText === "") {
