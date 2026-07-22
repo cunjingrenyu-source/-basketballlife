@@ -889,14 +889,14 @@ async function finalizeRegistration(name, pos, appeal, age, nationality, avatarD
         document.querySelectorAll('.practice-btn').forEach(b => b.disabled = (userAP <= 0));
     }
 
-        function renderPracticeGrid() {
+            function renderPracticeGrid() {
         let grid = document.getElementById('practice-grid'); grid.innerHTML = "";
         STAT_KEYS.forEach(sk => {
             let btn = document.createElement('button'); btn.className = 'practice-btn';
-            // 文字部分に onclick を追加
-            btn.innerHTML = `<div class="practice-name" onclick="openStatModal('${sk.k}', event)" style="color:#2980b9; text-decoration:underline;">${sk.n} ℹ️</div><div>↑ UP</div>`;
+            // モーダルを開く記述と下線を削除し、シンプルなテキストに
+            btn.innerHTML = `<div class="practice-name">${sk.n}</div><div>↑ UP</div>`;
             btn.onclick = (e) => {
-                if(e.target.classList.contains('practice-name')) return; // ℹ️クリック時は練習させない
+                // ℹ️クリックガードを削除。ボタン内ならどこを押しても発動
                 if(userAP > 0 && currentUser.stats[sk.k] < MAX_STAT) {
                     userAP--;
                     currentUser.stats[sk.k] += Math.floor(Math.random() * 3) + 1; 
@@ -910,6 +910,7 @@ async function finalizeRegistration(name, pos, appeal, age, nationality, avatarD
             grid.appendChild(btn);
         });
     }
+
 
         function generateAbilityGrid(stats) {
         let h1="", v1="", h2="", v2="";
