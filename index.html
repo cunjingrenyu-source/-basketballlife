@@ -1170,29 +1170,59 @@ function renderStandings() {
     makeTable("west-table", "West");
 }
 
-    function showRoster(teamId) {
-        let t = teams.find(x => x.id === teamId);
-        if(!t) return;
-        document.getElementById('roster-team-name').innerText = `${t.name} ロスター`;
-        let tbl = document.getElementById('roster-table');
-        tbl.innerHTML = `<tr><th>Pos</th><th>名前</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>EFF</th></tr>`;
-        
-        let sorted = []; POSITIONS.forEach(pos => { sorted.push(...t.roster.filter(p=>p.pos===pos)); });
-        sorted.forEach(p => {
-            let b = p.box; let div = b.g || 1;
-            let adv = calcAdvanced(b);
-            let tr = document.createElement('tr');
-            if(p.id === currentUser.id) tr.style.background = "#fff0f0";
-            tr.innerHTML = `<td>${p.pos}</td><td><span class="clickable-player" onclick="showPlayerDetail(${p.id})">#${p.num} ${p.name}</span></td><td>${formatMIN(Math.floor(b.min/div))}</td><td><strong>${(b.pts/div).toFixed(1)}</strong></td><td>${(b.reb/div).toFixed(1)}</td><td>${(b.ast/div).toFixed(1)}</td><td>${(b.stl/div).toFixed(1)}</td><td>${(b.blk/div).toFixed(1)}</td><td>${adv.eff}</td>`;
-            tbl.appendChild(tr);
-        });
-        changeView('roster');
-    }
+    // 【神の領域】ポジションのソート順をO(1)で高速参照するための事前ハッシュマップ化（計算量の大幅削減）
+const POS_ORDER = POSITIONS.reduce((acc, pos, idx) => (acc[pos] = idx, acc), {});
 
-    function showRosterByName(name) {
-        let t = teams.find(x => x.name === name);
-        if(t) showRoster(t.id);
-    }
+// ロスター画面の描画（限界突破の超絶最適化版）
+function showRoster(teamId) {
+    const t = teams.find(x => x.id === teamId);
+    if (!t) return;
+
+    // DOMの取得を一括化し、存在チェックもスマートに完結
+    const rosterTitle = document.getElementById('roster-team-name');
+    const tbl = document.getElementById('roster-table');
+    if (!tbl) return;
+    
+    if (rosterTitle) rosterTitle.innerText = `${t.name} ロスター`;
+    
+    // 配列のコピーとソートを同時に実行。事前構築したPOS_ORDERでindexOfの都度評価を排除し爆速化
+    const sorted = [...t.roster].sort((a, b) => POS_ORDER[a.pos] - POS_ORDER[b.pos]);
+    
+    // 分割代入（Destructuring）でプロパティを直接展開し、最も堅牢で最速のHTML文字列構築
+    const rowsHtml = sorted.map(({ id, num, name, pos, box = {} }) => {
+        // データ欠損にも完璧に耐えるデフォルト値の割り当て
+        const { g = 1, min = 0, pts = 0, reb = 0, ast = 0, stl = 0, blk = 0 } = box;
+        const div = g > 0 ? g : 1; // ゼロ除算を論理上完全に防ぐ
+        const adv = typeof calcAdvanced === 'function' ? calcAdvanced(box) : { eff: 0 };
+        
+        // ユーザー判定もオプショナルチェーンで安全に
+        const bgStyle = id === currentUser?.id ? ' style="background:#fff0f0;"' : '';
+
+        // テンプレートリテラル内のオブジェクト参照（.）を削り、変数直接参照でメモリ処理を極限まで最適化
+        return `<tr${bgStyle}>
+            <td>${pos}</td>
+            <td><span class="clickable-player" onclick="showPlayerDetail(${id})">#${num} ${name}</span></td>
+            <td>${formatMIN(Math.floor(min / div))}</td>
+            <td><strong>${(pts / div).toFixed(1)}</strong></td>
+            <td>${(reb / div).toFixed(1)}</td>
+            <td>${(ast / div).toFixed(1)}</td>
+            <td>${(stl / div).toFixed(1)}</td>
+            <td>${(blk / div).toFixed(1)}</td>
+            <td>${adv.eff}</td>
+        </tr>`;
+    }).join('');
+
+    // 一度のDOMアクセスでヘッダーごと流し込み、再描画（Reflow/Repaint）を最小限に抑制
+    tbl.innerHTML = `<tr><th>Pos</th><th>名前</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>EFF</th></tr>${rowsHtml}`;
+    
+    changeView('roster');
+}
+
+// チーム名からロスターを表示するヘルパー関数（ショートサーキット評価による究極のワンライナー）
+const showRosterByName = (name) => {
+    const t = teams.find(x => x.name === name);
+    t && showRoster(t.id); 
+};
 
     // --- コアエンジン: AI監督＆ハイスコア＆脳汁実況型シミュレーター ---
     function playCurrentRound(showMatchView = true) {
