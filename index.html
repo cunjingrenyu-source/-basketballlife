@@ -1040,38 +1040,88 @@ async function finalizeRegistration(name, pos, appeal, age, nationality, avatarD
     });
 }
 
-// 過去の試合詳細を表示する新規関数
-function showHistoricalMatch(logIndex) {
-    let log = currentUser.gameLog[logIndex];
-    if(!log || !log.matchDetails) {
+// 過去の試合詳細を表示する新規関数（IndexedDB ＆ UX最適化対応版）
+async function showHistoricalMatch(logIndex) {
+    // 【プロの堅牢性1】データが存在しない場合のエラー落ちを完全防御
+    if (!currentUser || !currentUser.gameLog || !currentUser.gameLog[logIndex]) {
+        alert("指定された試合データが見つかりません。");
+        return;
+    }
+
+    const log = currentUser.gameLog[logIndex];
+    if (!log.matchDetails) {
         alert("この試合の詳細データはありません。");
         return;
     }
-    let d = log.matchDetails;
+    const d = log.matchDetails;
     
-    // セーブ後はlogsHtmlが削られているため、代替メッセージを表示
-    let logBoxContent = d.logsHtml 
-        ? d.logsHtml 
-        : "<div style='color:#f1c40f; text-align:center; padding: 20px;'>※データ軽量化のため、この試合のテキスト速報アーカイブは削除されています。<br>スコアボードとスタッツをご確認ください。</div>";
+    const container = document.getElementById('historical-match-content');
+    if (!container) return;
 
-    let html = `
+    // 【プロのUX向上】IDBの読み込みにラグがある場合を考慮し、先にローディング画面を出して画面遷移させる
+    container.innerHTML = `<div style="text-align:center; padding:50px; color:#aaa; font-weight:bold;">試合記録を読み込み中...</div>`;
+    changeView('historical-match'); 
+
+    // IndexedDBから詳細ログを非同期で読み込む
+    let idbData = null;
+    if (log.logId) {
+        try {
+            idbData = await loadFromIDB(log.logId);
+        } catch (e) {
+            console.warn(`[IDB読み込み警告] ログID: ${log.logId}`, e);
+        }
+    }
+    
+    // 【プロの後方互換性】新方式(IDB)、旧方式(d.logsHtml)、データ無しの3パターンに完璧に対応
+    let logBoxContent = "";
+    let isDataEmpty = false;
+
+    if (idbData && idbData.logsHtml) {
+        logBoxContent = idbData.logsHtml; // 最新のIDBから取得
+    } else if (d.logsHtml) {
+        logBoxContent = d.logsHtml;       // 古いセーブデータ（Firebase側に残っている場合）から取得
+    } else {
+        isDataEmpty = true;
+        logBoxContent = `
+            <div style='color:#f1c40f; text-align:center; padding: 20px;'>
+                ※この端末にはテキスト速報アーカイブがありません。<br>
+                <span style="font-size:0.9em; color:#ccc;">他端末でのプレイデータか、保存前に削除された可能性があります。</span>
+            </div>`;
+    }
+
+    // 【プロのコード整理】テンプレートリテラル内をスッキリさせるため、変数に事前展開
+    const otHeader = d.qScoresHome.length > 4 ? '<th>OT</th>' : '';
+    const homeQScores = d.qScoresHome.map(q => `<td>${q}</td>`).join('');
+    const awayQScores = d.qScoresAway.map(q => `<td>${q}</td>`).join('');
+    
+    // 【プロのUI調整】データが無い時はメッセージを「中央配置(center)」、ログがある時は「上詰め(flex-start)」に動的変更
+    const flexAlign = isDataEmpty ? 'center' : 'flex-start';
+
+    // 最終的なHTMLの構築
+    const html = `
     <div class="match-header">
         <span class="clickable-team">${d.hTeamName}</span>
         <span class="match-score">${d.hScore} - ${d.aScore}</span>
         <span class="clickable-team">${d.aTeamName}</span>
     </div>
     <table class="scoreboard-mini">
-        <tr><th>TEAM</th><th>1Q</th><th>2Q</th><th>3Q</th><th>4Q</th>${d.qScoresHome.length>4?'<th>OT</th>':''}<th>TOT</th></tr>
-        <tr><td>${d.hTeamName}</td>${d.qScoresHome.map(q=>`<td>${q}</td>`).join('')}<td style="font-weight:bold; color:#e74c3c;">${d.hScore}</td></tr>
-        <tr><td>${d.aTeamName}</td>${d.qScoresAway.map(q=>`<td>${q}</td>`).join('')}<td style="font-weight:bold; color:#e74c3c;">${d.aScore}</td></tr>
+        <tr><th>TEAM</th><th>1Q</th><th>2Q</th><th>3Q</th><th>4Q</th>${otHeader}<th>TOT</th></tr>
+        <tr>
+            <td>${d.hTeamName}</td>${homeQScores}
+            <td style="font-weight:bold; color:#e74c3c;">${d.hScore}</td>
+        </tr>
+        <tr>
+            <td>${d.aTeamName}</td>${awayQScores}
+            <td style="font-weight:bold; color:#e74c3c;">${d.aScore}</td>
+        </tr>
     </table>
-    <div class="match-log-box" style="margin-top:15px; height:400px; display:flex; flex-direction:column; justify-content:center;">
+    <div class="match-log-box" style="margin-top:15px; height:400px; display:flex; flex-direction:column; justify-content:${flexAlign};">
         ${logBoxContent}
     </div>
     `;
     
-    document.getElementById('historical-match-content').innerHTML = html;
-    changeView('historical-match');
+    // 構築したHTMLを流し込む（ローディング表示からのシームレスな切り替え）
+    container.innerHTML = html;
 }
 
     function showPlayerDetail(id) {
