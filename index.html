@@ -281,18 +281,21 @@
         </div>
     </div>
     
+    <!-- ▼① 選手詳細ビュー -->
     <div id="player-detail-view" class="content-area" style="display: none;">
-            <!-- 過去試合の詳細確認ビュー -->
+        <button onclick="goBackFromDetail()" id="btn-detail-back" style="margin-bottom: 15px; padding: 6px 12px;">← 戻る</button>
+        <div id="detail-profile-target"></div>
+    </div> <!-- ←ここでちゃんと閉じる！ -->
+
+    <!-- ▼② 過去試合の詳細確認ビュー（外に独立させる） -->
     <div id="historical-match-view" class="content-area" style="display: none;">
         <button onclick="changeView('home')" style="margin-bottom: 15px; padding: 6px 15px; font-weight:bold;">← ホームへ戻る</button>
         <h2 style="border-left: 5px solid #2ecc71;">試合詳細記録</h2>
         <div id="historical-match-content"></div>
     </div>
 
-        <button onclick="goBackFromDetail()" id="btn-detail-back" style="margin-bottom: 15px; padding: 6px 12px;">← 戻る</button>
-        <div id="detail-profile-target"></div>
-    </div>
 </div>
+
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
