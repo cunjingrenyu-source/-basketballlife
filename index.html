@@ -1869,10 +1869,48 @@ const showRosterByName = (name) => {
         if(typeof switchMatchTab === "function") setTimeout(() => { switchMatchTab('full'); }, 50);
     }
 }
-</script>  
-    // 過去試合用のタブ切り替え関数
+// --- 試合詳細・スタッツ描画関数 ---
+function renderMatchStats(tableId, titleId, team, teamData) {
+    let tbl = document.getElementById(tableId);
+    let title = document.getElementById(titleId);
+    if(!tbl || !title) return;
+    
+    title.innerText = `${team.name} スタッツ`;
+    
+    let html = `<tr><th>Pos</th><th>名前</th><th>MIN</th><th>PTS</th><th>FG</th><th>3P</th><th>FT</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>PF</th><th>+/-</th></tr>`;
+    
+    let allP = [...teamData.court, ...teamData.bench];
+    allP.sort((a,b) => b._box.min - a._box.min); // プレイ時間順
+    
+    allP.forEach(p => {
+        let b = p._box;
+        if (b.min === 0) return;
+        let bgStyle = p.isUser ? ' style="background:#fff0f0;"' : '';
+        html += `<tr${bgStyle}>
+            <td>${p.pos}</td>
+            <td><span class="clickable-player" onclick="showPlayerDetail(${p.id})">#${p.num} ${p.name}</span></td>
+            <td>${formatMIN(Math.floor(b.min * 60))}</td>
+            <td><strong>${b.pts}</strong></td>
+            <td>${b.fgm}-${b.fga}</td>
+            <td>${b.tpm}-${b.tpa}</td>
+            <td>${b.ftm}-${b.fta}</td>
+            <td>${b.reb}</td>
+            <td>${b.ast}</td>
+            <td>${b.stl}</td>
+            <td>${b.blk}</td>
+            <td>${b.to}</td>
+            <td>${b.pf}</td>
+            <td style="color:${b.plusMinus>=0?'#2ecc71':'#e74c3c'};">${b.plusMinus > 0 ? '+' : ''}${b.plusMinus}</td>
+        </tr>`;
+    });
+    tbl.innerHTML = html;
+}
+
+// --- 過去試合のタブ切り替え関数 ---
 function switchHistoricalTab(tabType) {
-    document.querySelectorAll('#historical-match-view .match-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.match-tab-btn').forEach(b => {
+        if(b.id && b.id.startsWith('hist-tab-btn-')) b.classList.remove('active');
+    });
     let activeBtn = document.getElementById('hist-tab-btn-' + tabType);
     if(activeBtn) activeBtn.classList.add('active');
 
@@ -1898,20 +1936,8 @@ function switchHistoricalTab(tabType) {
             } else el.classList.add('log-hidden');
         }
     });
-
-    let existingEmptyMsg = logBox.querySelector('.empty-log-msg');
-    if (existingEmptyMsg) existingEmptyMsg.remove();
-    
-    if (visibleCount === 0) {
-                let msg = document.createElement('div');
-        msg.className = 'empty-log-msg log-entry';
-        msg.innerText = tabType === 'highlight' ? '該当するトッププレイはありませんでした。' : 'あなたのプレイ記録はありませんでした。';
-        logBox.appendChild(msg);
-    }
 }
-</script>
-
-
+⁠</script>⁠
 <!-- ========================================== -->
 <!-- ▼▼ エラー特定用：特製オンスクリーンコンソール (改良版) ▼▼ -->
 
