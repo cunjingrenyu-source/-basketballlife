@@ -1565,28 +1565,56 @@ function showHistoricalMatch(logIndex) {
 
     if(score.home > score.away) { hTeam.w++; aTeam.l++; } else { aTeam.w++; hTeam.l++; }
 
-    // 個人スタッツのグローバル反映（既存のロジック完全維持）
+      // 個人スタッツのグローバル反映＆IDB振り分け（最適化版）
     const commitToGlobalStats = (teamState, isH) => {
-        [...teamState.team.roster].forEach(p => {
-            let gb = p._box; if(!gb) return;
-            p.box.g++; if(gb.gs) p.box.gs++;
-            Object.keys(gb).forEach(k => { if(k!=='g'&&k!=='gs') p.box[k] += gb[k]; });
-            
-            let logData = {
-                round: typeof currentRound !== 'undefined' ? currentRound : 1, oppName: isH ? aTeam.name : hTeam.name,
-                result: (isH && score.home > score.away) || (!isH && score.away > score.home) ? "WIN" : "LOSE",
-                teamScore: isH ? score.home : score.away, oppScore: isH ? score.away : score.home,
-                pts: gb.pts||0, reb: gb.reb||0, ast: gb.ast||0
-            };
+        // 【プロの最適化1】ループ外での事前計算
+        // 万が一複数ユーザーがいた場合、ループ内で毎回 logs.join('') を走らせるとメモリとCPUを無駄に食うため1回に抑える
+        const joinedLogs = logs.join('');
+        const currentRnd = typeof currentRound !== 'undefined' ? currentRound : 1;
+        const oppTeamName = isH ? aTeam.name : hTeam.name;
+        const isWin = (isH && score.home > score.away) || (!isH && score.away > score.home);
 
+        teamState.team.roster.forEach(p => {
+            const gb = p._box; 
+            if (!gb) return;
+
+            // 基本スタッツの加算
+            p.box.g++; 
+            if (gb.gs) p.box.gs++;
+            Object.keys(gb).forEach(k => { 
+                if (k !== 'g' && k !== 'gs') p.box[k] += gb[k]; 
+            });
+            
             // マイプレイヤーのみ試合記録を蓄積する
             if (p.isUser) {
-                logData.matchDetails = {
-                    hTeamName: hTeam.name, aTeamName: aTeam.name, hScore: score.home, aScore: score.away,
-                    logsHtml: logs.join(''), 
-                    qScoresHome: qScores.home, qScoresAway: qScores.away
-                };
-                p.gameLog.push(logData);
+                // 【プロの最適化2】ID被りの完全排除
+                // 処理が速すぎてDate.now()が同一ミリ秒になるケースを想定し、末尾に選手ID(p.id)を付与してキーの重複エラーを100%防ぐ
+                const logId = `match_${Date.now()}_${currentRnd}_${p.id}`;
+                
+                p.gameLog.push({
+                    round: currentRnd, 
+                    oppName: oppTeamName,
+                    result: isWin ? "WIN" : "LOSE",
+                    teamScore: isH ? score.home : score.away, 
+                    oppScore: isH ? score.away : score.home,
+                    pts: gb.pts || 0, 
+                    reb: gb.reb || 0, 
+                    ast: gb.ast || 0,
+                    logId: logId, // IDB連携用のキー
+                    matchDetails: {
+                        hTeamName: hTeam.name, 
+                        aTeamName: aTeam.name, 
+                        hScore: score.home, 
+                        aScore: score.away,
+                        // 【プロの最適化3】意図しないデータ上書きを防ぐためのシャローコピー
+                        qScoresHome: [...qScores.home], 
+                        qScoresAway: [...qScores.away]
+                    }
+                });
+
+                // 【IndexedDB用】思い出アルバム（大容量の実況ログなどを丸投げ）
+                saveToIDB(logId, { logsHtml: joinedLogs })
+                    .catch(e => console.error(`[IDB保存エラー] logId: ${logId}`, e));
             }
         });
     };
