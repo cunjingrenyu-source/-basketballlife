@@ -478,22 +478,21 @@ function saveGame() {
         // 試合シミュレーション用の一時ステータスを削除
         delete cp._box; delete cp._stamina; delete cp._cond; delete cp._condStr;
         
-        // 【二重セーフティ】新旧問わず、実況HTML（logsHtml）が残っていればFirebase保存前に確実にパージ
-        if (cp.gameLog && cp.gameLog.length > 0) {
-            cp.gameLog = cp.gameLog.map(log => {
-                let cLog = { ...log };
-                // ルート直下、または matchDetails 内に logsHtml があれば削除
-                if (cLog.logsHtml) delete cLog.logsHtml;
-                if (cLog.matchDetails && cLog.matchDetails.logsHtml) {
-                    delete cLog.matchDetails.logsHtml;
-                }
-                return cLog;
-            });
-        }
+      if (cp.gameLog && cp.gameLog.length > 0) {
+    cp.gameLog = cp.gameLog.map(log => {
+        // matchDetailsの中身までしっかり独立したコピーを作る
+        let cLog = { 
+            ...log,
+            matchDetails: log.matchDetails ? { ...log.matchDetails } : undefined
+        };
         
-        return cp;
+        if (cLog.logsHtml) delete cLog.logsHtml;
+        if (cLog.matchDetails && cLog.matchDetails.logsHtml) {
+            delete cLog.matchDetails.logsHtml; // これで元データは無傷！
+        }
+        return cLog;
     });
- 
+}
 
     // ③ Firestoreの「ネストされた配列禁止」エラーを回避
     // schedule (二次元配列) を { matches: [...] } のオブジェクトにラップして安全化
