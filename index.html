@@ -1638,13 +1638,15 @@ const showRosterByName = (name) => {
                 const pts = isThree ? 3 : 2;
                 const targetSide = isHome ? 'home' : 'away';
 
-                // スタッツ更新
+                            // スタッツ更新
                 shooter._box.fgm++;
                 shooter._box.pts += pts;
                 if (isThree) shooter._box.tpm++;
                 
                 score[targetSide] += pts;
-                qScores[targetSide][Math.min(3, currentQ - 1)] += pts;
+                // 👇【修正版】何Qであっても正しく配列を拡張して加算する
+                const qIdx = currentQ - 1;
+                qScores[targetSide][qIdx] = (qScores[targetSide][qIdx] || 0) + pts;
 
                 // 状況判定
                 const newDiff = isHome ? (score.home - score.away) : (score.away - score.home);
