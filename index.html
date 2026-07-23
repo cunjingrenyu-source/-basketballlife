@@ -2386,5 +2386,507 @@ function switchHistoricalTab(tabType) {
     });
 }
 </script>
+
+    ⁠<script>⁠
+/**
+ * ⚡ DiagnosticEngine v3.0 (Enterprise Edition)
+ * 自動探査・非破壊的インターセプト・プロキシ完全可逆・Shadow DOM・パフォーマンス計測・多形式レポートエンジン
+ */
+class DiagnosticEngine {
+    #config = {
+        namespaces: [window],
+        maxDepth: 4,
+        enablePerformanceProfiling: true,
+        autoDiscoverDOMEvents: true,
+        observeMutations: true,
+        observeNetwork: true
+    };
+
+    #proxyRegistry = new WeakMap(); // [OriginalFn, { proxy, parent, key }]
+    #metrics = new Map();         // Path => Execution Metrics
+    #eventListeners = new Map();  // EventTarget => Registered Listeners
+    #networkErrors = [];
+    #runtimeErrors = [];
+    #mutationObserver = null;
+    #performanceObserver = null;
+    #originalAddEventListener = null;
+    #isTracking = false;
+
+    constructor(customConfig = {}) {
+        Object.assign(this.#config, customConfig);
+        this.#initObservers();
+    }
+
+    // --- 1. 初期化とグローバルレイヤーのフック ---
+    #initObservers() {
+        // グローバルエラーフック
+        window.addEventListener('error', (e) => {
+            this.#runtimeErrors.push({ type: 'Error', message: e.message, source: e.filename, line: e.lineno, col: e.colno, stack: e.error?.stack });
+        });
+        window.addEventListener('unhandledrejection', (e) => {
+            this.#runtimeErrors.push({ type: 'UnhandledPromise', message: String(e.reason), stack: e.reason?.stack });
+        });
+
+        // addEventListener の低レイヤーインターセプト (JSで登録されたイベントの検出)
+        const self = this;
+        this.#originalAddEventListener = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function (type, listener, options) {
+            if (typeof listener === 'function') {
+                if (!self.#eventListeners.has(this)) {
+                    self.#eventListeners.set(this, []);
+                }
+                self.#eventListeners.get(this).push({ type, listener, options, addedAt: new Error().stack });
+            }
+            return self.#originalAddEventListener.apply(this, arguments);
+        };
+
+        // ネットワーク / リソース読み込みエラー監視
+        if (this.#config.observeNetwork && typeof PerformanceObserver !== 'undefined') {
+            try {
+                this.#performanceObserver = new PerformanceObserver((list) => {
+                    list.getEntries().forEach((entry) => {
+                        if (entry.responseStatus && entry.responseStatus >= 400) {
+                            this.#networkErrors.push({ name: entry.name, status: entry.responseStatus, type: entry.initiatorType, duration: entry.duration });
+                        }
+                    });
+                });
+                this.#performanceObserver.observe({ type: 'resource', buffered: true });
+            } catch (e) { /* 古いブラウザ用のフォールバック */ }
+        }
+
+        // 動的DOM追加の監視
+        if (this.#config.observeMutations && typeof MutationObserver !== 'undefined') {
+            this.#mutationObserver = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SCRIPT') {
+                            console.warn(`[DiagnosticEngine] 動的スクリプト読み込みを検知: ${node.src || 'inline script'}`);
+                        }
+                    }
+                }
+            });
+            this.#mutationObserver.observe(document.documentElement, { childList: true, subtree: true });
+        }
+    }
+
+    // --- 2. オブジェクトツリーの型・構造・Descriptor完全解析 ---
+    static describeProperty(obj, key) {
+        let descriptor = null;
+        let proto = obj;
+        while (proto && !descriptor) {
+            descriptor = Object.getOwnPropertyDescriptor(proto, key);
+            proto = Object.getPrototypeOf(proto);
+        }
+
+        if (!descriptor) return { exists: false };
+
+        const value = descriptor.value;
+        const isGetter = !!descriptor.get;
+        const isSetter = !!descriptor.set;
+        
+        let detailedType = typeof value;
+        let signature = '-';
+        let length = 0;
+
+        if (isGetter || isSetter) {
+            detailedType = 'Accessor (Getter/Setter)';
+        } else if (typeof value === 'function') {
+            length = value.length;
+            const str = Function.prototype.toString.call(value);
+            if (str.startsWith('class')) detailedType = 'Class';
+            else if (value.constructor?.name === 'AsyncFunction') detailedType = 'AsyncFunction';
+            else if (value.constructor?.name === 'GeneratorFunction') detailedType = 'GeneratorFunction';
+            else detailedType = 'Function';
+
+            const match = str.match(/\(([^)]*)\)/);
+            signature = match ? `(${match[1].trim()})` : `(${length} args)`;
+        } else if (value === null) detailedType = 'null';
+        else if (Array.isArray(value)) detailedType = 'Array';
+
+        return {
+            exists: true,
+            value,
+            type: detailedType,
+            signature,
+            length,
+            isOwn: Object.prototype.hasOwnProperty.call(obj, key),
+            writable: !!descriptor.writable,
+            enumerable: !!descriptor.enumerable,
+            configurable: !!descriptor.configurable,
+            isGetter,
+            isSetter
+        };
+    }
+
+    // --- 3. DOM & Shadow DOM & HTML属性解析 (全イベント対応) ---
+    scanDOMEvents(root = document) {
+        const usages = [];
+        const allElements = root.querySelectorAll('*');
+
+        allElements.forEach((el) => {
+            // HTML インライン属性 (on*) の全走査
+            for (const attr of el.attributes) {
+                if (attr.name.startsWith('on')) {
+                    usages.push({
+                        element: el,
+                        tagName: el.tagName.toLowerCase(),
+                        id: el.id ? `#${el.id}` : '',
+                        event: attr.name,
+                        code: attr.value,
+                        type: 'InlineHTML'
+                    });
+                }
+            }
+
+            // Shadow DOM 内の再帰探索
+            if (el.shadowRoot) {
+                usages.push(...this.scanDOMEvents(el.shadowRoot));
+            }
+        });
+
+        // addEventListener で登録された動的イベントの紐付け
+        this.#eventListeners.forEach((listeners, target) => {
+            listeners.forEach((l) => {
+                usages.push({
+                    element: target,
+                    tagName: target.tagName ? target.tagName.toLowerCase() : 'window/document',
+                    id: target.id ? `#${target.id}` : '',
+                    event: `on${l.type}`,
+                    code: l.listener.name || '[Anonymous Function]',
+                    type: 'addEventListener'
+                });
+            });
+        });
+
+        return usages;
+    }
+
+    // --- 4. 可逆的プロキシによる実行時トラッキング ---
+    attachTracker(obj, key, path) {
+        const desc = DiagnosticEngine.describeProperty(obj, key);
+        if (!desc.exists || typeof desc.value !== 'function' || !desc.configurable) return;
+
+        const originalFn = desc.value;
+        if (this.#proxyRegistry.has(originalFn)) return; // 既にラップ済み
+
+        const metrics = this.#metrics.get(path) || { calls: 0, totalTime: 0, minTime: Infinity, maxTime: 0, errors: 0, lastCalled: null };
+        this.#metrics.set(path, metrics);
+
+        const self = this;
+        const proxy = new Proxy(originalFn, {
+            apply(target, thisArg, argArray) {
+                metrics.calls++;
+                metrics.lastCalled = new Date();
+                const start = performance.now();
+                try {
+                    const result = Reflect.apply(target, thisArg, argArray);
+                    if (result instanceof Promise) {
+                        return result.catch((err) => {
+                            metrics.errors++;
+                            throw err;
+                        });
+                    }
+                    return result;
+                } catch (err) {
+                    metrics.errors++;
+                    throw err;
+                } finally {
+                    const duration = performance.now() - start;
+                    metrics.totalTime += duration;
+                    metrics.minTime = Math.min(metrics.minTime, duration);
+                    metrics.maxTime = Math.max(metrics.maxTime, duration);
+                }
+            },
+            construct(target, argArray, newTarget) {
+                metrics.calls++;
+                return Reflect.construct(target, argArray, newTarget);
+            }
+        });
+
+        try {
+            obj[key] = proxy;
+            this.#proxyRegistry.set(originalFn, { proxy, parent: obj, key });
+        } catch (e) {
+            // Read-only プロパティ等の保護
+        }
+    }
+
+    // トラッキングの完全除去（元の状態へ復元）
+    detachAllTrackers() {
+        this.#proxyRegistry.forEach(({ parent, key }, originalFn) => {
+            try {
+                parent[key] = originalFn;
+            } catch (e) {}
+        });
+        this.#proxyRegistry = new WeakMap();
+    }
+
+    // --- 5. 自動ターゲット発見＆スキャン ---
+    autoDiscoverTargets() {
+        const discoveredPaths = new Set();
+        const visitedObjects = new WeakSet();
+
+        const traverse = (obj, currentPath, depth) => {
+            if (depth > this.#config.maxDepth || !obj || visitedObjects.has(obj)) return;
+            visitedObjects.add(obj);
+
+            const keys = [...Object.getOwnPropertyNames(obj), ...Object.getOwnPropertySymbols(obj)];
+            for (const key of keys) {
+                if (typeof key === 'symbol') continue;
+                if (depth === 0 && ['window', 'document', 'location', 'top', 'frames', 'self', 'parent'].includes(key)) continue;
+
+                const path = currentPath ? `${currentPath}.${key}` : key;
+                const desc = DiagnosticEngine.describeProperty(obj, key);
+
+                if (desc.exists) {
+                    if (desc.type.includes('Function') || desc.type === 'Class') {
+                        discoveredPaths.add(path);
+                        this.attachTracker(obj, key, path);
+                    } else if (typeof desc.value === 'object' && desc.value !== null) {
+                        traverse(desc.value, path, depth + 1);
+                    }
+                }
+            }
+        };
+
+        this.#config.namespaces.forEach((ns) => traverse(ns, '', 0));
+        return Array.from(discoveredPaths);
+    }
+
+    // --- 6. 総合診断実行・判定・スコアリング ---
+    async diagnose() {
+        const targetPaths = this.autoDiscoverTargets();
+        const domUsages = this.scanDOMEvents();
+        const reportItems = [];
+
+        let criticalCount = 0;
+        let warningCount = 0;
+
+        for (const path of targetPaths) {
+            const parts = path.split('.');
+            let curr = window;
+            let parent = null;
+            let key = '';
+
+            for (let i = 0; i < parts.length; i++) {
+                parent = curr;
+                key = parts[i];
+                curr = curr ? curr[key] : undefined;
+            }
+
+            const desc = DiagnosticEngine.describeProperty(parent || window, key);
+            const metrics = this.#metrics.get(path) || { calls: 0, totalTime: 0, minTime: 0, maxTime: 0, errors: 0 };
+            
+            // HTML/DOMイベントからの呼び出し照合
+            const matchingDOMUses = domUsages.filter(u => u.code.includes(path) || u.code === key);
+            
+            let status = '✅ 正常 (Healthy)';
+            let priority = 'LOW';
+            let suggestion = 'なし';
+
+            if (!desc.exists) {
+                status = '❌ 未定義 (Missing)';
+                priority = 'CRITICAL';
+                criticalCount++;
+                suggestion = '関数・オブジェクトの読み込み順序または定義漏れを確認してください。';
+            } else if (matchingDOMUses.length > 0 && !desc.type.includes('Function')) {
+                status = '🚨 HTML呼び出し対象が関数ではありません';
+                priority = 'CRITICAL';
+                criticalCount++;
+                suggestion = 'HTMLイベント属性に指定されたプロパティが関数として定義されていません。';
+            } else if (metrics.calls === 0 && matchingDOMUses.length === 0) {
+                status = '⚠️ 未使用の可能性 (Unused/Dead Code)';
+                priority = 'MEDIUM';
+                warningCount++;
+                suggestion = '一度も実行されておらず、DOMからも参照されていません。不要であれば削除を検討してください。';
+            } else if (metrics.errors > 0) {
+                status = `🔥 実行時エラー発生 (${metrics.errors}回)`;
+                priority = 'HIGH';
+                warningCount++;
+                suggestion = '内部処理で例外が発生しています。スタックトレースを確認してください。';
+            }
+
+            const avgTime = metrics.calls > 0 ? (metrics.totalTime / metrics.calls).toFixed(2) : 0;
+
+            reportItems.push({
+                path,
+                status,
+                priority,
+                type: desc.type || 'undefined',
+                signature: desc.signature || '-',
+                calls: metrics.calls,
+                avgTimeMs: Number(avgTime),
+                errors: metrics.errors,
+                domReferences: matchingDOMUses.length,
+                isOwn: desc.isOwn ?? false,
+                writable: desc.writable ?? false,
+                enumerable: desc.enumerable ?? false,
+                configurable: desc.configurable ?? false,
+                suggestion
+            });
+        }
+
+        // 健全性スコア計算 (100点満点からの減点方式)
+        const healthScore = Math.max(0, 100 - (criticalCount * 25) - (warningCount * 5) - (this.#runtimeErrors.length * 10) - (this.#networkErrors.length * 15));
+
+        const finalReport = {
+            timestamp: new Date().toISOString(),
+            healthScore: `${healthScore} / 100`,
+            summary: {
+                totalTargets: targetPaths.length,
+                criticalIssues: criticalCount,
+                warnings: warningCount,
+                runtimeErrors: this.#runtimeErrors.length,
+                networkErrors: this.#networkErrors.length
+            },
+            items: reportItems,
+            runtimeErrors: this.#runtimeErrors,
+            networkErrors: this.#networkErrors
+        };
+
+        this.renderConsoleOutput(finalReport);
+        return finalReport;
+    }
+
+    // --- 7. コンソール出力プロファイル ---
+    renderConsoleOutput(report) {
+        console.group('%c⚡ DiagnosticEngine v3.0 総合診断レポート', 'color: #00ffff; font-size: 14px; font-weight: bold;');
+        console.log(`%cシステム健全性スコア: ${report.healthScore}`, `font-size: 16px; font-weight: bold; color: ${parseInt(report.healthScore) > 80 ? '#00ff00' : '#ff4444'};`);
+        console.log(`📊 サマリー: 診断対象: ${report.summary.totalTargets} | 重大障害: ${report.summary.criticalIssues} | 警告: ${report.summary.warnings} | 実行エラー: ${report.summary.runtimeErrors} | ネットワークエラー: ${report.summary.networkErrors}`);
+
+        if (report.networkErrors.length > 0) {
+            console.group('📡 ネットワーク / リソース失敗 (404/エラー)');
+            console.table(report.networkErrors);
+            console.groupEnd();
+        }
+
+        if (report.runtimeErrors.length > 0) {
+            console.group('🔥 捕捉されたグローバル例外');
+            console.table(report.runtimeErrors);
+            console.groupEnd();
+        }
+
+        console.group('🔍 詳細要素レポート');
+        console.table(report.items.map(i => ({
+            '対象 (Path)': i.path,
+            '判定': i.status,
+            '優先度': i.priority,
+            '詳細型': i.type,
+            'シグネチャ': i.signature,
+            '実行回数': `${i.calls} 回`,
+            '平均時間': `${i.avgTimeMs} ms`,
+            'DOM参照': `${i.domReferences} 箇所`,
+            '改善案': i.suggestion
+        })));
+        console.groupEnd();
+        console.groupEnd();
+    }
+
+    // --- 8. 多形式エクスポート (JSON / CSV / HTMLレポートダウンロード) ---
+    exportJSON(report) {
+        return JSON.stringify(report, null, 2);
+    }
+
+    exportCSV(report) {
+        const headers = ['Path', 'Status', 'Priority', 'Type', 'Signature', 'Calls', 'AvgTimeMs', 'Errors', 'DOMReferences', 'Suggestion'];
+        const rows = report.items.map(i => [
+            `"${i.path}"`, `"${i.status}"`, `"${i.priority}"`, `"${i.type}"`, `"${i.signature}"`,
+            i.calls, i.avgTimeMs, i.errors, i.domReferences, `"${i.suggestion}"`
+        ]);
+        return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    }
+
+    downloadHTMLReport(report) {
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="ja">
+        <head>
+            <meta charset="UTF-8">
+            <title>Diagnostic Engine Report - ${report.timestamp}</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
+                h1 { color: #00ffff; }
+                .score { font-size: 32px; font-weight: bold; color: ${parseInt(report.healthScore) > 80 ? '#00ff00' : '#ff5555'}; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #1e1e1e; }
+                th, td { border: 1px solid #333; padding: 10px; text-align: left; }
+                th { background: #2a2a2a; color: #00ffff; }
+                .CRITICAL { color: #ff5555; font-weight: bold; }
+                .HIGH { color: #ffb86c; }
+                .MEDIUM { color: #f1fa8c; }
+                .LOW { color: #50fa7b; }
+            </style>
+        </head>
+        <body>
+            <h1>⚡ System Health Diagnostic Report</h1>
+            <p>生成日時: ${report.timestamp}</p>
+            <div class="score">Health Score: ${report.healthScore}</div>
+            <h2>詳細レポート</h2>
+            <table>
+                <thead>
+                    <tr><th>Path</th><th>Status</th><th>Priority</th><th>Type</th><th>Signature</th><th>Calls</th><th>Avg Time</th><th>DOM Refs</th><th>Suggestion</th></tr>
+                </thead>
+                <tbody>
+                    ${report.items.map(i => `
+                        <tr>
+                            <td><strong>${i.path}</strong></td>
+                            <td>${i.status}</td>
+                            <td class="${i.priority}">${i.priority}</td>
+                            <td>${i.type}</td>
+                            <td><code>${i.signature}</code></td>
+                            <td>${i.calls}</td>
+                            <td>${i.avgTimeMs} ms</td>
+                            <td>${i.domReferences}</td>
+                            <td>${i.suggestion}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </body>
+        </html>`;
+
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `diagnostic-report-${Date.now()}.html`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // デストラクタ / 後処理
+    destroy() {
+        this.detachAllTrackers();
+        if (this.#mutationObserver) this.#mutationObserver.disconnect();
+        if (this.#performanceObserver) this.#performanceObserver.disconnect();
+        if (this.#originalAddEventListener) {
+            EventTarget.prototype.addEventListener = this.#originalAddEventListener;
+        }
+        console.log('🧹 [DiagnosticEngine] 全てのフック・トラッカー・プロキシを解除しました。');
+    }
+}
+
+// --- 即時実行インターフェース ---
+(async () => {
+    // インスタンス作成
+    window.__diagEngine = new DiagnosticEngine({
+        maxDepth: 3,
+        observeNetwork: true,
+        observeMutations: true
+    });
+
+    // 診断の実行
+    const report = await window.__diagEngine.diagnose();
+
+    // 便利なグローバルコマンドの登録 (グローバル汚染は最小限の1オブジェクトのみ)
+    window.Diagnostic = {
+        run: () => window.__diagEngine.diagnose(),
+        downloadReport: () => window.__diagEngine.downloadHTMLReport(report),
+        exportJSON: () => window.__diagEngine.exportJSON(report),
+        exportCSV: () => window.__diagEngine.exportCSV(report),
+        clean: () => window.__diagEngine.destroy()
+    };
+})();
+
+ </script>   
 </body>
 </html>
