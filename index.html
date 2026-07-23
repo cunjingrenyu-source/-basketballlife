@@ -1073,19 +1073,34 @@ async function showHistoricalMatch(logIndex) {
         }
     }
     
-    // 【プロの後方互換性】三項演算子と論理和(||)を組み合わせ、3パターンの条件分岐を驚異的にスッキリさせる
-    const logBoxContent = idbData?.logsHtml || d.logsHtml || `
-        <div style='color:#f1c40f; text-align:center; padding: 20px;'>
-            ※この端末にはテキスト速報アーカイブがありません。<br>
-            <span style="font-size:0.9em; color:#ccc;">他端末でのプレイデータか、保存前に削除された可能性があります。</span>
-        </div>`;
-    const isDataEmpty = !idbData?.logsHtml && !d.logsHtml;
+  // --- 1. ログ表示部分（安全なデータ抽出） ---
+// Nullish Coalescing (??) は避け、空文字の場合もフォールバックさせるなら || でOKですが、
+// 変数に一度逃がすことで可読性を上げ、無駄な評価を減らします。
+const rawIdbLog = idbData?.logsHtml;
+const rawDLog = d?.logsHtml;
 
-    // 【プロのコード整理】変数に事前展開
-    const otHeader = d.qScoresHome.length > 4 ? '<th>OT</th>' : '';
-    const homeQScores = d.qScoresHome.map(q => `<td>${q}</td>`).join('');
-    const awayQScores = d.qScoresAway.map(q => `<td>${q}</td>`).join('');
-    
+const logBoxContent = rawIdbLog || rawDLog || `
+    <div style='color:#f1c40f; text-align:center; padding: 20px;'>
+        ※この端末にはテキスト速報アーカイブがありません。<br>
+        <span style="font-size:0.9em; color:#ccc;">他端末でのプレイデータか、保存前に削除された可能性があります。</span>
+    </div>`;
+
+const isDataEmpty = !rawIdbLog && !rawDLog;
+
+
+// --- 2. スコア展開部分（絶対クラッシュしない＆マルチOT対応版） ---
+// 存在しない場合は空配列 [] を代入することで、後続の .length や .map でのクラッシュを完全に防ぐ
+const homeScores = d?.qScoresHome ?? [];
+const awayScores = d?.qScoresAway ?? [];
+
+// 延長戦が複数回ある場合（OT1, OT2...）にも動的にヘッダーを生成して表の崩壊を防ぐ
+const otHeader = homeScores.length > 4 
+    ? homeScores.slice(4).map((_, index) => `<th>OT${index + 1}</th>`).join('') 
+    : '';
+
+// 値が欠損していた場合は '-' を表示してUIの崩れを防止
+const homeQScores = homeScores.map(q => `<td>${q ?? '-'}</td>`).join('');
+const awayQScores = awayScores.map(q => `<td>${q ?? '-'}</td>`).join('');
     // 【プロのUI調整】データが無い時は中央配置(center)、ログがある時は上詰め(flex-start)
     const flexAlign = isDataEmpty ? 'center' : 'flex-start';
 
