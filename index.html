@@ -1602,13 +1602,19 @@ const showRosterByName = (name) => {
             let abilityBonus = ((statUsed - 30) / 120) * 0.30;
             let successRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - defensePressure;
 
-            let ankleBreak = false;
+                        let ankleBreak = false;
             if(shooter.stats.dribble > defender.stats.defense + 20 && Math.random() < 0.15 * shooter._cond) {
                 ankleBreak = true;
                 successRate += 0.25;
             }
 
+            // 】ブロック・成功・失敗の判定へ進む前に、まず試投数を加算
+            shooter._box.fga++;
+            if (shotType === "three") shooter._box.tpa++;
+
             // --- B. ブロック判定 ---
+            let blockChance = ((defender.stats.defense + defender.stats.physical) / 300) * 0.08 + defPressureBonus;
+
             let blockChance = ((defender.stats.defense + defender.stats.physical) / 300) * 0.08 + defPressureBonus;
             if(shotType === "dunk") blockChance -= 0.03; 
             if(shotType === "layup" && shooter.stats.layup > 110) blockChance -= 0.04; 
