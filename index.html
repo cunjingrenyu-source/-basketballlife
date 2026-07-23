@@ -1522,8 +1522,13 @@ const showRosterByName = (name) => {
                 if(isAnd1) {
                     shooter._box.fgm++; 
                     shooter._box.pts += 2; // 3P時のAND-1も簡略化のため2点+1スローとする
-                    if(isHome) { score.home += 2; qScores.home[Math.min(3, currentQ-1)] += 2; } 
-                    else { score.away += 2; qScores.away[Math.min(3, currentQ-1)] += 2; }
+                                        // 【最終改良版】チーム判定とQのインデックスを最初に定義
+                    const side = isHome ? 'home' : 'away';
+                    const qIdx = currentQ - 1;
+
+                    // 1. AND-1の2点追加（延長戦バグ解消済）
+                    score[side] += 2; 
+                    qScores[side][qIdx] = (qScores[side][qIdx] || 0) + 2;
                     
                     offData.court.forEach(p => p._box.plusMinus += 2);
                     defData.court.forEach(p => p._box.plusMinus -= 2);
@@ -1536,7 +1541,11 @@ const showRosterByName = (name) => {
                     let ftRate = 0.60 + ((shooter.stats.middle - 30) / 120) * 0.25;
                     if(Math.random() < Math.max(0.40, ftRate * shooter._cond * mentalBuff)) {
                         shooter._box.ftm++; shooter._box.pts++;
-                        if(isHome) { score.home++; qScores.home[Math.min(3, currentQ-1)]++; } else { score.away++; qScores.away[Math.min(3, currentQ-1)]++; }
+                        
+                        // 2. ボーナススローの1点追加
+                        score[side] += 1;
+                        qScores[side][qIdx] = (qScores[side][qIdx] || 0) + 1;
+                        
                         writeLog(clock, shooter.name, `ボーナススロー：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
                         offData.court.forEach(p => p._box.plusMinus += 1); defData.court.forEach(p => p._box.plusMinus -= 1);
                     } else {
@@ -1552,12 +1561,16 @@ const showRosterByName = (name) => {
                 
                 let ftMade = 0;
                 shooter._box.fta += ftCount;
+                
                 for(let f=1; f<=ftCount; f++) {
                     let ftRate = 0.60 + ((shooter.stats.middle - 30) / 120) * 0.25;
                     if(Math.random() < Math.max(0.40, ftRate * shooter._cond * mentalBuff)) {
                         ftMade++; shooter._box.ftm++; shooter._box.pts++;
-                        if(isHome) { score.home++; qScores.home[Math.min(3, currentQ-1)]++; } 
-                        else { score.away++; qScores.away[Math.min(3, currentQ-1)]++; }
+                        
+                        // 3. 通常フリースローの1点追加
+                        score[side] += 1;
+                        qScores[side][qIdx] = (qScores[side][qIdx] || 0) + 1;
+                        
                         writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
                     } else {
                         writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`, false, [shooter.id]);
@@ -1567,7 +1580,6 @@ const showRosterByName = (name) => {
                 defData.court.forEach(p => p._box.plusMinus -= ftMade);
                 isHomeOffense = !isHomeOffense; 
                 continue; 
-            }
 
             // --- シュートタイプの決定 ---
             let shotType = "layup"; 
