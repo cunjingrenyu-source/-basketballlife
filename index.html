@@ -1113,8 +1113,9 @@ async function showHistoricalMatch(logIndex) {
   // --- 1. ログ表示部分（安全なデータ抽出） ---
 // Nullish Coalescing (??) は避け、空文字の場合もフォールバックさせるなら || でOKですが、
 // 変数に一度逃がすことで可読性を上げ、無駄な評価を減らします。
-const rawIdbLog = idbData?.logsHtml;
-const rawDLog = d?.logsHtml;
+const rawIdbLog = (idbData && idbData.logsHtml) ? idbData.logsHtml : null;
+const rawDLog = (d && d.logsHtml) ? d.logsHtml : null;
+
 
 const logBoxContent = rawIdbLog || rawDLog || `
     <div style='color:#f1c40f; text-align:center; padding: 20px;'>
