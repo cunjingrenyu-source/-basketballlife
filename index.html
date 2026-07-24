@@ -1912,16 +1912,19 @@ const showRosterByName = (name) => {
         let titleAway = document.getElementById('boxscore-title-away');
         if(titleAway) titleAway.innerText = `🚀 ${aTeam.name} 個人スタッツ`;
 
-        const fillBoxScoreTable = (targetTableId, roster) => {
+             const fillBoxScoreTable = (targetTableId, roster) => {
             let t = document.getElementById(targetTableId);
             if(!t) return;
             if(typeof generateTableHeaderHtml === "function" && typeof generatePlayerRowHtml === "function"){
-                t.innerHTML = generateTableHeaderHtml();
+                // 【プロ仕様修正】文字列として一括結合してからDOMに1回だけ書き込む（描画負荷を劇的に軽減）
+                let html = generateTableHeaderHtml();
                 roster.sort((a,b) => b._box.pts - a._box.pts).forEach(p => {
-                    t.innerHTML += `<tr>${generatePlayerRowHtml(p, p._box, false)}</tr>`;
+                    html += `<tr>${generatePlayerRowHtml(p, p._box, false)}</tr>`;
                 });
+                t.innerHTML = html;
             }
         };
+
         fillBoxScoreTable('match-box-home', hTeam.roster);
         fillBoxScoreTable('match-box-away', aTeam.roster);
         
