@@ -1204,7 +1204,11 @@ function showPlayerDetail(id) {
     
     // 過去試合画面(historical-match)も判定対象に含める
     const views = ['home', 'practice', 'standings', 'roster', 'match', 'historical-match'];
-    const currentActiveView = views.find(v => document.getElementById(`${v}-view`)?.style.display === 'block') || 'home';
+        const currentActiveView = views.find(v => {
+        const el = document.getElementById(`${v}-view`);
+        return el && el.style.display === 'block';
+    }) || 'home';
+
     
     if (currentActiveView !== 'player-detail') {
         previousView = currentActiveView;
