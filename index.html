@@ -1785,14 +1785,32 @@ const showRosterByName = (name) => {
                     offReber._box.orb++; 
                     offReber._box.reb++;
                     
-                    // プットバック判定
+                                      // プットバック判定
                     if (offReber.stats.dunk > 90 && offReber.stats.physical > 90 && Math.random() < 0.2) {
+                        // 【プロ仕様修正】ダンク成功時のスタッツ加算、スコア反映、攻守交代を正確に処理
+                        offReber._box.fga++;
+                        offReber._box.fgm++;
+                        offReber._box.pts += 2;
+                        
+                        const side = isHome ? 'home' : 'away';
+                        const qIdx = currentQ - 1;
+                        score[side] += 2;
+                        qScores[side][qIdx] = (qScores[side][qIdx] || 0) + 2;
+                        
+                        offData.court.forEach(p => p._box.plusMinus += 2);
+                        defData.court.forEach(p => p._box.plusMinus -= 2);
+
                         writeLog(clock, offData.team.name, `<span style="color:#e74c3c; font-weight:bold;">【プットバック！】</span>${offReber.name}がオフェンスリバウンドを空中で掴み、そのまま強烈なダンクを叩き込んだ！！`, true, [offReber.id]);
+                        
+                        isHomeOffense = !isHomeOffense; // ゴールが決まったので必ず攻守交代
                     } else if (offReber.stats.physical > 110 && Math.random() < 0.4) {
                         writeLog(clock, offData.team.name, `【空中戦】${offReber.name}がフィジカルで圧倒し、強引にオフェンスリバウンドをもぎ取った！`, false, [offReber.id]);
+                        // 通常のORB獲得時はそのまま攻撃継続
                     } else {
                         writeLog(clock, offData.team.name, `${offReber.name}が執念でオフェンスリバウンドを拾う！`, false, [offReber.id]);
+                        // 通常のORB獲得時はそのまま攻撃継続
                     }
+
                     // オフェンスリバウンド時は isHomeOffense は反転しない（そのまま）
                 } else {
                     defReber._box.drb++; 
