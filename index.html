@@ -1080,7 +1080,8 @@ async function finalizeRegistration(name, pos, appeal, age, nationality, avatarD
 // 過去の試合詳細を表示する新規関数（タブ機能 ＆ UX最適化 ＆ プロ仕様マージ版）
 async function showHistoricalMatch(logIndex) {
     // 【プロの堅牢性1】オプショナルチェーン(?.)を使い、一撃で安全に存在確認
-    if (!currentUser?.gameLog?.[logIndex]) {
+        if (!currentUser || !currentUser.gameLog || !currentUser.gameLog[logIndex]) {
+
         alert("指定された試合データが見つかりません。");
         return;
     }
