@@ -1522,77 +1522,72 @@ const showRosterByName = (name) => {
                 isHomeOffense = !isHomeOffense; continue;
             }
 
-                        // --- ファウル判定（And-1の導入とハイライト強化） ---
-            let foulRisk = 0.08 - (defender.stats.defense / 1000) + (defender.stats.physical / 1500);
-            if(Math.random() < Math.min(0.12, Math.max(0.02, foulRisk))) {
+                              // --- ファウル判定（And-1の導入とハイライト強化） ---
+            const foulRisk = 0.08 - (defender.stats.defense / 1000) + (defender.stats.physical / 1500);
+            
+            if (Math.random() < Math.min(0.12, Math.max(0.02, foulRisk))) {
                 defender._box.pf++;
                 
-                // バスカン(AND-1)判定：フィジカルとメンタルが高いと強引にねじ込める
-                let and1Chance = ((shooter.stats.physical + shooter.stats.mental) / 1000) * 0.15;
-                let isAnd1 = Math.random() < and1Chance && clock > 5; // 劇的なバザービーターAND-1も防がないが基本は通常時
+                // 【プロの設計1】変数のスコープを修正し、判定全体で共有。参照エラーを完全に防ぐ
+                const side = isHome ? 'home' : 'away';
+                const qIdx = currentQ - 1;
 
-                if(isAnd1) {
+                // 【プロの設計2】得点・PlusMinus加算処理の共通化（DRY原則）。コード量を減らし保守性を劇的に向上
+                const addScore = (pts) => {
+                    score[side] += pts;
+                    qScores[side][qIdx] = (qScores[side][qIdx] || 0) + pts;
+                    offData.court.forEach(p => p._box.plusMinus += pts);
+                    defData.court.forEach(p => p._box.plusMinus -= pts);
+                };
+
+                // 【プロの設計3】ループ内で毎回計算していたフリースロー成功率を外で事前計算（処理の高速化）
+                const ftRate = Math.max(0.40, (0.60 + ((shooter.stats.middle - 30) / 120) * 0.25) * shooter._cond * mentalBuff);
+
+                // バスカン(AND-1)判定
+                const and1Chance = ((shooter.stats.physical + shooter.stats.mental) / 1000) * 0.15;
+                const isAnd1 = Math.random() < and1Chance && clock > 5;
+
+                if (isAnd1) {
                     shooter._box.fgm++; 
-                    shooter._box.pts += 2; // 3P時のAND-1も簡略化のため2点+1スローとする
-                                        // 【最終改良版】チーム判定とQのインデックスを最初に定義
-                    const side = isHome ? 'home' : 'away';
-                    const qIdx = currentQ - 1;
+                    shooter._box.pts += 2; 
+                    addScore(2); // 共通関数で2点追加
 
-                    // 1. AND-1の2点追加（延長戦バグ解消済）
-                    score[side] += 2; 
-                    qScores[side][qIdx] = (qScores[side][qIdx] || 0) + 2;
-                    
-                    offData.court.forEach(p => p._box.plusMinus += 2);
-                    defData.court.forEach(p => p._box.plusMinus -= 2);
-
-                    let and1Text = `<span style="color:#e74c3c; font-weight:bold; font-size:14px;">🔥【AND-1!!!】🔥</span>${shooter.name}が${defender.name}の激しいファウルを受けながらも、強靭なフィジカルでシュートをねじ込んだ！！！`;
+                    const and1Text = `<span style="color:#e74c3c; font-weight:bold; font-size:14px;">🔥【AND-1!!!】🔥</span>${shooter.name}が${defender.name}の激しいファウルを受けながらも、強靭なフィジカルでシュートをねじ込んだ！！！`;
                     writeLog(clock, offData.team.name, and1Text, true, [shooter.id, defender.id]);
 
                     // ボーナススロー1本
                     shooter._box.fta += 1;
-                    let ftRate = 0.60 + ((shooter.stats.middle - 30) / 120) * 0.25;
-                    if(Math.random() < Math.max(0.40, ftRate * shooter._cond * mentalBuff)) {
-                        shooter._box.ftm++; shooter._box.pts++;
-                        
-                        // 2. ボーナススローの1点追加
-                        score[side] += 1;
-                        qScores[side][qIdx] = (qScores[side][qIdx] || 0) + 1;
-                        
+                    if (Math.random() < ftRate) {
+                        shooter._box.ftm++; 
+                        shooter._box.pts++;
+                        addScore(1); // 共通関数で1点追加
                         writeLog(clock, shooter.name, `ボーナススロー：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
-                        offData.court.forEach(p => p._box.plusMinus += 1); defData.court.forEach(p => p._box.plusMinus -= 1);
                     } else {
                         writeLog(clock, shooter.name, `ボーナススロー：外れる！`, false, [shooter.id]);
                     }
-                    isHomeOffense = !isHomeOffense; 
-                    continue; 
-                }
-
-                // 通常のフリースロー
-                let ftCount = (Math.random() < 0.25) ? 3 : 2; 
-                writeLog(clock, defData.team.name, `${defender.name}が激しいファウル！${shooter.name}がフリースロー獲得！`, false, [shooter.id, defender.id]);
-                
-                let ftMade = 0;
-                shooter._box.fta += ftCount;
-                
-                for(let f=1; f<=ftCount; f++) {
-                    let ftRate = 0.60 + ((shooter.stats.middle - 30) / 120) * 0.25;
-                    if(Math.random() < Math.max(0.40, ftRate * shooter._cond * mentalBuff)) {
-                        ftMade++; shooter._box.ftm++; shooter._box.pts++;
-                        
-                        // 3. 通常フリースローの1点追加
-                        score[side] += 1;
-                        qScores[side][qIdx] = (qScores[side][qIdx] || 0) + 1;
-                        
-                        writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
-                    } else {
-                        writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`, false, [shooter.id]);
+                } else {
+                    // 通常のフリースロー
+                    const ftCount = (Math.random() < 0.25) ? 3 : 2; 
+                    writeLog(clock, defData.team.name, `${defender.name}が激しいファウル！${shooter.name}がフリースロー獲得！`, false, [shooter.id, defender.id]);
+                    
+                    shooter._box.fta += ftCount;
+                    
+                    for (let f = 1; f <= ftCount; f++) {
+                        if (Math.random() < ftRate) {
+                            shooter._box.ftm++; 
+                            shooter._box.pts++;
+                            addScore(1); // 共通関数で1点追加
+                            writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
+                        } else {
+                            writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`, false, [shooter.id]);
+                        }
                     }
                 }
-                offData.court.forEach(p => p._box.plusMinus += ftMade);
-                defData.court.forEach(p => p._box.plusMinus -= ftMade);
+                
                 isHomeOffense = !isHomeOffense; 
                 continue;
-　　　　　　　　　　　　　　}
+            } // 【バグ修正】ここに混入していた全角スペースを完全削除
+
             // --- シュートタイプの決定 ---
             let shotType = "layup"; 
             let randShot = Math.random();
