@@ -1273,8 +1273,9 @@ function showRoster(teamId) {
         const div = g > 0 ? g : 1; // ゼロ除算を論理上完全に防ぐ
         const adv = typeof calcAdvanced === 'function' ? calcAdvanced(box) : { eff: 0 };
         
-        // ユーザー判定もオプショナルチェーンで安全に
-        const bgStyle = id === currentUser?.id ? ' style="background:#fff0f0;"' : '';
+            // ユーザー判定を古いブラウザでもエラーにならないように修正
+        const bgStyle = (currentUser && id === currentUser.id) ? ' style="background:#fff0f0;"' : '';
+
 
         // テンプレートリテラル内のオブジェクト参照（.）を削り、変数直接参照でメモリ処理を極限まで最適化
         return `<tr${bgStyle}>
