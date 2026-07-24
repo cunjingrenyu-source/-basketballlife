@@ -1138,8 +1138,9 @@ const otHeader = homeScores.length > 4
     : '';
 
 // 値が欠損していた場合は '-' を表示してUIの崩れを防止
-const homeQScores = homeScores.map(q => `<td>${q ?? '-'}</td>`).join('');
-const awayQScores = awayScores.map(q => `<td>${q ?? '-'}</td>`).join('');
+const homeQScores = homeScores.map(q => `<td>${(q !== null && q !== undefined) ? q : '-'}</td>`).join('');
+const awayQScores = awayScores.map(q => `<td>${(q !== null && q !== undefined) ? q : '-'}</td>`).join('');
+
     // 【プロのUI調整】データが無い時は中央配置(center)、ログがある時は上詰め(flex-start)
     const flexAlign = isDataEmpty ? 'center' : 'flex-start';
 
