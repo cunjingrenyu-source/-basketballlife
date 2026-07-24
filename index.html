@@ -2389,275 +2389,253 @@ function switchHistoricalTab(tabType) {
 
 <script>
 /**
- * ⚡ DiagnosticEngine v3.1 (Safe Mode Edition)
- * 干渉度を下げ、ネイティブ関数の汚染を防ぐマイルドな設計に変更。
- * バグの温床となるEventTargetのハックを廃止し、ユーザー定義コードのみを安全にトラッキングします。
+ * 👻 Omniscient Debugger v6.0 (Ghost Protocol)
+ * [完全非干渉モデル] プロトタイプ汚染・モンキーパッチを一切排除。
+ * 最新のWeb API群を駆使し、外側から影のように全事象を監視・解析する。
  */
-class DiagnosticEngine {
+class GhostDebugger {
     #config = {
-        namespaces: [window],
-        maxDepth: 2, // 探索深度を下げて負荷と不要な干渉を軽減
-        observeMutations: true,
-        observeNetwork: true
+        eventBufferSize: 200,      // エラー前後把握のためのイベントリングバッファ
+        idleTimeout: 5000,         // 状態スナップショットの取得間隔(ms)
+        heavyTaskMs: 50,           // メインスレッドブロック判定(ms)
+        leakThreshold: 10000,      // DOMがGCされずに残っていたら警告(ms)
     };
 
-    #proxyRegistry = new WeakMap();
-    #metrics = new Map();
-    #networkErrors = [];
-    #runtimeErrors = [];
-    #mutationObserver = null;
-    #performanceObserver = null;
-    #isTracking = false;
+    #state = {
+        ringBuffer: [],            // 最新アクション100〜200件を常に上書き保存
+        bufferIndex: 0,
+        errors: new Map(),
+        storageHash: '',
+        zombieDoms: new Set(),     // メモリリーク（Detached DOM）疑いリスト
+        performanceStats: { layoutShifts: 0, longTasks: 0, fpsDrops: 0 },
+        lastKnownState: null
+    };
 
-    constructor(customConfig = {}) {
-        Object.assign(this.#config, customConfig);
-        this.#initSafeObservers();
+    // メモリリーク（GC）を監視するハッカー級API
+    #gcRegistry = typeof FinalizationRegistry !== 'undefined' 
+        ? new FinalizationRegistry(heldValue => {
+            // メモリから完全に解放されたらリストから消去
+            this.#state.zombieDoms.delete(heldValue);
+        }) : null;
+
+    constructor() {
+        console.groupCollapsed('%c👻 Ghost Debugger v6.0 [Stealth Mode] 起動', 'color: #8e44ad; font-weight: bold;');
+        console.log('認証: モンキーパッチ排除完了。完全パッシブ監視に移行。');
+        
+        this.#startEventWiretap();
+        this.#startMemoryAndDOMRadar();
+        this.#startPerformanceSonar();
+        this.#startBackgroundStateDiffing();
+        this.#startErrorBlackbox();
+        
+        if (document.readyState === 'complete') this.#analyzeStaticAnomalies();
+        else window.addEventListener('load', () => this.#analyzeStaticAnomalies(), { once: true });
+
+        console.log('%c✅ システムへの干渉ゼロ。バックグラウンド監視中。', 'color: #2ecc71;');
+        console.log('%c💡 解析レポートの出力: Debugger.generateAIReport()', 'color: #f1c40f;');
+        console.groupEnd();
     }
 
-    // --- 1. 安全な初期化 (EventTargetのハックを廃止) ---
-    #initSafeObservers() {
-        // グローバルエラーフック (読み取り専用なので安全)
-        window.addEventListener('error', (e) => {
-            this.#runtimeErrors.push({ type: 'Error', message: e.message, source: e.filename, line: e.lineno });
-        });
-        window.addEventListener('unhandledrejection', (e) => {
-            this.#runtimeErrors.push({ type: 'UnhandledPromise', message: String(e.reason) });
-        });
+    // ==========================================
+    // 1. イベント傍受 (Event Wiretap) - 干渉ゼロ
+    // ==========================================
+    #startEventWiretap() {
+        const eventsToTrack = ['click', 'input', 'keydown', 'scroll', 'touchstart'];
+        
+        const passiveListener = (e) => {
+            // { passive: true } により、preventDefaultなどを妨害しない。
+            // キャプチャフェーズ(true)により、子要素がstopPropagationしても必ず検知。
+            const target = e.target;
+            const path = target?.tagName ? `${target.tagName.toLowerCase()}${target.id ? '#'+target.id : ''}` : 'Unknown';
+            
+            this.#recordToBuffer({
+                type: 'event',
+                name: e.type,
+                target: path,
+                time: performance.now()
+            });
 
-        // ネットワーク監視 (読み取り専用なので安全)
-        if (this.#config.observeNetwork && typeof PerformanceObserver !== 'undefined') {
-            try {
-                this.#performanceObserver = new PerformanceObserver((list) => {
-                    list.getEntries().forEach((entry) => {
-                        if (entry.responseStatus && entry.responseStatus >= 400) {
-                            this.#networkErrors.push({ name: entry.name, status: entry.responseStatus, type: entry.initiatorType });
-                        }
-                    });
+            // 連打・暴走検知 (100ms以内に同じ要素への同一イベントが5回以上等)
+            this.#detectClickSpam(e.type, target);
+        };
+
+        eventsToTrack.forEach(evt => {
+            window.addEventListener(evt, passiveListener, { capture: true, passive: true });
+        });
+    }
+
+    #detectClickSpam(type, target) {
+        if (type !== 'click') return;
+        const recent = this.#state.ringBuffer.filter(b => b && b.type === 'event' && b.name === 'click' && performance.now() - b.time < 500);
+        if (recent.length > 5) {
+            console.warn(`⚠️ [連打暴走検知] 0.5秒間に5回以上のクリックが発生しました。`, target);
+        }
+    }
+
+    // ==========================================
+    // 2. メモリ＆DOMリーク監視 (GC Radar)
+    // ==========================================
+    #startMemoryAndDOMRadar() {
+        if (!this.#gcRegistry) return;
+
+        // MutationObserverでDOMの削除を検知
+        const observer = new MutationObserver((mutations) => {
+            let removedNodesCount = 0;
+            mutations.forEach(m => {
+                m.removedNodes.forEach(node => {
+                    if (node.nodeType === 1) { // Element Node
+                        removedNodesCount++;
+                        const id = `dom_${Date.now()}_${Math.random()}`;
+                        this.#state.zombieDoms.add(id);
+                        // GC監視対象として登録
+                        this.#gcRegistry.register(node, id, node);
+                    }
                 });
-                this.#performanceObserver.observe({ type: 'resource', buffered: true });
-            } catch (e) {}
-        }
-
-        // 動的DOM監視
-        if (this.#config.observeMutations && typeof MutationObserver !== 'undefined') {
-            this.#mutationObserver = new MutationObserver((mutations) => {
-                for (const mutation of mutations) {
-                    for (const node of mutation.addedNodes) {
-                        if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'SCRIPT') {
-                            console.warn(`[Diagnostic] 動的スクリプト読み込み: ${node.src || 'inline'}`);
-                        }
-                    }
-                }
             });
-            this.#mutationObserver.observe(document.body, { childList: true, subtree: true });
-        }
-    }
 
-    // --- 2. ネイティブ関数判定 (一番重要なバグ回避策) ---
-    static isNativeFunction(fn) {
-        return typeof fn === 'function' && /\{\s*\[native code\]\s*\}/.test(Function.prototype.toString.call(fn));
-    }
-
-    // --- 3. プロパティの安全な解析 ---
-    static describeProperty(obj, key) {
-        let descriptor = null;
-        let proto = obj;
-        while (proto && !descriptor) {
-            descriptor = Object.getOwnPropertyDescriptor(proto, key);
-            proto = Object.getPrototypeOf(proto);
-        }
-
-        if (!descriptor) return { exists: false };
-
-        const value = descriptor.value;
-        let detailedType = typeof value;
-        let isNative = false;
-
-        if (descriptor.get || descriptor.set) {
-            detailedType = 'Accessor';
-        } else if (typeof value === 'function') {
-            isNative = this.isNativeFunction(value);
-            detailedType = isNative ? 'NativeFunction' : 'UserFunction';
-        } else if (Array.isArray(value)) {
-            detailedType = 'Array';
-        }
-
-        return {
-            exists: true,
-            value,
-            type: detailedType,
-            isNative,
-            configurable: !!descriptor.configurable
-        };
-    }
-
-    // --- 4. 安全なトラッカー (ユーザー定義関数のみProxy化) ---
-    attachTracker(obj, key, path) {
-        const desc = DiagnosticEngine.describeProperty(obj, key);
-        
-        // 【重要】ネイティブ関数や、設定不可能なプロパティは絶対に触らない
-        if (!desc.exists || desc.type !== 'UserFunction' || desc.isNative || !desc.configurable) return;
-
-        const originalFn = desc.value;
-        if (this.#proxyRegistry.has(originalFn)) return;
-
-        const metrics = this.#metrics.get(path) || { calls: 0, totalTime: 0, errors: 0 };
-        this.#metrics.set(path, metrics);
-
-        const proxy = new Proxy(originalFn, {
-            apply(target, thisArg, argArray) {
-                metrics.calls++;
-                const start = performance.now();
-                try {
-                    const result = Reflect.apply(target, thisArg, argArray);
-                    if (result instanceof Promise) {
-                        return result.catch((err) => { metrics.errors++; throw err; });
-                    }
-                    return result;
-                } catch (err) {
-                    metrics.errors++;
-                    throw err;
-                } finally {
-                    metrics.totalTime += (performance.now() - start);
-                }
+            if (removedNodesCount > 100) {
+                console.warn(`⚠️ [DOM大量破棄] 一度に ${removedNodesCount} 件のDOMが削除されました。リペイント負荷大。`);
             }
         });
 
-        try {
-            obj[key] = proxy;
-            this.#proxyRegistry.set(originalFn, { proxy, parent: obj, key });
-        } catch (e) {
-            // 例外が起きるプロパティは無視
-        }
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        // 定期的にzombieDomsをチェック（消されずに残っている＝リーク）
+        setInterval(() => {
+            if (this.#state.zombieDoms.size > 50) {
+                console.error(`🧠 [メモリリーク警告] 画面から消えたのにメモリ上に残留しているDOM (Detached DOM) が ${this.#state.zombieDoms.size} 件あります。イベントリスナーや配列への参照残りが原因です。`);
+            }
+        }, 10000);
     }
 
-    // --- 5. DOM調査 (インライン属性のみに限定し安全化) ---
-    scanDOMEvents(root = document) {
-        const usages = [];
-        try {
-            const allElements = root.querySelectorAll('*');
-            allElements.forEach((el) => {
-                for (const attr of el.attributes) {
-                    if (attr.name.startsWith('on')) {
-                        usages.push({
-                            tagName: el.tagName.toLowerCase(),
-                            event: attr.name,
-                            code: attr.value
-                        });
-                    }
+    // ==========================================
+    // 3. パフォーマンス＆ネットワーク監視 (Passive Sonar)
+    // ==========================================
+    #startPerformanceSonar() {
+        if (typeof PerformanceObserver === 'undefined') return;
+
+        // メインスレッドの停止（重い処理）
+        new PerformanceObserver((list) => {
+            list.getEntries().forEach(entry => {
+                this.#state.performanceStats.longTasks++;
+                this.#recordToBuffer({ type: 'perf', name: 'LongTask', duration: entry.duration, time: performance.now() });
+                if (entry.duration > 200) console.warn(`⏳ [CPU負荷] メインスレッドが ${Math.round(entry.duration)}ms 停止。重いループかレイアウト計算が発生しています。`);
+            });
+        }).observe({ type: 'longtask', buffered: true });
+
+        // リソース/通信エラー監視 (fetch/XHRのフック不要で検知可能)
+        new PerformanceObserver((list) => {
+            list.getEntries().forEach(entry => {
+                if (entry.initiatorType === 'fetch' || entry.initiatorType === 'xmlhttprequest') {
+                    if (entry.duration > 3000) console.warn(`🌐 [通信遅延] ${entry.name} の通信に ${Math.round(entry.duration)}ms かかりました。`);
+                    this.#recordToBuffer({ type: 'network', url: entry.name, duration: entry.duration, time: performance.now() });
                 }
             });
-        } catch(e) {}
-        return usages;
+        }).observe({ type: 'resource', buffered: true });
     }
 
-    // --- 6. スキャン＆トラッキング適用 (CORSエラー回避) ---
-    autoDiscoverTargets() {
-        const discoveredPaths = new Set();
-        const visitedObjects = new WeakSet();
-        const skipKeys = ['localStorage', 'sessionStorage', 'customElements', 'frames']; // 触ると危険なものを除外
-
-        const traverse = (obj, currentPath, depth) => {
-            if (depth > this.#config.maxDepth || !obj || typeof obj !== 'object' || visitedObjects.has(obj)) return;
-            visitedObjects.add(obj);
-
-            let keys = [];
+    // ==========================================
+    // 4. バックグラウンド状態差分 (Idle State Diffing)
+    // ==========================================
+    #startBackgroundStateDiffing() {
+        // requestIdleCallbackを使い、ブラウザが暇な時にだけストレージや変数をスキャン
+        const scan = () => {
             try {
-                // Cross-Origin IFRAMEなどでエラーになるのを防ぐ
-                keys = Object.getOwnPropertyNames(obj);
-            } catch (e) { return; }
+                // 1. LocalStorageの監視
+                const currentStorage = JSON.stringify(localStorage);
+                if (this.#state.storageHash !== currentStorage) {
+                    this.#recordToBuffer({ type: 'state', name: 'LocalStorageChanged', size: currentStorage.length, time: performance.now() });
+                    
+                    if (currentStorage.length > 5000000) console.error('📦 [セーブ容量異常] localStorageが5MBの限界に近づいています。');
+                    this.#state.storageHash = currentStorage;
+                }
 
-            for (const key of keys) {
-                if (depth === 0 && skipKeys.includes(key)) continue;
-
-                const path = currentPath ? `${currentPath}.${key}` : key;
-                try {
-                    const desc = DiagnosticEngine.describeProperty(obj, key);
-                    if (desc.exists && desc.type === 'UserFunction') {
-                        discoveredPaths.add(path);
-                        this.attachTracker(obj, key, path);
-                    } else if (desc.exists && typeof desc.value === 'object' && desc.value !== null && !desc.isNative) {
-                        traverse(desc.value, path, depth + 1);
+                // 2. 致命的データ異常 (NaN, null) の受動的スキャン
+                // ※対象を限定（例: window.gameState や特定のグローバル変数）
+                const gameState = window.gameState || window.playerData || null; 
+                if (gameState) {
+                    const strState = JSON.stringify(gameState);
+                    if (strState.includes('null') || strState.includes('NaN')) {
+                        console.error('⚠️ [データ破損検知] ゲーム状態に null または NaN が侵入しました。直前のバッファログを確認してください。');
                     }
-                } catch(e) {} // アクセス権エラー等を無視
-            }
+                }
+            } catch (e) {}
+
+            setTimeout(() => {
+                (window.requestIdleCallback || window.setTimeout)(scan, { timeout: 1000 });
+            }, this.#config.idleTimeout);
+        };
+        (window.requestIdleCallback || window.setTimeout)(scan, { timeout: 1000 });
+    }
+
+    // ==========================================
+    // 5. エラーのブラックボックス記録 (Error Blackbox)
+    // ==========================================
+    #startErrorBlackbox() {
+        const handleCrash = (e, type) => {
+            const errorMsg = e.message || String(e.reason);
+            const stack = e.error?.stack || e.reason?.stack || 'No Stack';
+            
+            // エラー直前の100アクションを抽出
+            const recentHistory = this.#getBufferOrdered();
+            
+            console.group(`%c🔥 [CRASH REPORT] ${errorMsg}`, 'color: white; background: red; padding: 2px 10px;');
+            console.log('📍 スタックトレース:', stack);
+            console.log('👣 エラー発生までの軌跡 (最新50件):', recentHistory.slice(-50));
+            console.log('💡 AIへの連携用レポートを出力します...');
+            console.groupEnd();
+            
+            this.#state.errors.set(Date.now(), { msg: errorMsg, stack, history: recentHistory });
         };
 
-        this.#config.namespaces.forEach((ns) => traverse(ns, '', 0));
-        return Array.from(discoveredPaths);
+        window.addEventListener('error', (e) => handleCrash(e, 'SyncError'));
+        window.addEventListener('unhandledrejection', (e) => handleCrash(e, 'AsyncError'));
     }
 
-    // --- 7. 診断実行とレポート ---
-    async diagnose() {
-        const targetPaths = this.autoDiscoverTargets();
-        const domUsages = this.scanDOMEvents();
-        const reportItems = [];
-
-        for (const path of targetPaths) {
-            const metrics = this.#metrics.get(path) || { calls: 0, totalTime: 0, errors: 0 };
-            
-            // 最後のキー名を取得（例: "App.utils.testFn" -> "testFn"）
-            const keyName = path.split('.').pop();
-            const matchingDOMUses = domUsages.filter(u => u.code.includes(path) || u.code.includes(keyName));
-            
-            let status = '✅ 正常';
-            if (metrics.calls === 0 && matchingDOMUses.length === 0) status = '⚠️ 未使用の可能性';
-            if (metrics.errors > 0) status = `🔥 エラー (${metrics.errors}回)`;
-
-            const avgTime = metrics.calls > 0 ? (metrics.totalTime / metrics.calls).toFixed(2) : 0;
-
-            reportItems.push({
-                '対象関数 (Path)': path,
-                '状態': status,
-                '実行回数': metrics.calls,
-                '平均時間(ms)': avgTime,
-                'HTML呼び出し': matchingDOMUses.length > 0 ? 'あり' : 'なし'
-            });
-        }
-
-        console.group('%c⚡ DiagnosticEngine v3.1 (Safe Mode)', 'color: #00ffff; font-size: 14px; font-weight: bold;');
-        
-        if (this.#networkErrors.length > 0) {
-            console.group('📡 ネットワークエラー');
-            console.table(this.#networkErrors);
-            console.groupEnd();
-        }
-
-        if (this.#runtimeErrors.length > 0) {
-            console.group('🔥 実行時エラー');
-            console.table(this.#runtimeErrors);
-            console.groupEnd();
-        }
-
-        console.group('🔍 ユーザー定義関数レポート');
-        console.table(reportItems);
-        console.groupEnd();
-        console.groupEnd();
-        
-        return { items: reportItems, network: this.#networkErrors, runtime: this.#runtimeErrors };
-    }
-
-    // クリーンアップ
-    destroy() {
-        this.#proxyRegistry.forEach(({ parent, key }, originalFn) => {
-            try { parent[key] = originalFn; } catch (e) {}
+    // 静的解析 (HTMLとJSの不整合をロード時に1回だけパッシブチェック)
+    #analyzeStaticAnomalies() {
+        document.querySelectorAll('[onclick], [onchange], [oninput]').forEach(el => {
+            const attr = el.getAttribute('onclick') || el.getAttribute('onchange');
+            if (!attr) return;
+            const match = attr.match(/([a-zA-Z0-9_]+)\s*\(/);
+            if (match && typeof window[match[1]] !== 'function') {
+                console.error(`🔗 [結合エラー] 要素に設定された '${match[1]}' が存在しません。スコープ外かタイポです。`, el);
+            }
         });
-        if (this.#mutationObserver) this.#mutationObserver.disconnect();
-        if (this.#performanceObserver) this.#performanceObserver.disconnect();
-        console.log('🧹 [DiagnosticEngine] 全フックを解除し、元の状態に戻しました。');
+    }
+
+    // リングバッファ（メモリを肥大化させないための循環配列）
+    #recordToBuffer(data) {
+        this.#state.ringBuffer[this.#state.bufferIndex] = data;
+        this.#state.bufferIndex = (this.#state.bufferIndex + 1) % this.#config.eventBufferSize;
+    }
+
+    #getBufferOrdered() {
+        return [
+            ...this.#state.ringBuffer.slice(this.#state.bufferIndex),
+            ...this.#state.ringBuffer.slice(0, this.#state.bufferIndex)
+        ].filter(Boolean);
+    }
+
+    // AI解析向け完全レポートエクスポート
+    generateAIReport() {
+        const report = {
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            performance: this.#state.performanceStats,
+            memoryLeaks: Array.from(this.#state.zombieDoms),
+            recentErrors: Array.from(this.#state.errors.values()),
+            last100Events: this.#getBufferOrdered().slice(-100)
+        };
+        const json = JSON.stringify(report, null, 2);
+        console.log('%c📋 [AI用レポート生成完了] 以下のJSONをAIに提供してください。', 'color: #3498db; font-weight:bold;');
+        console.log(json);
+        return json;
     }
 }
 
-// --- 自動実行 ---
-(async () => {
-    window.__diagEngine = new DiagnosticEngine();
-    await window.__diagEngine.diagnose();
-
-    window.Diagnostic = {
-        run: () => window.__diagEngine.diagnose(),
-        clean: () => window.__diagEngine.destroy()
-    };
-})();
+// 起動 (本体に一切干渉せず、影からシステム全体を監視します)
+window.Debugger = new GhostDebugger();
 </script>
 </body>
 </html>
