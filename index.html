@@ -722,98 +722,164 @@ window.onload = async function() {
         schedule = allMatches;
     }
 
-    function registerPlayer() {
-        const btn = document.getElementById('reg-btn');
-        if(btn) {
-            btn.disabled = true;
-            btn.innerText = "登録処理中...";
-        }
+(() => {
+    const processAvatarImage = (file) => {
+        if (!file) return Promise.resolve(null);
 
-        let name = document.getElementById('reg-name').value || "マイプレイヤー";
-        let pos = document.getElementById('reg-pos').value;
-        let appeal = document.getElementById('reg-appeal').value;
-        let age = parseInt(document.getElementById('reg-age').value) || 18;
-        let nationality = document.getElementById('reg-nationality').value || "日本"; 
-        
-        let fileInput = document.getElementById('reg-image');
-        
-        if (fileInput && fileInput.files && fileInput.files[0]) {
-            let reader = new FileReader();
-            reader.onload = function(e) {
-                let img = new Image();
-                img.onload = function() {
-                    let canvas = document.createElement('canvas');
-                    let ctx = canvas.getContext('2d');
-                    let maxSize = 150; 
-                    let width = img.width; let height = img.height;
-                    
-                    if (width > height) { if (width > maxSize) { height *= maxSize / width; width = maxSize; } } 
-                    else { if (height > maxSize) { width *= maxSize / height; height = maxSize; } }
-                    
-                    canvas.width = width; canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
-                    let compressedData = canvas.toDataURL('image/jpeg', 0.7); 
-                    
-                    finalizeRegistration(name, pos, appeal, age, nationality, compressedData);
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onerror = () => resolve(null);
+
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onerror = () => resolve(null);
+
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const maxSize = 150;
+                        let { width, height } = img;
+
+                        if (width > height) {
+                            if (width > maxSize) { height = Math.round(height * maxSize / width); width = maxSize; }
+                        } else {
+                            if (height > maxSize) { width = Math.round(width * maxSize / height); height = maxSize; }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        resolve(canvas.toDataURL('image/jpeg', 0.8));
+                    } catch (e) {
+                        resolve(null);
+                    }
                 };
+
                 img.src = e.target.result;
             };
-            reader.readAsDataURL(fileInput.files[0]);
-        } else {
-            finalizeRegistration(name, pos, appeal, age, nationality, null);
-        }
-    }
 
-    async function finalizeRegistration(name, pos, appeal, age, nationality, avatarData) {
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const setRegisteringUIState = (isProcessing, labelText) => {
+        const btn = document.getElementById('reg-btn');
+        if (!btn) return;
+        btn.disabled = isProcessing;
+        btn.innerText = labelText || (isProcessing ? "登録処理中..." : "ドラフト参入");
+    };
+
+    window.registerPlayer = async function() {
+        setRegisteringUIState(true, "登録処理中...");
+
+        try {
+            const nameVal = document.getElementById('reg-name')?.value?.trim();
+            const posVal = document.getElementById('reg-pos')?.value;
+            const appealVal = document.getElementById('reg-appeal')?.value;
+            const ageVal = parseInt(document.getElementById('reg-age')?.value, 10);
+            const natVal = document.getElementById('reg-nationality')?.value?.trim();
+            const fileInput = document.getElementById('reg-image');
+
+            const name = nameVal || "マイプレイヤー";
+            const pos = posVal || "PG";
+            const appeal = appealVal || null;
+            const age = Number.isInteger(ageVal) && ageVal > 0 ? ageVal : 18;
+            const nationality = natVal || "日本";
+
+            const avatarData = (fileInput && fileInput.files && fileInput.files[0])
+                ? await processAvatarImage(fileInput.files[0])
+                : null;
+
+            await window.finalizeRegistration(name, pos, appeal, age, nationality, avatarData);
+
+        } catch (fatalError) {
+            console.error("RegisterPlayer Error:", fatalError);
+            setRegisteringUIState(false, "登録再試行");
+        }
+    };
+
+    window.finalizeRegistration = async function(name, pos, appeal, age, nationality, avatarData) {
+        if (typeof teams === 'undefined' || !Array.isArray(teams) || teams.length === 0) {
+            console.error("teams array is empty or undefined.");
+            setRegisteringUIState(false, "データ未初期化エラー");
+            return;
+        }
+
+        const currentId = (typeof playerIdCounter !== 'undefined') ? playerIdCounter++ : Date.now();
+        
         currentUser = {
-            id: playerIdCounter++, isUser: true, name: name, pos: pos, age: age, nationality: nationality, avatar: avatarData,
-            stats: createStats(appeal, age), box: createBoxScore(), gameLog: [], teamId: null
+            id: currentId,
+            isUser: true,
+            name: name,
+            pos: pos,
+            age: age,
+            nationality: nationality,
+            avatar: avatarData,
+            stats: (typeof createStats === 'function') ? createStats(appeal, age) : {},
+            box: (typeof createBoxScore === 'function') ? createBoxScore() : {},
+            gameLog: [],
+            teamId: null
         };
 
-        let targetTeam = teams[Math.floor(Math.random() * 30)];
+        const targetTeam = teams[Math.floor(Math.random() * teams.length)];
         currentUser.teamId = targetTeam.id;
-        
-        let comIdx = targetTeam.roster.findIndex(p => p.pos === pos);
-        currentUser.num = targetTeam.roster[comIdx].num; 
-        
-        allPlayers = allPlayers.filter(p => p.id !== targetTeam.roster[comIdx].id);
-        targetTeam.roster.splice(comIdx, 1, currentUser);
-        allPlayers.push(currentUser);
 
-        gameStartTimeEpoch = Date.now();
-        
-        const btn = document.getElementById('reg-btn');
-        
-        try {
-            if (typeof saveGame === 'function') await saveGame();
-            
-            if(btn) {
-                btn.disabled = false;
-                btn.innerText = "ドラフト参入";
+        if (targetTeam && Array.isArray(targetTeam.roster)) {
+            const comIdx = targetTeam.roster.findIndex(p => p.pos === pos);
+            if (comIdx !== -1) {
+                currentUser.num = targetTeam.roster[comIdx].num;
+                const removedPlayer = targetTeam.roster[comIdx];
+
+                if (typeof allPlayers !== 'undefined' && Array.isArray(allPlayers)) {
+                    allPlayers = allPlayers.filter(p => p.id !== removedPlayer.id);
+                }
+                targetTeam.roster.splice(comIdx, 1, currentUser);
+            } else {
+                currentUser.num = Math.floor(Math.random() * 99) + 1;
+                targetTeam.roster.push(currentUser);
             }
-            setupGameUI();
-            
-        } catch (error) {
-            if(btn) {
-                btn.disabled = false;
-                btn.innerText = "登録再試行";
-            }
-            console.error("登録完了時のセーブに失敗したため、処理を中断しました");
         }
-    }
 
-    function setupGameUI() {
-        let regView = document.getElementById('reg-view');
-        let statusBar = document.getElementById('server-status-bar');
-        
-        if(regView) regView.style.display = 'none';
-        if(statusBar) statusBar.style.display = 'flex';
-        
+        if (typeof allPlayers !== 'undefined' && Array.isArray(allPlayers)) {
+            allPlayers.push(currentUser);
+        }
+
+        if (typeof gameStartTimeEpoch !== 'undefined') {
+            gameStartTimeEpoch = Date.now();
+        } else {
+            window.gameStartTimeEpoch = Date.now();
+        }
+
+        try {
+            if (typeof saveGame === 'function') {
+                await saveGame();
+            }
+            setRegisteringUIState(false, "ドラフト参入");
+            window.setupGameUI();
+        } catch (saveError) {
+            console.error("SaveGame Error:", saveError);
+            setRegisteringUIState(false, "登録再試行");
+        }
+    };
+
+    window.setupGameUI = function() {
+        const regView = document.getElementById('reg-view');
+        const statusBar = document.getElementById('server-status-bar');
+
+        if (regView) regView.style.display = 'none';
+        if (statusBar) statusBar.style.display = 'flex';
+
         if (typeof renderPracticeGrid === 'function') renderPracticeGrid();
         if (typeof goHome === 'function') goHome();
         if (typeof processOfflineProgress === 'function') processOfflineProgress();
         if (typeof startServerClock === 'function') startServerClock();
-    }
+    };
+})();
 
     // --- オフライン時間経過・オート進行 ---
     function processOfflineProgress() {
