@@ -627,9 +627,8 @@ window.onload = async function() {
         return `👤`;
     }
 
-    // 初期値生成（年齢の概念を追加）
+      // 初期値生成（年齢の概念を追加）
     function rollStat(isAppeal = false, age = 18) {
-        // 18歳は初期値低め。将来的に22歳以上の場合は底上げする。
         let baseMin = (age >= 22) ? 0.15 : 0.05;
         let baseMax = (age >= 22) ? 0.35 : 0.20;
 
@@ -650,7 +649,7 @@ window.onload = async function() {
         };
     }
 
-        window.initWorld = function() {
+    function initWorld() {
         teams = []; allPlayers = []; currentRound = 1;
         const teamNames = [
             "セルティックス", "ネッツ", "ニックス", "シクサーズ", "ラプターズ",
@@ -676,7 +675,7 @@ window.onload = async function() {
             };
             POSITIONS.forEach((pos) => {
                 for (let j = 1; j <= 3; j++) {
-                    let comStats = createStats(null, 22); // COMは暫定大卒相当のベース
+                    let comStats = createStats(null, 22);
                     STAT_KEYS.forEach(sk => { if(Math.random() > 0.5) comStats[sk.k] += Math.floor(Math.random() * 20); });
                     let p = { 
                         id: playerIdCounter++, teamId: team.id, isUser: false, age: 22, avatar: null,
@@ -688,26 +687,22 @@ window.onload = async function() {
             });
             teams.push(team);
         }
-        window.generate82Schedule();
-    };
+        generate82Schedule();
+    }
 
-    window.generate82Schedule = function() {
+    function generate82Schedule() {
         schedule = [];
-        const numTeams = teams.length; // 30チーム
-        let teamIds = teams.map(t => t.id); // チームIDだけの配列を作る
+        const numTeams = teams.length; 
+        let teamIds = teams.map(t => t.id); 
         let allMatches = [];
 
-        // --- 1. サークル・メソッドによる総当たりスケジュールの生成 ---
-        // 30チームの場合、1周（29節）で全チームと1回ずつ対戦します。
-        // それを82節になるまでひたすら回し続けます。
-        for (let r = 0; r < totalRounds; r++) { // totalRounds = 82
+        for (let r = 0; r < totalRounds; r++) { 
             let roundMatches = [];
             
-            for (let i = 0; i < numTeams / 2; i++) { // 15試合を作る
+            for (let i = 0; i < numTeams / 2; i++) { 
                 let home = teamIds[i];
                 let away = teamIds[numTeams - 1 - i];
                 
-                // ホーム＆アウェイの偏りを無くすため、奇数節と偶数節で場所を反転
                 if (r % 2 === 1) {
                     [home, away] = [away, home];
                 }
@@ -715,30 +710,24 @@ window.onload = async function() {
             }
             allMatches.push(roundMatches);
             
-            // 🔄 チームの回転（ここがアルゴリズムのキモ）
-            // ID[0]のチームだけ位置を固定し、残りのチームを時計回りに1つずつズラすことで
-            // 誰とも被らずに全ての対戦カードを網羅できます。
             const last = teamIds.pop();
             teamIds.splice(1, 0, last);
         }
         
-        // --- 2. シーズン日程のシャッフル ---
-        // このままだと「毎年必ず第1節は同じ対戦相手」になってしまうため、
-        // 「節（ラウンド）」の順番をごっそりシャッフルします。
         for (let i = allMatches.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [allMatches[i], allMatches[j]] = [allMatches[j], allMatches[i]];
         }
 
         schedule = allMatches;
-    };
+    }
 
-
-    // --- 登録処理（画像アップロード＆確実な遷移） ---
-    window.registerPlayer = function() {
+    function registerPlayer() {
         const btn = document.getElementById('reg-btn');
-        btn.disabled = true;
-        btn.innerText = "登録処理中...";
+        if(btn) {
+            btn.disabled = true;
+            btn.innerText = "登録処理中...";
+        }
 
         let name = document.getElementById('reg-name').value || "マイプレイヤー";
         let pos = document.getElementById('reg-pos').value;
@@ -748,10 +737,9 @@ window.onload = async function() {
         
         let fileInput = document.getElementById('reg-image');
         
-        if (fileInput.files && fileInput.files[0]) {
+        if (fileInput && fileInput.files && fileInput.files[0]) {
             let reader = new FileReader();
             reader.onload = function(e) {
-                // 【追加】画像がデカすぎてセーブデータが壊れるのを防ぐため、アイコンサイズに圧縮
                 let img = new Image();
                 img.onload = function() {
                     let canvas = document.createElement('canvas');
@@ -766,18 +754,17 @@ window.onload = async function() {
                     ctx.drawImage(img, 0, 0, width, height);
                     let compressedData = canvas.toDataURL('image/jpeg', 0.7); 
                     
-                    window.finalizeRegistration(name, pos, appeal, age, nationality, compressedData);
+                    finalizeRegistration(name, pos, appeal, age, nationality, compressedData);
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(fileInput.files[0]);
         } else {
-            window.finalizeRegistration(name, pos, appeal, age, nationality, null);
+            finalizeRegistration(name, pos, appeal, age, nationality, null);
         }
-    };
+    }
 
-    // ▼ async を追加した新しい関数に差し替えます
-    window.finalizeRegistration = async function(name, pos, appeal, age, nationality, avatarData) {
+    async function finalizeRegistration(name, pos, appeal, age, nationality, avatarData) {
         currentUser = {
             id: playerIdCounter++, isUser: true, name: name, pos: pos, age: age, nationality: nationality, avatar: avatarData,
             stats: createStats(appeal, age), box: createBoxScore(), gameLog: [], teamId: null
@@ -798,32 +785,35 @@ window.onload = async function() {
         const btn = document.getElementById('reg-btn');
         
         try {
-            // ▼ セーブが完了するまでここで待機！
-            await saveGame();
+            if (typeof saveGame === 'function') await saveGame();
             
-            btn.disabled = false;
-            btn.innerText = "ドラフト参入";
-            
-            // ▼ セーブに成功した場合のみUIをセットアップして次へ
-            window.setupGameUI();
+            if(btn) {
+                btn.disabled = false;
+                btn.innerText = "ドラフト参入";
+            }
+            setupGameUI();
             
         } catch (error) {
-            // ▼ セーブ失敗時はボタンを戻して処理を止める
-            btn.disabled = false;
-            btn.innerText = "登録再試行";
+            if(btn) {
+                btn.disabled = false;
+                btn.innerText = "登録再試行";
+            }
             console.error("登録完了時のセーブに失敗したため、処理を中断しました");
         }
-    };
+    }
 
-    window.setupGameUI = function() {
-        document.getElementById('reg-view').style.display = 'none';
-        document.getElementById('server-status-bar').style.display = 'flex';
-        renderPracticeGrid();
-        window.goHome();
-        processOfflineProgress();
-        startServerClock();
-    };
-
+    function setupGameUI() {
+        let regView = document.getElementById('reg-view');
+        let statusBar = document.getElementById('server-status-bar');
+        
+        if(regView) regView.style.display = 'none';
+        if(statusBar) statusBar.style.display = 'flex';
+        
+        if (typeof renderPracticeGrid === 'function') renderPracticeGrid();
+        if (typeof goHome === 'function') goHome();
+        if (typeof processOfflineProgress === 'function') processOfflineProgress();
+        if (typeof startServerClock === 'function') startServerClock();
+    }
 
     // --- オフライン時間経過・オート進行 ---
     function processOfflineProgress() {
@@ -837,18 +827,18 @@ window.onload = async function() {
             let simCount = Math.min(diff, totalRounds - currentRound + 1);
             if(simCount > 0) {
                 for(let i=0; i<simCount; i++) {
-                    playCurrentRound(false);
+                    if (typeof playCurrentRound === 'function') playCurrentRound(false);
                     userAP = Math.min(maxAP, userAP + 3);
                 }
-                saveGame();
+                if (typeof saveGame === 'function') saveGame();
                 alert(`オフライン中の時間経過により、${simCount}試合が自動進行しました。`);
-                goHome();
+                if (typeof goHome === 'function') goHome();
             }
         }
-        updateAP();
+        if (typeof updateAP === 'function') updateAP();
     }
 
-        function startServerClock() {
+    function startServerClock() {
         setInterval(() => {
             let now = new Date();
             let m = now.getMinutes(); let s = now.getSeconds();
@@ -859,7 +849,8 @@ window.onload = async function() {
             if(remainSec <= 0) remainSec = 600; 
 
             let rm = Math.floor(remainSec / 60); let rs = remainSec % 60;
-            document.getElementById('timer-display').innerText = `${rm}:${rs.toString().padStart(2,'0')}`;
+            let timerEl = document.getElementById('timer-display');
+            if (timerEl) timerEl.innerText = `${rm}:${rs.toString().padStart(2,'0')}`;
 
             let msPerRound = 10 * 60 * 1000;
             let elapsedMs = Date.now() - gameStartTimeEpoch;
@@ -867,11 +858,15 @@ window.onload = async function() {
             
             if(expectedRound > currentRound && currentRound <= totalRounds) {
                 try {
-                    playCurrentRound(false); 
+                    if (typeof playCurrentRound === 'function') playCurrentRound(false); 
                     userAP = Math.min(maxAP, userAP + 3);
-                    updateAP();
-                    saveGame();
-                    if(document.getElementById('home-view').style.display === 'block') renderGameHistory();
+                    if (typeof updateAP === 'function') updateAP();
+                    if (typeof saveGame === 'function') saveGame();
+                    
+                    let homeView = document.getElementById('home-view');
+                    if(homeView && homeView.style.display === 'block' && typeof renderGameHistory === 'function') {
+                        renderGameHistory();
+                    }
                 } catch (e) {
                     console.error("自動進行中にエラーが発生しました", e);
                 }
@@ -879,12 +874,11 @@ window.onload = async function() {
         }, 1000);
     }
  
-
     function forceSimulate() {
         if(currentRound <= totalRounds) {
             gameStartTimeEpoch -= (10 * 60 * 1000); 
-            playCurrentRound(true);
-            saveGame();
+            if (typeof playCurrentRound === 'function') playCurrentRound(true);
+            if (typeof saveGame === 'function') saveGame();
         }
     }
 
