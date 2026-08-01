@@ -650,7 +650,7 @@ window.onload = async function() {
         };
     }
 
-    function initWorld() {
+        window.initWorld = function() {
         teams = []; allPlayers = []; currentRound = 1;
         const teamNames = [
             "セルティックス", "ネッツ", "ニックス", "シクサーズ", "ラプターズ",
@@ -688,54 +688,54 @@ window.onload = async function() {
             });
             teams.push(team);
         }
-        generate82Schedule();
-    }
+        window.generate82Schedule();
+    };
 
-    function generate82Schedule() {
-    schedule = [];
-    const numTeams = teams.length; // 30チーム
-    let teamIds = teams.map(t => t.id); // チームIDだけの配列を作る
-    let allMatches = [];
+    window.generate82Schedule = function() {
+        schedule = [];
+        const numTeams = teams.length; // 30チーム
+        let teamIds = teams.map(t => t.id); // チームIDだけの配列を作る
+        let allMatches = [];
 
-    // --- 1. サークル・メソッドによる総当たりスケジュールの生成 ---
-    // 30チームの場合、1周（29節）で全チームと1回ずつ対戦します。
-    // それを82節になるまでひたすら回し続けます。
-    for (let r = 0; r < totalRounds; r++) { // totalRounds = 82
-        let roundMatches = [];
-        
-        for (let i = 0; i < numTeams / 2; i++) { // 15試合を作る
-            let home = teamIds[i];
-            let away = teamIds[numTeams - 1 - i];
+        // --- 1. サークル・メソッドによる総当たりスケジュールの生成 ---
+        // 30チームの場合、1周（29節）で全チームと1回ずつ対戦します。
+        // それを82節になるまでひたすら回し続けます。
+        for (let r = 0; r < totalRounds; r++) { // totalRounds = 82
+            let roundMatches = [];
             
-            // ホーム＆アウェイの偏りを無くすため、奇数節と偶数節で場所を反転
-            if (r % 2 === 1) {
-                [home, away] = [away, home];
+            for (let i = 0; i < numTeams / 2; i++) { // 15試合を作る
+                let home = teamIds[i];
+                let away = teamIds[numTeams - 1 - i];
+                
+                // ホーム＆アウェイの偏りを無くすため、奇数節と偶数節で場所を反転
+                if (r % 2 === 1) {
+                    [home, away] = [away, home];
+                }
+                roundMatches.push({ home, away });
             }
-            roundMatches.push({ home, away });
+            allMatches.push(roundMatches);
+            
+            // 🔄 チームの回転（ここがアルゴリズムのキモ）
+            // ID[0]のチームだけ位置を固定し、残りのチームを時計回りに1つずつズラすことで
+            // 誰とも被らずに全ての対戦カードを網羅できます。
+            const last = teamIds.pop();
+            teamIds.splice(1, 0, last);
         }
-        allMatches.push(roundMatches);
         
-        // 🔄 チームの回転（ここがアルゴリズムのキモ）
-        // ID[0]のチームだけ位置を固定し、残りのチームを時計回りに1つずつズラすことで
-        // 誰とも被らずに全ての対戦カードを網羅できます。
-        const last = teamIds.pop();
-        teamIds.splice(1, 0, last);
-    }
-    
-    // --- 2. シーズン日程のシャッフル ---
-    // このままだと「毎年必ず第1節は同じ対戦相手」になってしまうため、
-    // 「節（ラウンド）」の順番をごっそりシャッフルします。
-    for (let i = allMatches.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allMatches[i], allMatches[j]] = [allMatches[j], allMatches[i]];
-    }
+        // --- 2. シーズン日程のシャッフル ---
+        // このままだと「毎年必ず第1節は同じ対戦相手」になってしまうため、
+        // 「節（ラウンド）」の順番をごっそりシャッフルします。
+        for (let i = allMatches.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [allMatches[i], allMatches[j]] = [allMatches[j], allMatches[i]];
+        }
 
-    schedule = allMatches;
-}
+        schedule = allMatches;
+    };
 
 
     // --- 登録処理（画像アップロード＆確実な遷移） ---
-      function registerPlayer() {
+    window.registerPlayer = function() {
         const btn = document.getElementById('reg-btn');
         btn.disabled = true;
         btn.innerText = "登録処理中...";
@@ -766,63 +766,64 @@ window.onload = async function() {
                     ctx.drawImage(img, 0, 0, width, height);
                     let compressedData = canvas.toDataURL('image/jpeg', 0.7); 
                     
-                    finalizeRegistration(name, pos, appeal, age, nationality, compressedData);
+                    window.finalizeRegistration(name, pos, appeal, age, nationality, compressedData);
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(fileInput.files[0]);
         } else {
-            finalizeRegistration(name, pos, appeal, age, nationality, null);
+            window.finalizeRegistration(name, pos, appeal, age, nationality, null);
         }
-    }
-
-    // ▼ async を追加した新しい関数に差し替えます
-async function finalizeRegistration(name, pos, appeal, age, nationality, avatarData) {
-    currentUser = {
-        id: playerIdCounter++, isUser: true, name: name, pos: pos, age: age, nationality: nationality, avatar: avatarData,
-        stats: createStats(appeal, age), box: createBoxScore(), gameLog: [], teamId: null
     };
 
-    let targetTeam = teams[Math.floor(Math.random() * 30)];
-    currentUser.teamId = targetTeam.id;
-    
-    let comIdx = targetTeam.roster.findIndex(p => p.pos === pos);
-    currentUser.num = targetTeam.roster[comIdx].num; 
-    
-    allPlayers = allPlayers.filter(p => p.id !== targetTeam.roster[comIdx].id);
-    targetTeam.roster.splice(comIdx, 1, currentUser);
-    allPlayers.push(currentUser);
+    // ▼ async を追加した新しい関数に差し替えます
+    window.finalizeRegistration = async function(name, pos, appeal, age, nationality, avatarData) {
+        currentUser = {
+            id: playerIdCounter++, isUser: true, name: name, pos: pos, age: age, nationality: nationality, avatar: avatarData,
+            stats: createStats(appeal, age), box: createBoxScore(), gameLog: [], teamId: null
+        };
 
-    gameStartTimeEpoch = Date.now();
-    
-    const btn = document.getElementById('reg-btn');
-    
-    try {
-        // ▼ セーブが完了するまでここで待機！
-        await saveGame();
+        let targetTeam = teams[Math.floor(Math.random() * 30)];
+        currentUser.teamId = targetTeam.id;
         
-        btn.disabled = false;
-        btn.innerText = "ドラフト参入";
+        let comIdx = targetTeam.roster.findIndex(p => p.pos === pos);
+        currentUser.num = targetTeam.roster[comIdx].num; 
         
-        // ▼ セーブに成功した場合のみUIをセットアップして次へ
-        setupGameUI();
-        
-    } catch (error) {
-        // ▼ セーブ失敗時はボタンを戻して処理を止める
-        btn.disabled = false;
-        btn.innerText = "登録再試行";
-        console.error("登録完了時のセーブに失敗したため、処理を中断しました");
-    }
-}
+        allPlayers = allPlayers.filter(p => p.id !== targetTeam.roster[comIdx].id);
+        targetTeam.roster.splice(comIdx, 1, currentUser);
+        allPlayers.push(currentUser);
 
-    function setupGameUI() {
+        gameStartTimeEpoch = Date.now();
+        
+        const btn = document.getElementById('reg-btn');
+        
+        try {
+            // ▼ セーブが完了するまでここで待機！
+            await saveGame();
+            
+            btn.disabled = false;
+            btn.innerText = "ドラフト参入";
+            
+            // ▼ セーブに成功した場合のみUIをセットアップして次へ
+            window.setupGameUI();
+            
+        } catch (error) {
+            // ▼ セーブ失敗時はボタンを戻して処理を止める
+            btn.disabled = false;
+            btn.innerText = "登録再試行";
+            console.error("登録完了時のセーブに失敗したため、処理を中断しました");
+        }
+    };
+
+    window.setupGameUI = function() {
         document.getElementById('reg-view').style.display = 'none';
         document.getElementById('server-status-bar').style.display = 'flex';
         renderPracticeGrid();
-        goHome();
+        window.goHome();
         processOfflineProgress();
         startServerClock();
-    }
+    };
+
 
     // --- オフライン時間経過・オート進行 ---
     function processOfflineProgress() {
