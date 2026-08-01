@@ -887,14 +887,26 @@ async function finalizeRegistration(name, pos, appeal, age, nationality, avatarD
         }
     }
 
-    // --- UI・表示制御 ---
-    function goHome() { changeView('home'); }
-    function toggleMenu() { let m = document.getElementById('nav-menu'); m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; }
-    
-  function changeView(viewName) {
+ // --- UI・表示制御 ---
+window.goHome = function() { 
+    window.changeView('home'); 
+};
+
+window.toggleMenu = function() { 
+    let m = document.getElementById('nav-menu'); 
+    if(m) m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; 
+};
+
+window.changeView = function(viewName) {
     ['reg-view', 'home-view','practice-view','standings-view','roster-view','match-view','player-detail-view', 'historical-match-view'].forEach(v => {
-        let el = document.getElementById(v); if(el) el.style.display = 'none';
+        let el = document.getElementById(v); 
+        if(el) el.style.display = 'none';
     });
+    // ▼指定された画面を表示する処理を補完
+    let target = document.getElementById(viewName + '-view');
+    if (target) target.style.display = 'block';
+};
+
     // ...以下そのまま...
         ['btn-nav-home','btn-nav-practice','btn-nav-standings'].forEach(id => {
             let el = document.getElementById(id); if(el) el.classList.remove('active');
