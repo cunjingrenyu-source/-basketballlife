@@ -1390,14 +1390,22 @@ const showRosterByName = (name) => {
     t && showRoster(t.id); 
 };
 
-    // --- コアエンジン: AI監督＆ハイスコア＆脳汁実況型シミュレーター ---
+      // --- コアエンジン: AI監督＆ハイスコア＆脳汁実況型シミュレーター ---
     function playCurrentRound(showMatchView = true) {
+        // 【神アップデート】シーズン終了後（82節以降）の進行とエラー落ちを完全にブロック
+        if (currentRound > totalRounds) return;
+        
         let roundMatches = schedule[currentRound - 1];
+        // 万が一データが存在しない場合のフェイルセーフ
+        if (!roundMatches) return;
+
         let userMatch = null;
 
         roundMatches.forEach(m => {
-            let hTeam = teams.find(t=>t.id===m.home); let aTeam = teams.find(t=>t.id===m.away);
+            let hTeam = teams.find(t=>t.id===m.home); 
+            let aTeam = teams.find(t=>t.id===m.away);
             let isUserGame = (m.home === currentUser.teamId || m.away === currentUser.teamId);
+            
             if(isUserGame) { 
                 userMatch = { hTeam, aTeam }; 
                 simulateGame(hTeam, aTeam, true); 
@@ -1411,11 +1419,11 @@ const showRosterByName = (name) => {
         document.getElementById('round-display').innerText = currentRound <= totalRounds ? currentRound : "終了";
     }
 
-        function simulateGame(hTeam, aTeam, isVisual) {
-    let logs = []; 
-    let score = { home: 0, away: 0 };
-    let qScores = { home: [0,0,0,0], away: [0,0,0,0] };
-
+    function simulateGame(hTeam, aTeam, isVisual) {
+        let logs = []; 
+        let score = { home: 0, away: 0 };
+        let qScores = { home: [0,0,0,0], away: [0,0,0,0] };
+    
     // スタッツボックスの初期化
     let gamePlayers = [...hTeam.roster, ...aTeam.roster];
     gamePlayers.forEach(p => {
