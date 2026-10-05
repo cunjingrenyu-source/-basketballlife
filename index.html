@@ -1278,14 +1278,13 @@ function showPlayerDetail(id) {
     const p = allPlayers.find(x => x.id === id);
     if(!p) return;
     
-    // 過去試合画面(historical-match)も判定対象に含める
-    const views = ['home', 'practice', 'standings', 'roster', 'match', 'historical-match'];
-        const currentActiveView = views.find(v => {
-        const el = document.getElementById(`${v}-view`);
-        return el && el.style.display === 'block';
-    }) || 'home';
+  // 修正後：配列に'player-detail'を追加し、要素の存在確認も安全に行う
+const views = ['home', 'practice', 'standings', 'roster', 'match', 'historical-match', 'player-detail'];
+const currentActiveView = views.find(v => {
+    const el = document.getElementById(`${v}-view`);
+    return el && el.style.display === 'block';
+}) || 'home';
 
-    
     if (currentActiveView !== 'player-detail') {
         previousView = currentActiveView;
     }
