@@ -1010,22 +1010,26 @@ window.changeView = function(viewName) {
         STAT_KEYS.forEach(sk => {
             let btn = document.createElement('button'); btn.className = 'practice-btn';
             // モーダルを開く記述と下線を削除し、シンプルなテキストに
-            btn.innerHTML = `<div class="practice-name">${sk.n}</div><div>↑ UP</div>`;
-            btn.onclick = (e) => {
-                // ℹ️クリックガードを削除。ボタン内ならどこを押しても発動
+                     btn.innerHTML = `<div class="practice-name">${sk.n}</div><div>↑ UP</div>`;
+            btn.onclick = async (e) => {
                 if(userAP > 0 && currentUser.stats[sk.k] < MAX_STAT) {
+                    btn.disabled = true; // 連打によるセーブ重複をブロック
                     userAP--;
                     currentUser.stats[sk.k] += Math.floor(Math.random() * 3) + 1; 
                     if(currentUser.stats[sk.k] > MAX_STAT) currentUser.stats[sk.k] = MAX_STAT;
-                    updateAP(); saveGame(); alert(`${sk.n}が成長した！`);
+                    updateAP(); 
+                    await saveGame(); // 非同期セーブの完了を待つ
+                    alert(`${sk.n}が成長した！`);
                     if(document.getElementById('player-detail-view').style.display === 'block'){
                          document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(currentUser);
                     }
+                    btn.disabled = false; // 処理が終わったら解除
                 }
             };
             grid.appendChild(btn);
         });
     }
+
 
 
         function generateAbilityGrid(stats) {
