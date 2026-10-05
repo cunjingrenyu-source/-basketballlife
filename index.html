@@ -904,8 +904,11 @@ window.onload = async function() {
         if (typeof updateAP === 'function') updateAP();
     }
 
-    function startServerClock() {
-        setInterval(() => {
+      function startServerClock() {
+        // すでにタイマーが動いていたら一度消して、二重起動を防ぐ
+        if (serverClockTimer) clearInterval(serverClockTimer);
+
+        serverClockTimer = setInterval(() => {
             let now = new Date();
             let m = now.getMinutes(); let s = now.getSeconds();
             let nextM = Math.ceil((m + 1) / 10) * 10;
@@ -947,6 +950,7 @@ window.onload = async function() {
             if (typeof saveGame === 'function') saveGame();
         }
     }
+
 // --- UI・表示制御 ---
 window.goHome = function() { 
     window.changeView('home'); 
