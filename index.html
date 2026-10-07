@@ -970,85 +970,150 @@ window.onload = async function() {
         }
     }
 
-// --- UI・表示制御 ---
+// --- UI・表示制御（安全ガード完全装甲版） ---
 window.goHome = function() { 
-    window.changeView('home'); 
+    if (typeof window.changeView === 'function') {
+        window.changeView('home'); 
+    }
 };
 
 window.toggleMenu = function() { 
-    let m = document.getElementById('nav-menu'); 
-    if(m) m.style.display = m.style.display === 'flex' ? 'none' : 'flex'; 
+    const m = document.getElementById('nav-menu'); 
+    if (m) {
+        m.style.display = (m.style.display === 'flex') ? 'none' : 'flex'; 
+    }
 };
 
 window.changeView = function(viewName) {
-    // 1. すべてのビューを一旦非表示にする
-    ['reg-view', 'home-view','practice-view','standings-view','roster-view','match-view','player-detail-view', 'historical-match-view'].forEach(v => {
-        let el = document.getElementById(v); 
-        if(el) el.style.display = 'none';
-    });
+    try {
+        // 1. すべてのビューを一旦非表示にする（要素の安全チェック付き）
+        const views = ['reg-view', 'home-view', 'practice-view', 'standings-view', 'roster-view', 'match-view', 'player-detail-view', 'historical-match-view'];
+        views.forEach(v => {
+            const el = document.getElementById(v); 
+            if (el) el.style.display = 'none';
+        });
 
-    // 2. ナビゲーションのハイライトをリセット
-    ['btn-nav-home','btn-nav-practice','btn-nav-standings'].forEach(id => {
-        let el = document.getElementById(id); 
-        if(el) el.classList.remove('active');
-    });
+        // 2. ナビゲーションのハイライトをリセット
+        const navBtns = ['btn-nav-home', 'btn-nav-practice', 'btn-nav-standings'];
+        navBtns.forEach(id => {
+            const el = document.getElementById(id); 
+            if (el && el.classList) el.classList.remove('active');
+        });
 
-    // 3. 各画面専用のデータ描画処理
-    if(viewName === 'home') {
-        document.getElementById('home-profile-target').innerHTML = generateBasicProfile(currentUser);
-        renderGameHistory();
-        document.getElementById('btn-nav-home').classList.add('active');
-    } else if(viewName === 'practice') {
-        document.getElementById('btn-nav-practice').classList.add('active');
-        updateAP();
-    } else if(viewName === 'standings') {
-        renderStandings(); 
-        document.getElementById('btn-nav-standings').classList.add('active');
-    } else if(viewName === 'player-detail') {
-        document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(currentUser);
+        // 3. 各画面専用のデータ描画処理（Null例外・関数未定義の完全ガード）
+        if (viewName === 'home') {
+            const target = document.getElementById('home-profile-target');
+            if (target && typeof currentUser !== 'undefined' && currentUser && typeof generateBasicProfile === 'function') {
+                target.innerHTML = generateBasicProfile(currentUser);
+            }
+            if (typeof renderGameHistory === 'function') {
+                renderGameHistory();
+            }
+            const btnNavHome = document.getElementById('btn-nav-home');
+            if (btnNavHome && btnNavHome.classList) btnNavHome.classList.add('active');
+
+        } else if (viewName === 'practice') {
+            const btnNavPractice = document.getElementById('btn-nav-practice');
+            if (btnNavPractice && btnNavPractice.classList) btnNavPractice.classList.add('active');
+            if (typeof window.updateAP === 'function') {
+                window.updateAP();
+            }
+
+        } else if (viewName === 'standings') {
+            if (typeof renderStandings === 'function') {
+                renderStandings(); 
+            }
+            const btnNavStandings = document.getElementById('btn-nav-standings');
+            if (btnNavStandings && btnNavStandings.classList) btnNavStandings.classList.add('active');
+
+        } else if (viewName === 'player-detail') {
+            const target = document.getElementById('detail-profile-target');
+            if (target && typeof currentUser !== 'undefined' && currentUser && typeof generateDetailProfile === 'function') {
+                target.innerHTML = generateDetailProfile(currentUser);
+            }
+        }
+        
+        // 4. ターゲットの画面を表示し、メニューを閉じる
+        const targetView = document.getElementById(viewName + '-view');
+        if (targetView) targetView.style.display = 'block';
+        
+        const navMenu = document.getElementById('nav-menu');
+        if (navMenu) navMenu.style.display = 'none';
+        
+        const roundDisplay = document.getElementById('round-display');
+        if (roundDisplay) {
+            const curRound = typeof currentRound !== 'undefined' ? currentRound : 1;
+            const totRounds = typeof totalRounds !== 'undefined' ? totalRounds : 82;
+            roundDisplay.innerText = curRound <= totRounds ? curRound : "終了";
+        }
+    } catch (e) {
+        console.error("画面切り替え (changeView) 中にエラーが発生しました:", e);
     }
-    
-    // 4. ターゲットの画面を表示し、メニューを閉じる
-    let targetView = document.getElementById(viewName + '-view');
-    if(targetView) targetView.style.display = 'block';
-    
-    let navMenu = document.getElementById('nav-menu');
-    if(navMenu) navMenu.style.display = 'none';
-    
-    let roundDisplay = document.getElementById('round-display');
-    if(roundDisplay) roundDisplay.innerText = currentRound <= totalRounds ? currentRound : "終了";
 };
 
-    function updateAP() {
-        document.getElementById('ap-display').innerText = userAP;
-        document.querySelectorAll('.practice-btn').forEach(b => b.disabled = (userAP <= 0));
+window.updateAP = function() {
+    const apDisplay = document.getElementById('ap-display');
+    if (apDisplay && typeof userAP !== 'undefined') {
+        apDisplay.innerText = userAP;
     }
+    const btns = document.querySelectorAll('.practice-btn');
+    btns.forEach(b => {
+        if (b && typeof userAP !== 'undefined') {
+            b.disabled = (userAP <= 0);
+        }
+    });
+};
 
-            function renderPracticeGrid() {
-        let grid = document.getElementById('practice-grid'); grid.innerHTML = "";
-        STAT_KEYS.forEach(sk => {
-            let btn = document.createElement('button'); btn.className = 'practice-btn';
-            // モーダルを開く記述と下線を削除し、シンプルなテキストに
-                     btn.innerHTML = `<div class="practice-name">${sk.n}</div><div>↑ UP</div>`;
-            btn.onclick = async (e) => {
-                if(userAP > 0 && currentUser.stats[sk.k] < MAX_STAT) {
-                    btn.disabled = true; // 連打によるセーブ重複をブロック
-                    userAP--;
-                    currentUser.stats[sk.k] += Math.floor(Math.random() * 3) + 1; 
-                    if(currentUser.stats[sk.k] > MAX_STAT) currentUser.stats[sk.k] = MAX_STAT;
-                    updateAP(); 
-                    await saveGame(); // 非同期セーブの完了を待つ
-                    alert(`${sk.n}が成長した！`);
-                    if(document.getElementById('player-detail-view').style.display === 'block'){
-                         document.getElementById('detail-profile-target').innerHTML = generateDetailProfile(currentUser);
-                    }
-                    btn.disabled = false; // 処理が終わったら解除
+window.renderPracticeGrid = function() {
+    const grid = document.getElementById('practice-grid'); 
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    if (typeof STAT_KEYS === 'undefined' || !Array.isArray(STAT_KEYS)) return;
+
+    STAT_KEYS.forEach(sk => {
+        const btn = document.createElement('button'); 
+        btn.className = 'practice-btn';
+        btn.innerHTML = `<div class="practice-name">${sk.n}</div><div>↑ UP</div>`;
+        
+        btn.onclick = async (e) => {
+            try {
+                if (typeof userAP === 'undefined' || typeof currentUser === 'undefined' || !currentUser || !currentUser.stats) {
+                    console.warn("ユーザーデータが未初期化のため練習を実行できません");
+                    return;
                 }
-            };
-            grid.appendChild(btn);
-        });
-    }
+                
+                const maxStatVal = typeof MAX_STAT !== 'undefined' ? MAX_STAT : 150;
 
+                if (userAP > 0 && (currentUser.stats[sk.k] || 0) < maxStatVal) {
+                    btn.disabled = true; // 連打防止
+                    userAP--;
+                    
+                    currentUser.stats[sk.k] = (currentUser.stats[sk.k] || 0) + Math.floor(Math.random() * 3) + 1; 
+                    if (currentUser.stats[sk.k] > maxStatVal) {
+                        currentUser.stats[sk.k] = maxStatVal;
+                    }
+                    
+                    if (typeof window.updateAP === 'function') window.updateAP(); 
+                    if (typeof saveGame === 'function') await saveGame(); 
+                    
+                    alert(`${sk.n}が成長した！`);
+                    
+                    const detailView = document.getElementById('player-detail-view');
+                    const detailTarget = document.getElementById('detail-profile-target');
+                    if (detailView && detailView.style.display === 'block' && detailTarget && typeof generateDetailProfile === 'function') {
+                        detailTarget.innerHTML = generateDetailProfile(currentUser);
+                    }
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                console.error("練習処理中にエラーが発生しました:", err);
+                btn.disabled = false;
+            }
+        };
+        grid.appendChild(btn);
+    });
+};
 
 
         function generateAbilityGrid(stats) {
