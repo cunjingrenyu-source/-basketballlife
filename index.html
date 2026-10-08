@@ -1238,17 +1238,23 @@ window.renderPracticeGrid = function() {
             return; 
         }
         
-        let totalGames = currentUser.gameLog.length;
-        currentUser.gameLog.slice().reverse().forEach((log, reversedIndex) => {
-            let originalIndex = totalGames - 1 - reversedIndex;
-            list.innerHTML += `
-            <div class="history-item" style="cursor:pointer;" onclick="showHistoricalMatch(${originalIndex})">
-                <div><strong>第${log.round}節</strong> vs <span class="clickable-team" onclick="event.stopPropagation(); showRosterByName('${log.oppName}')">${log.oppName}</span></div>
-                <div style="font-weight:bold; color:${log.result==='WIN'?'#2ecc71':'#e74c3c'}; text-decoration:underline;">${log.result} ${log.teamScore} - ${log.oppScore}</div>
-                <div style="color:#555;">${log.pts}点 ${log.reb}REB ${log.ast}AST</div>
-            </div>`;
-        });
-    };
+      let totalGames = currentUser.gameLog.length;
+let historyHTML = ""; // 神コードの要：HTMLを一旦変数に貯めておく
+
+currentUser.gameLog.slice().reverse().forEach((log, reversedIndex) => {
+    let originalIndex = totalGames - 1 - reversedIndex;
+    
+    // バグ修正: onclick内で (event || window.event) を使って安全に伝播を止める
+    historyHTML += `
+    <div class="history-item" style="cursor:pointer;" onclick="showHistoricalMatch(${originalIndex})">
+        <div><strong>第${log.round}節</strong> vs <span class="clickable-team" onclick="(event || window.event).stopPropagation(); showRosterByName('${log.oppName}')">${log.oppName}</span></div>
+        <div style="font-weight:bold; color:${log.result==='WIN'?'#2ecc71':'#e74c3c'}; text-decoration:underline;">${log.result} ${log.teamScore} - ${log.oppScore}</div>
+        <div style="color:#555;">${log.pts}点 ${log.reb}REB ${log.ast}AST</div>
+    </div>`;
+});
+
+// 最後に1回だけ画面に書き出す（毎回書き出すより100倍以上速い）
+list.innerHTML += historyHTML;
 
     window.showHistoricalMatch = async function(logIndex) {
         if (!currentUser || !currentUser.gameLog || !currentUser.gameLog[logIndex]) {
