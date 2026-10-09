@@ -1647,7 +1647,13 @@ window.renderPracticeGrid = function() {
         let maxQ = 4;
         let isOverTime = false;
 
-     // --- 試合シミュレーションメインループ ---
+           // =========================================================
+        // 【追加】試合開始前に全選手へ「実質ステータス(currentStats)」を付与
+        // =========================================================
+        hTeam.players.forEach(p => p.currentStats = getEffectiveStats(p));
+        aTeam.players.forEach(p => p.currentStats = getEffectiveStats(p));
+
+        // --- 試合シミュレーションメインループ ---
         while (currentQ <= maxQ) {
             let clock = (isOverTime) ? 300 : 720; 
             let qName = isOverTime ? `延長第${currentQ - 4}Q(OT)` : `第${currentQ}Q`;
@@ -1692,26 +1698,32 @@ window.renderPracticeGrid = function() {
                 let isClutchTime = (currentQ >= 4 && clock < 120 && Math.abs(prevDiff) <= 5);
                 let mentalBuff = 1.0;
                 if (isClutchTime && prevDiff < 0) {
-                    mentalBuff = 1.0 + (shooter.stats.mental / 500);
+                    // ★stats から currentStats に変更
+                    mentalBuff = 1.0 + (shooter.currentStats.mental / 500);
                 }
 
                 let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
-                let defensePressure = ((defender.stats.defense * 0.35) / 150) + defPressureBonus; 
+                // ★stats から currentStats に変更
+                let defensePressure = ((defender.currentStats.defense * 0.35) / 150) + defPressureBonus; 
 
                 // --- A. ターンオーバー & スティール判定 ---
-                let toRisk = 0.18 - (((shooter.stats.dribble + shooter.stats.pass + (shooter.stats.speed*0.5)) * mentalBuff) / 500);
+                // ★stats から currentStats に変更
+                let toRisk = 0.18 - (((shooter.currentStats.dribble + shooter.currentStats.pass + (shooter.currentStats.speed*0.5)) * mentalBuff) / 500);
                 if(shooter._condStr === "不調") toRisk += 0.05;
 
                 if(Math.random() < Math.max(0.04, toRisk)) {
                     shooter._box.to++;
-                    if(Math.random() < ((defender.stats.speed / 200) + defPressureBonus)) {
+                    // ★stats から currentStats に変更
+                    if(Math.random() < ((defender.currentStats.speed / 200) + defPressureBonus)) {
                         defender._box.stl++;
-                        let stlText = defender.stats.defense > 120 
+                        // ★stats から currentStats に変更
+                        let stlText = defender.currentStats.defense > 120 
                             ? `${defender.name}がコースを完全によみきり、戦慄のパスカット！！ボールを強奪！`
                             : `${shooter.name}が仕掛けるも、${defender.name}が電光石火のスティール！`;
                         writeLog(clock, offData.team.name, stlText, true, [shooter.id, defender.id]);
                     } else {
-                        let toText = shooter.stats.pass < 60 && Math.random() < 0.5 
+                        // ★stats から currentStats に変更
+                        let toText = shooter.currentStats.pass < 60 && Math.random() < 0.5 
                             ? `${shooter.name}の無謀なパスが味方に合わずターンオーバー。`
                             : `${shooter.name}のボールハンドリングが乱れターンオーバー。`;
                         writeLog(clock, offData.team.name, toText, false, [shooter.id]);
@@ -1721,7 +1733,8 @@ window.renderPracticeGrid = function() {
                 }
 
                 // --- ファウル判定（And-1の導入とハイライト強化） ---
-                const foulRisk = 0.08 - (defender.stats.defense / 1000) + (defender.stats.physical / 1500);
+                // ★stats から currentStats に変更
+                const foulRisk = 0.08 - (defender.currentStats.defense / 1000) + (defender.currentStats.physical / 1500);
                 
                 if (Math.random() < Math.min(0.12, Math.max(0.02, foulRisk))) {
                     defender._box.pf++;
@@ -1736,8 +1749,9 @@ window.renderPracticeGrid = function() {
                         defData.court.forEach(p => p._box.plusMinus -= pts);
                     };
 
-                    const ftRate = Math.max(0.40, (0.60 + ((shooter.stats.middle - 30) / 120) * 0.25) * shooter._cond * mentalBuff);
-                    const and1Chance = ((shooter.stats.physical + shooter.stats.mental) / 1000) * 0.15;
+                    // ★stats から currentStats に変更
+                    const ftRate = Math.max(0.40, (0.60 + ((shooter.currentStats.middle - 30) / 120) * 0.25) * shooter._cond * mentalBuff);
+                    const and1Chance = ((shooter.currentStats.physical + shooter.currentStats.mental) / 1000) * 0.15;
                     const isAnd1 = Math.random() < and1Chance && clock > 5;
 
                     if (isAnd1) {
@@ -1779,12 +1793,12 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-                             // --- シュートタイプの決定（能力値連動・現代NBA仕様） ---
-                // まず確実にステータスを取得（名前揺れ対応）
-                let stat3 = shooter.stats.three || shooter.stats["3pt"] || shooter.stats.tpt || 30;
-                let statMid = shooter.stats.middle || shooter.stats.mid || 30;
-                let statIn = shooter.stats.layup || shooter.stats.inside || 30;
-                let statDk = shooter.stats.dunk || 30;
+                // --- シュートタイプの決定（能力値連動・現代NBA仕様） ---
+                // ★stats から currentStats に変更（名前揺れ対応もそのまま）
+                let stat3 = shooter.currentStats.three || shooter.currentStats["3pt"] || shooter.currentStats.tpt || 30;
+                let statMid = shooter.currentStats.middle || shooter.currentStats.mid || 30;
+                let statIn = shooter.currentStats.layup || shooter.currentStats.inside || 30;
+                let statDk = shooter.currentStats.dunk || 30;
 
                 // 1. ポジションごとのベース傾向（現代NBAは3Pとゴール下が多い）
                 let base3 = (shooter.pos === "PG" || shooter.pos === "SG") ? 45 : (shooter.pos === "SF") ? 35 : 20;
@@ -1825,13 +1839,15 @@ window.renderPracticeGrid = function() {
                 let successRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - (defensePressure * 0.7);
 
                 let ankleBreak = false;
-                if(shooter.stats.dribble > defender.stats.defense + 20 && Math.random() < 0.15 * shooter._cond) {
+                // ★stats から currentStats に変更
+                if(shooter.currentStats.dribble > defender.currentStats.defense + 20 && Math.random() < 0.15 * shooter._cond) {
                     ankleBreak = true;
                     successRate += 0.25;
                 }
 
                 // --- B. ブロック判定 ---
-                let blockChance = ((defender.stats.defense + defender.stats.physical) / 300) * 0.08 + defPressureBonus;
+                // ★stats から currentStats に変更
+                let blockChance = ((defender.currentStats.defense + defender.currentStats.physical) / 300) * 0.08 + defPressureBonus;
                 if(shotType === "dunk") blockChance -= 0.03; 
                 if(shotType === "layup" && statIn > 110) blockChance -= 0.04; 
 
@@ -1839,10 +1855,11 @@ window.renderPracticeGrid = function() {
                     defender._box.blk++;
                     let isBlockHigh = false;
                     let blkText = "";
-                    if (defender.stats.physical > 110 && defender.stats.defense > 100 && Math.random() < 0.3) {
+                    // ★stats から currentStats に変更
+                    if (defender.currentStats.physical > 110 && defender.currentStats.defense > 100 && Math.random() < 0.3) {
                         blkText = `<span style="color:#e74c3c; font-weight:bold;">【超絶ブロック！】</span>${shooter.name}のシュートを${defender.name}がバレーボールのスパイクのように客席へ叩き落とす！！！`;
                         isBlockHigh = true;
-                    } else if (defender.stats.speed > 100 && Math.random() < 0.3) {
+                    } else if (defender.currentStats.speed > 100 && Math.random() < 0.3) {
                         blkText = `<span style="color:#e74c3c; font-weight:bold;">【チェイスダウン！】</span>${shooter.name}の背後から迫った${defender.name}がボードに叩きつけるチェイスダウンブロック！！！`;
                         isBlockHigh = true;
                     } else {
@@ -1853,7 +1870,7 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-                                // --- C. シュート成功判定 ---
+                // --- C. シュート成功判定 ---
                 // 修正: どんな状況でも最低確率25%を担保（プロの意地）
                 if (Math.random() < Math.max(0.25, successRate)) {
                     const isThree = (shotType === "three");
@@ -1882,23 +1899,24 @@ window.renderPracticeGrid = function() {
                     // --- アシスト判定 ---
                     const passer = offData.court[Math.floor(Math.random() * 5)];
                     let assistText = "";
-                    const isAssist = (passer.id !== shooter.id && Math.random() < (passer.stats.pass / 150) * 0.65);
+                    // ★stats から currentStats に変更
+                    const isAssist = (passer.id !== shooter.id && Math.random() < (passer.currentStats.pass / 150) * 0.65);
 
                     if (isAssist) {
                         passer._box.ast++;
                         involved.push(passer.id);
                         
-                        const isAlleyOop = (shotType === "dunk" || shotType === "layup") && passer.stats.pass > 100 && (shooter.stats.dunk > 90 || shooter.stats.layup > 100);
+                        // ★stats から currentStats に変更
+                        const isAlleyOop = (shotType === "dunk" || shotType === "layup") && passer.currentStats.pass > 100 && (shooter.currentStats.dunk > 90 || shooter.currentStats.layup > 100);
                         if (isAlleyOop && Math.random() < 0.3) {
                             playText = `<span style="color:#9b59b6; font-weight:bold;">【アリウープ！】</span>${passer.name}の絶妙なロブパスを、空中で受け取った${shooter.name}がそのまま豪快にリングへ叩き込んだ！！！`;
                             isHigh = true;
-                        } else if (passer.stats.pass > 120 && Math.random() < 0.3) {
+                        } else if (passer.currentStats.pass > 120 && Math.random() < 0.3) {
                             assistText = `<span class="log-assist">#${passer.num} ${passer.name}の変態的なノールックパス ➔ </span>`;
                         } else {
                             assistText = `<span class="log-assist">#${passer.num} ${passer.name}の的確なアシスト ➔ </span>`;
                         }
                     }
-
 
                     // --- 個人技テキスト（すべての条件分岐と記述を完全維持） ---
                     if (!playText) {
