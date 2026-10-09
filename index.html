@@ -1135,7 +1135,7 @@ window.renderPracticeGrid = function() {
         </div>`;
     }
 
-    // --- スタッツ計算・UIフォーマッタ ---
+     // --- スタッツ計算・UIフォーマッタ ---
     function formatMIN(sec) {
         if(!sec) return "00:00";
         let m = Math.floor(sec / 60); let s = sec % 60;
@@ -1145,23 +1145,18 @@ window.renderPracticeGrid = function() {
         return a > 0 ? ((m / a) * 100).toFixed(1) + "%" : "0.0%";
     }
     
-        function calcAdvanced(b, isSeasonAvg = false) {
-        // 安全対策: データがまだ無い（undefined）場合に0を代入してNaNバグを防ぐ
+    function calcAdvanced(b, isSeasonAvg = false) {
         let pts = b.pts || 0, fga = b.fga || 0, fgm = b.fgm || 0;
         let fta = b.fta || 0, ftm = b.ftm || 0, reb = b.reb || 0;
         let ast = b.ast || 0, stl = b.stl || 0, blk = b.blk || 0;
         let to = b.to || 0, min = b.min || 0, g = b.g || 1;
 
-        // TS% (True Shooting)
         let tsDenom = 2 * (fga + 0.44 * fta);
         let ts = tsDenom > 0 ? (pts / tsDenom) * 100 : 0;
 
-        // EFF (Efficiency)
         let eff = (pts + reb + ast + stl + blk) - ((fga - fgm) + (fta - ftm) + to);
-        if (isSeasonAvg && g > 0) eff = eff / g; // EFFは累積スタッツなので試合数で割る
+        if (isSeasonAvg && g > 0) eff = eff / g;
 
-        // USG% (Usage Rate: 簡易計算)
-        // バグ修正: 割合(%)データなので試合数で割ってはいけない
         let usgDenom = Math.max(1, (min / 5));
         let usg = ((fga + 0.44 * fta + to) / usgDenom) * 100;
 
@@ -1172,11 +1167,15 @@ window.renderPracticeGrid = function() {
         };
     }
 
+    // ⚠️ 消えていたヘッダー生成関数を復活
+    function generateTableHeaderHtml() {
+        return `<tr><th>PLAYER</th><th>MIN</th><th>PTS</th><th>FG</th><th>FG%</th><th>3P</th><th>3P%</th><th>FT</th><th>FT%</th><th>ORB</th><th>DRB</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>PF</th><th>+/-</th><th>USG%</th><th>TS%</th><th>EFF</th></tr>`;
+    }
+
     function generatePlayerRowHtml(p, b, isSeasonAvg = false) {
         let div = isSeasonAvg ? (b.g || 1) : 1;
-        let adv = calcAdvanced(b, isSeasonAvg); // ここも修正
+        let adv = calcAdvanced(b, isSeasonAvg);
         let minDisplay = isSeasonAvg ? formatMIN(Math.floor((b.min || 0) / div)) : formatMIN(b.min || 0);
-        
         let fgText = isSeasonAvg ? ((b.fgm||0)/div).toFixed(1) + "-" + ((b.fga||0)/div).toFixed(1) : `${b.fgm||0}-${b.fga||0}`;
         let tpText = isSeasonAvg ? ((b.tpm||0)/div).toFixed(1) + "-" + ((b.tpa||0)/div).toFixed(1) : `${b.tpm||0}-${b.tpa||0}`;
         let ftText = isSeasonAvg ? ((b.ftm||0)/div).toFixed(1) + "-" + ((b.fta||0)/div).toFixed(1) : `${b.ftm||0}-${b.fta||0}`;
