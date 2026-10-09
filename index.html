@@ -1647,7 +1647,7 @@ window.renderPracticeGrid = function() {
         let maxQ = 4;
         let isOverTime = false;
 
-      // --- 試合シミュレーションメインループ ---
+     // --- 試合シミュレーションメインループ ---
         while (currentQ <= maxQ) {
             let clock = (isOverTime) ? 300 : 720; 
             let qName = isOverTime ? `延長第${currentQ - 4}Q(OT)` : `第${currentQ}Q`;
@@ -1779,26 +1779,50 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-                // --- シュートタイプの決定 ---
-                let shotType = "layup"; 
-                let randShot = Math.random();
-                if(shooter.pos === "C" || shooter.pos === "PF") {
-                    shotType = (randShot < 0.45 && (shooter.stats.physical > 90 || shooter.stats.dunk > 80)) ? "dunk" : "layup";
-                } else {
-                    if(randShot < 0.40) shotType = "layup";
-                    else if(randShot < 0.70) shotType = "three";
-                    else shotType = "middle";
-                    if(shooter.stats.dunk > 85 && shooter.stats.speed > 90 && Math.random() < 0.15) shotType = "dunk";
-                }
+                             // --- シュートタイプの決定（能力値連動・現代NBA仕様） ---
+                // まず確実にステータスを取得（名前揺れ対応）
+                let stat3 = shooter.stats.three || shooter.stats["3pt"] || shooter.stats.tpt || 30;
+                let statMid = shooter.stats.middle || shooter.stats.mid || 30;
+                let statIn = shooter.stats.layup || shooter.stats.inside || 30;
+                let statDk = shooter.stats.dunk || 30;
+
+                // 1. ポジションごとのベース傾向（現代NBAは3Pとゴール下が多い）
+                let base3 = (shooter.pos === "PG" || shooter.pos === "SG") ? 45 : (shooter.pos === "SF") ? 35 : 20;
+                let baseMid = 20; // ミドルは全ポジション共通で少なめ
+                let baseIn = (shooter.pos === "C" || shooter.pos === "PF") ? 50 : 30;
+                let baseDk = (shooter.pos === "C" || shooter.pos === "PF") ? 20 : 5;
+
+                // 2. 本人の能力値による補正（能力が高いほどそのシュートを選びやすくなる）
+                // 初期値が低くてもベース傾向があるため破綻しない
+                let weight3 = base3 + (stat3 * 0.6);
+                let weightMid = baseMid + (statMid * 0.4);
+                let weightIn = baseIn + (statIn * 0.5);
+                let weightDk = baseDk + (statDk * 0.6);
+
+                let totalWeight = weight3 + weightMid + weightIn + weightDk;
+                let randShot = Math.random() * totalWeight;
+
+                // 3. 重み付けルーレットでシュート選択
+                let shotType = "layup";
+                if (randShot < weight3) shotType = "three";
+                else if (randShot < weight3 + weightMid) shotType = "middle";
+                else if (randShot < weight3 + weightMid + weightIn) shotType = "layup";
+                else shotType = "dunk";
 
                 shooter._box.fga++;
                 if(shotType === "three") shooter._box.tpa++;
 
-                let statUsed = shooter.stats[shotType] || shooter.stats.middle;
-                let baseRate = shotType === "dunk" ? 0.65 : shotType === "layup" ? 0.50 : shotType === "middle" ? 0.40 : 0.30;
+                let statUsed = 50;
+                if (shotType === "dunk") statUsed = statDk;
+                else if (shotType === "layup") statUsed = statIn;
+                else if (shotType === "middle") statUsed = statMid;
+                else if (shotType === "three") statUsed = stat3;
+
+                // 現実のNBAの平均FG%に近づけるベース確率
+                let baseRate = shotType === "dunk" ? 0.75 : shotType === "layup" ? 0.55 : shotType === "middle" ? 0.45 : 0.37;
                 
                 let abilityBonus = ((statUsed - 30) / 120) * 0.30;
-                let successRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - defensePressure;
+                let successRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - (defensePressure * 0.7);
 
                 let ankleBreak = false;
                 if(shooter.stats.dribble > defender.stats.defense + 20 && Math.random() < 0.15 * shooter._cond) {
@@ -1809,7 +1833,7 @@ window.renderPracticeGrid = function() {
                 // --- B. ブロック判定 ---
                 let blockChance = ((defender.stats.defense + defender.stats.physical) / 300) * 0.08 + defPressureBonus;
                 if(shotType === "dunk") blockChance -= 0.03; 
-                if(shotType === "layup" && shooter.stats.layup > 110) blockChance -= 0.04; 
+                if(shotType === "layup" && statIn > 110) blockChance -= 0.04; 
 
                 if(Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
                     defender._box.blk++;
@@ -1829,8 +1853,9 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-                // --- C. シュート成功判定 ---
-                if (Math.random() < Math.max(0.15, successRate)) {
+                                // --- C. シュート成功判定 ---
+                // 修正: どんな状況でも最低確率25%を担保（プロの意地）
+                if (Math.random() < Math.max(0.25, successRate)) {
                     const isThree = (shotType === "three");
                     const pts = isThree ? 3 : 2;
                     const targetSide = isHome ? 'home' : 'away';
@@ -1873,6 +1898,7 @@ window.renderPracticeGrid = function() {
                             assistText = `<span class="log-assist">#${passer.num} ${passer.name}の的確なアシスト ➔ </span>`;
                         }
                     }
+
 
                     // --- 個人技テキスト（すべての条件分岐と記述を完全維持） ---
                     if (!playText) {
