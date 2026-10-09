@@ -1733,7 +1733,7 @@ window.renderPracticeGrid = function() {
                 // ★stats から currentStats に変更
                 let defensePressure = ((defender.currentStats.defense * 0.35) / 150) + defPressureBonus; 
 
-                // --- A. ターンオーバー & スティール判定 ---
+                                // --- A. ターンオーバー & スティール判定 ---
                 // ★stats から currentStats に変更
                 let toRisk = 0.18 - (((shooter.currentStats.dribble + shooter.currentStats.pass + (shooter.currentStats.speed*0.5)) * mentalBuff) / 500);
                 if(shooter._condStr === "不調") toRisk += 0.05;
@@ -1759,169 +1759,158 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-                                // --- 2. ファウル判定（シュートタイプ決定後・NBA公式スタッツ準拠） ---
-                    const foulRisk = 0.08 - (defender.currentStats.defense / 1000) + (defender.currentStats.physical / 1500);
+                // --- 1. パサーの選定（Playmaker Buffの現実化） & シュートタイプの決定 ---
+                const passerCandidates = offData.court.filter(p => p.id !== shooter.id);
+                let passWeights = passerCandidates.map(p => Math.max(1, Math.pow((p.currentStats.pass || 50) / 50, 2))); 
+                let totalPassWeight = passWeights.reduce((a, b) => a + b, 0);
+                let passRand = Math.random() * totalPassWeight;
+                let passer = passerCandidates[0];
+                let passCum = 0;
+                for (let i = 0; i < passerCandidates.length; i++) {
+                    passCum += passWeights[i];
+                    if (passRand < passCum) {
+                        passer = passerCandidates[i];
+                        break;
+                    }
+                }
+
+                let assistText = "";
+                let isAssist = false;
+                let playmakerBuff = 0; 
+                
+                let passAbility = passer.currentStats.pass || 50;
+                let assistProb = passAbility >= 70 ? (passAbility / 150) * 0.65 : (passAbility / 150) * 0.20; 
+
+                if (Math.random() < assistProb) {
+                    isAssist = true;
+                    if (passAbility >= 80) {
+                        playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
+                    }
+                }
+
+                let stat3 = shooter.currentStats.three || shooter.currentStats["3pt"] || shooter.currentStats.tpt || 30;
+                let statMid = shooter.currentStats.middle || shooter.currentStats.mid || 30;
+                let statIn = shooter.currentStats.layup || shooter.currentStats.inside || 30;
+                let statDk = shooter.currentStats.dunk || 30;
+
+                let base3 = (shooter.pos === "PG" || shooter.pos === "SG") ? 45 : (shooter.pos === "SF") ? 35 : 20;
+                let baseMid = 20; 
+                let baseIn = (shooter.pos === "C" || shooter.pos === "PF") ? 50 : 30;
+                let baseDk = (shooter.pos === "C" || shooter.pos === "PF") ? 20 : 5;
+
+                let weight3 = base3 + (Math.pow(stat3 / 50, 2) * 12);
+                let weightMid = baseMid + (Math.pow(statMid / 50, 2) * 10);
+                let weightIn = baseIn + (Math.pow(statIn / 50, 2) * 15);
+                let weightDk = baseDk + (Math.pow(statDk / 50, 2) * 8);
+
+                let totalWeight = weight3 + weightMid + weightIn + weightDk;
+                let randShot = Math.random() * totalWeight;
+
+                let shotType = "layup";
+                if (randShot < weight3) shotType = "three";
+                else if (randShot < weight3 + weightMid) shotType = "middle";
+                else if (randShot < weight3 + weightMid + weightIn) shotType = "layup";
+                else shotType = "dunk";
+
+                let statUsed = 50;
+                if (shotType === "dunk") statUsed = statDk;
+                else if (shotType === "layup") statUsed = statIn;
+                else if (shotType === "middle") statUsed = statMid;
+                else if (shotType === "three") statUsed = stat3;
+
+                let baseRate = shotType === "dunk" ? 0.75 : shotType === "layup" ? 0.55 : shotType === "middle" ? 0.45 : 0.37;
+
+                // --- 2. ファウル判定（シュートタイプ決定後・NBA公式スタッツ準拠） ---
+                const foulRisk = 0.08 - (defender.currentStats.defense / 1000) + (defender.currentStats.physical / 1500);
+                
+                if (Math.random() < Math.min(0.12, Math.max(0.02, foulRisk))) {
+                    defender._box.pf++;
                     
-                    if (Math.random() < Math.min(0.12, Math.max(0.02, foulRisk))) {
-                        defender._box.pf++;
+                    const side = isHome ? 'home' : 'away';
+                    const qIdx = currentQ - 1;
+
+                    const addScore = (pts) => {
+                        score[side] += pts;
+                        qScores[side][qIdx] = (qScores[side][qIdx] || 0) + pts;
+                        offData.court.forEach(p => p._box.plusMinus += pts);
+                        defData.court.forEach(p => p._box.plusMinus -= pts);
+                    };
+
+                    const midStat = shooter.currentStats.middle || shooter.currentStats.mid || 50;
+                    const ftRate = Math.max(0.40, (0.60 + ((midStat - 30) / 120) * 0.25) * shooter._cond * mentalBuff);
+                    
+                    let abilityBonus = ((statUsed - 30) / 120) * 0.30;
+                    let rawSuccessRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - (defensePressure * 0.7) + playmakerBuff;
+                    const and1Chance = Math.min(0.70, Math.max(0.10, rawSuccessRate * 0.8 + ((shooter.currentStats.physical / 200) * 0.2)));
+                    const isAnd1 = Math.random() < and1Chance && clock > 5;
+
+                    if (isAnd1) {
+                        shooter._box.fga++;
+                        shooter._box.fgm++; 
+                        const pts = (shotType === "three") ? 3 : 2;
+                        if(shotType === "three") {
+                            shooter._box.tpa++;
+                            shooter._box.tpm++;
+                        }
+                        shooter._box.pts += pts; 
+                        addScore(pts);
+
+                        const and1Text = `<span style="color:#e74c3c; font-weight:bold; font-size:14px;">🔥【AND-1!!!】🔥</span>${shooter.name}が${defender.name}の激しいファウルを受けながらも、強靭なフィジカルで${shotType === "three" ? "スリーポイント" : "シュート"}をねじ込んだ！！！`;
+                        writeLog(clock, offData.team.name, and1Text, true, [shooter.id, defender.id]);
+
+                        shooter._box.fta += 1;
+                        if (Math.random() < ftRate) {
+                            shooter._box.ftm++; 
+                            shooter._box.pts++;
+                            addScore(1);
+                            writeLog(clock, shooter.name, `ボーナススロー：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
+                        } else {
+                            writeLog(clock, shooter.name, `ボーナススロー：外れる！`, false, [shooter.id]);
+                        }
+                    } else {
+                        const ftCount = (shotType === "three") ? 3 : 2; 
+                        writeLog(clock, defData.team.name, `${defender.name}が激しいファウル！${shooter.name}がフリースロー獲得（${ftCount}投）！`, false, [shooter.id, defender.id]);
                         
-                        const side = isHome ? 'home' : 'away';
-                        const qIdx = currentQ - 1;
-    
-                        const addScore = (pts) => {
-                            score[side] += pts;
-                            qScores[side][qIdx] = (qScores[side][qIdx] || 0) + pts;
-                            offData.court.forEach(p => p._box.plusMinus += pts);
-                            defData.court.forEach(p => p._box.plusMinus -= pts);
-                        };
-    
-                        const midStat = shooter.currentStats.middle || shooter.currentStats.mid || 50;
-                        const ftRate = Math.max(0.40, (0.60 + ((midStat - 30) / 120) * 0.25) * shooter._cond * mentalBuff);
+                        shooter._box.fta += ftCount;
                         
-                        // 能力値ベースのAnd-1ねじ込み率（単なるフィジカル抽選を廃止）
-                        let abilityBonus = ((statUsed - 30) / 120) * 0.30;
-                        let rawSuccessRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - (defensePressure * 0.7) + playmakerBuff;
-                        const and1Chance = Math.min(0.70, Math.max(0.10, rawSuccessRate * 0.8 + ((shooter.currentStats.physical / 200) * 0.2)));
-                        const isAnd1 = Math.random() < and1Chance && clock > 5;
-    
-                        if (isAnd1) {
-                            // NBAルール: And-1成功時はFGA(試投数)とFGM(成功数)を両方加算する
-                            shooter._box.fga++;
-                            shooter._box.fgm++; 
-                            const pts = (shotType === "three") ? 3 : 2;
-                            if(shotType === "three") {
-                                shooter._box.tpa++;
-                                shooter._box.tpm++;
-                            }
-                            shooter._box.pts += pts; 
-                            addScore(pts);
-    
-                            const and1Text = `<span style="color:#e74c3c; font-weight:bold; font-size:14px;">🔥【AND-1!!!】🔥</span>${shooter.name}が${defender.name}の激しいファウルを受けながらも、強靭なフィジカルで${shotType === "three" ? "スリーポイント" : "シュート"}をねじ込んだ！！！`;
-                            writeLog(clock, offData.team.name, and1Text, true, [shooter.id, defender.id]);
-    
-                            shooter._box.fta += 1;
+                        for (let f = 1; f <= ftCount; f++) {
                             if (Math.random() < ftRate) {
                                 shooter._box.ftm++; 
                                 shooter._box.pts++;
                                 addScore(1);
-                                writeLog(clock, shooter.name, `ボーナススロー：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
+                                writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
                             } else {
-                                writeLog(clock, shooter.name, `ボーナススロー：外れる！`, false, [shooter.id]);
-                            }
-                        } else {
-                            // NBAルール: シュートミス時のファウルはFGA(試投数)にカウントしない。これでFG%の崩壊を防ぐ
-                            const ftCount = (shotType === "three") ? 3 : 2; 
-                            writeLog(clock, defData.team.name, `${defender.name}が激しいファウル！${shooter.name}がフリースロー獲得（${ftCount}投）！`, false, [shooter.id, defender.id]);
-                            
-                            shooter._box.fta += ftCount;
-                            
-                            for (let f = 1; f <= ftCount; f++) {
-                                if (Math.random() < ftRate) {
-                                    shooter._box.ftm++; 
-                                    shooter._box.pts++;
-                                    addScore(1);
-                                    writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
-                                } else {
-                                    writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`, false, [shooter.id]);
-                                }
+                                writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`, false, [shooter.id]);
                             }
                         }
-                        
-                        isHomeOffense = !isHomeOffense; 
-                        continue; // ファウル処理終了。次のループへ
                     }
-
-                    // ファウルが起きなかった場合のみ、正規のシュートとしてFGAを加算
-                    shooter._box.fga++;
-                    if(shotType === "three") shooter._box.tpa++;
-
-                              // --- 1. パサーの選定（Playmaker Buffの現実化） ---
-                    // 課題7,8,9,10の解決: 完全ランダムを廃止し、パス能力が高い選手ほど起点になりやすくする重み付け抽選
-                    const passerCandidates = offData.court.filter(p => p.id !== shooter.id);
-                    let passWeights = passerCandidates.map(p => Math.max(1, Math.pow((p.currentStats.pass || 50) / 50, 2))); 
-                    let totalPassWeight = passWeights.reduce((a, b) => a + b, 0);
-                    let passRand = Math.random() * totalPassWeight;
-                    let passer = passerCandidates[0];
-                    let passCum = 0;
-                    for (let i = 0; i < passerCandidates.length; i++) {
-                        passCum += passWeights[i];
-                        if (passRand < passCum) {
-                            passer = passerCandidates[i];
-                            break;
-                        }
-                    }
-
-                    let assistText = "";
-                    let isAssist = false;
-                    let playmakerBuff = 0; 
                     
-                    let passAbility = passer.currentStats.pass || 50;
-                    // 課題8: パス能力が70未満の場合はアシスト発生率を激減させ、まぐれを減らす
-                    let assistProb = passAbility >= 70 ? (passAbility / 150) * 0.65 : (passAbility / 150) * 0.20; 
+                    isHomeOffense = !isHomeOffense; 
+                    continue;
+                }
 
-                    if (Math.random() < assistProb) {
-                        isAssist = true;
-                        // 課題9,10: バフが強すぎる問題を修正。最大+15%から最大+8%へマイルドにし、能力80以上から適用
-                        if (passAbility >= 80) {
-                            playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
-                        }
-                    }
+                // ファウルが起きなかった場合のみ、正規のシュートとしてFGAを加算
+                shooter._box.fga++;
+                if(shotType === "three") shooter._box.tpa++;
 
-                    // --- 2. シュートタイプの決定（Shot IQの改修） ---
-                    // 課題26: 互換キーの統一。すべてここで取得し、以降の計算は必ずこの変数を使う
-                    let stat3 = shooter.currentStats.three || shooter.currentStats["3pt"] || shooter.currentStats.tpt || 30;
-                    let statMid = shooter.currentStats.middle || shooter.currentStats.mid || 30;
-                    let statIn = shooter.currentStats.layup || shooter.currentStats.inside || 30;
-                    let statDk = shooter.currentStats.dunk || 30;
-    
-                    // 1. ポジションごとのベース傾向
-                    let base3 = (shooter.pos === "PG" || shooter.pos === "SG") ? 45 : (shooter.pos === "SF") ? 35 : 20;
-                    let baseMid = 20; 
-                    let baseIn = (shooter.pos === "C" || shooter.pos === "PF") ? 50 : 30;
-                    let baseDk = (shooter.pos === "C" || shooter.pos === "PF") ? 20 : 5;
-    
-                    // 課題1,2,3,4の解決: 1ポイントの差で重みが急変するロジックを廃止。
-                    // 能力値を指数化(2乗)して加算することで、高い能力ほど自然に選択率が上がり、同点でも破綻しないグラデーション設計。
-                    let weight3 = base3 + (Math.pow(stat3 / 50, 2) * 12);
-                    let weightMid = baseMid + (Math.pow(statMid / 50, 2) * 10);
-                    let weightIn = baseIn + (Math.pow(statIn / 50, 2) * 15);
-                    let weightDk = baseDk + (Math.pow(statDk / 50, 2) * 8);
-    
-                    let totalWeight = weight3 + weightMid + weightIn + weightDk;
-                    let randShot = Math.random() * totalWeight;
-    
-                    // 3. 重み付けルーレットでシュート選択
-                    let shotType = "layup";
-                    if (randShot < weight3) shotType = "three";
-                    else if (randShot < weight3 + weightMid) shotType = "middle";
-                    else if (randShot < weight3 + weightMid + weightIn) shotType = "layup";
-                    else shotType = "dunk";
-    
-                    // 課題21対策の準備: FGAの加算は維持（後でAnd-1の仕組みを直すまではここに残す）
-                    shooter._box.fga++;
-                    if(shotType === "three") shooter._box.tpa++;
-    
-                    let statUsed = 50;
-                    if (shotType === "dunk") statUsed = statDk;
-                    else if (shotType === "layup") statUsed = statIn;
-                    else if (shotType === "middle") statUsed = statMid;
-                    else if (shotType === "three") statUsed = stat3;
-    
-                    // 現実のNBAの平均FG%に近づけるベース確率
-                    let baseRate = shotType === "dunk" ? 0.75 : shotType === "layup" ? 0.55 : shotType === "middle" ? 0.45 : 0.37;
+                // --- 3. ブロック＆シュート成功判定（確率キャップ・排他制御） ---
+                let abilityBonus = ((statUsed - 30) / 120) * 0.30;
+                let rawRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - (defensePressure * 0.7) + playmakerBuff;
 
+                let ankleBreak = false;
+                if(shooter.currentStats.dribble > defender.currentStats.defense + 20 && Math.random() < 0.15 * shooter._cond) {
+                    ankleBreak = true;
+                    rawRate += 0.20; 
+                }
 
-                // --- B. ブロック判定 ---
-                // ★stats から currentStats に変更
                 let blockChance = ((defender.currentStats.defense + defender.currentStats.physical) / 300) * 0.08 + defPressureBonus;
                 if(shotType === "dunk") blockChance -= 0.03; 
-                if(shotType === "layup" && statIn > 110) blockChance -= 0.04; 
+                if(shotType === "layup" && statUsed > 110) blockChance -= 0.04; 
 
                 if(Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
                     defender._box.blk++;
                     let isBlockHigh = false;
                     let blkText = "";
-                    // ★stats から currentStats に変更
                     if (defender.currentStats.physical > 110 && defender.currentStats.defense > 100 && Math.random() < 0.3) {
                         blkText = `<span style="color:#e74c3c; font-weight:bold;">【超絶ブロック！】</span>${shooter.name}のシュートを${defender.name}がバレーボールのスパイクのように客席へ叩き落とす！！！`;
                         isBlockHigh = true;
@@ -1936,9 +1925,9 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-                // --- C. シュート成功判定 ---
-                // 修正: どんな状況でも最低確率25%を担保（プロの意地）
-                if (Math.random() < Math.max(0.25, successRate)) {
+                let finalSuccessRate = Math.min(0.92, Math.max(0.25, rawRate));
+
+                if (Math.random() < finalSuccessRate) {
                     const isThree = (shotType === "three");
                     const pts = isThree ? 3 : 2;
                     const targetSide = isHome ? 'home' : 'away';
@@ -1962,27 +1951,25 @@ window.renderPracticeGrid = function() {
                     let isHigh = false;
                     const involved = [shooter.id, defender.id];
 
-                    // --- アシスト判定 ---
-                    const passer = offData.court[Math.floor(Math.random() * 5)];
-                    let assistText = "";
-                    // ★stats から currentStats に変更
-                    const isAssist = (passer.id !== shooter.id && Math.random() < (passer.currentStats.pass / 150) * 0.65);
-
                     if (isAssist) {
                         passer._box.ast++;
                         involved.push(passer.id);
                         
-                        // ★stats から currentStats に変更
-                        const isAlleyOop = (shotType === "dunk" || shotType === "layup") && passer.currentStats.pass > 100 && (shooter.currentStats.dunk > 90 || shooter.currentStats.layup > 100);
+                        const dunkVal = shooter.currentStats.dunk || 50;
+                        const layupVal = shooter.currentStats.layup || shooter.currentStats.inside || 50;
+                        const passVal = passer.currentStats.pass || 50;
+
+                        const isAlleyOop = (shotType === "dunk" || shotType === "layup") && passVal > 100 && (dunkVal > 90 || layupVal > 100);
                         if (isAlleyOop && Math.random() < 0.3) {
                             playText = `<span style="color:#9b59b6; font-weight:bold;">【アリウープ！】</span>${passer.name}の絶妙なロブパスを、空中で受け取った${shooter.name}がそのまま豪快にリングへ叩き込んだ！！！`;
                             isHigh = true;
-                        } else if (passer.currentStats.pass > 120 && Math.random() < 0.3) {
+                        } else if (passVal > 120 && Math.random() < 0.3) {
                             assistText = `<span class="log-assist">#${passer.num} ${passer.name}の変態的なノールックパス ➔ </span>`;
                         } else {
                             assistText = `<span class="log-assist">#${passer.num} ${passer.name}の的確なアシスト ➔ </span>`;
                         }
                     }
+
 
                     // --- 個人技テキスト（すべての条件分岐と記述を完全維持） ---
                     if (!playText) {
