@@ -315,6 +315,31 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 </script>
 <script>
+    // 選手のステータスを計算する関数
+function getEffectiveStats(player) {
+    // 選手データが空っぽの場合はエラーを防ぐために全て0で返す
+    if (!player) {
+        return { speed: 0, dribble: 0, pass: 0, inside: 0, middle: 0, three: 0, dunk: 0, defense: 0, physical: 0, mental: 0 };
+    }
+
+    // player.stats の中にデータがあればそれを、無ければ player の中身を直接見る
+    const s = player.stats || player;
+
+    // データが欠けている項目があってもゲームがバグらないように、最低でも50をデフォルトとしてセットする
+    return {
+        speed: s.speed || 50,
+        dribble: s.dribble || 50,
+        pass: s.pass || 50,
+        inside: s.inside || s.layup || 50,
+        middle: s.middle || s.mid || 50,
+        three: s.three || s["3pt"] || 50,
+        dunk: s.dunk || 50,
+        defense: s.defense || 50,
+        physical: s.physical || 50,
+        mental: s.mental || 50
+    };
+}
+
     // --- IndexedDB (ブラウザ保存) の設定 ---
 const IDB_NAME = "BasketballLife_DB";
 const IDB_STORE = "matchHistory";
