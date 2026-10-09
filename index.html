@@ -2045,20 +2045,74 @@ window.renderPracticeGrid = function() {
                     writeLog(clock, offData.team.name, `${assistText}${playText} [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, isHigh, involved);
                     isHomeOffense = !isHomeOffense;
                 } 
-                          // --- D. シュート失敗 & リバウンド判定 ---
+                                        // --- D. シュート失敗 & リバウンド判定 ---
                 else {
                     const missText = (shotType === "three") ? `${shooter.name}の3Pシュートはリングに弾かれる。` : `${shooter.name}がシュートを放つもリングに弾かれる！`;
                     writeLog(clock, offData.team.name, missText, false, [shooter.id]);
                     
-                    // 課題5, 8: リバウンダーを currentStats を用いて重み付け選出（ポジションボーナスあり）
+                    // 【課題8, 9解決】能力値を安全に取得（0を正常値として扱い、undefined/NaN/Infinityを完全保護）
+                    const getStat = (player, key, fallback = 50) => {
+                        if (!player || !player.currentStats) return fallback;
+                        const val = player.currentStats[key];
+                        return (typeof val === "number" && isFinite(val)) ? val : fallback;
+                    };
+
+                    // 【課題1, 4, 13, 14, 20解決】得点・スタッツ・プラスマイナスの共通記録処理
+                    const recordBasket = (player, pts, isThree = false) => {
+                        if (!player || !player._box) return; // _boxが存在しない場合のエラー防止
+                        player._box.pts += pts;
+                        player._box.fgm++;
+                        player._box.fga++;
+                        if (isThree) {
+                            player._box.tpm++;
+                            player._box.tpa++;
+                        }
+                        
+                        // 【課題1解決】得点先は「現在の攻撃チーム」に基づく
+                        const side = isHomeOffense ? 'home' : 'away';
+                        const qIdx = currentQ - 1;
+                        score[side] += pts;
+                        
+                        // 【課題20解決】配列の未初期化インデックスへの安全対策
+                        if (qScores[side][qIdx] === undefined) qScores[side][qIdx] = 0;
+                        qScores[side][qIdx] += pts;
+                        
+                        // 【課題4, 6解決】プラスマイナス更新時の安全ガード
+                        if (Array.isArray(offData?.court)) {
+                            offData.court.forEach(p => { if (p && p._box) p._box.plusMinus += pts; });
+                        }
+                        if (Array.isArray(defData?.court)) {
+                            defData.court.forEach(p => { if (p && p._box) p._box.plusMinus -= pts; });
+                        }
+                    };
+
+                    // 【課題3, 7, 8解決】安全な重み付きリバウンダー選出
                     const getRebounder = (teamData) => {
+                        // 【課題3解決】コートが空の場合は、エラーを起こさない完全なモックダミーを返す
+                        if (!teamData || !Array.isArray(teamData.court) || teamData.court.length === 0) {
+                            return { 
+                                id: "dummy", 
+                                name: "不明な選手", 
+                                _box: { reb: 0, orb: 0, drb: 0, pts: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, plusMinus: 0 }, 
+                                currentStats: {} 
+                            };
+                        }
+                        
                         let weights = teamData.court.map(p => {
-                            let reb = p.currentStats.rebound || 50;
-                            let phy = p.currentStats.physical || 50;
-                            let posBonus = (p.pos === "C" || p.pos === "PF") ? 1.5 : 1.0; // ビッグマン優遇
-                            return Math.max(1, Math.pow((reb + phy * 0.5) / 50, 2) * posBonus);
+                            let reb = getStat(p, "rebound", 50);
+                            let phy = getStat(p, "physical", 50);
+                            let posBonus = (p.pos === "C" || p.pos === "PF") ? 1.3 : 1.0; 
+                            let baseVal = (reb + phy * 0.5) / 50;
+                            
+                            // 【課題8解決】極端な重みを防ぐため上限10を設ける
+                            let weight = Math.min(10, Math.pow(Math.max(0.1, baseVal), 1.5) * posBonus); 
+                            
+                            return (!isFinite(weight) || weight <= 0) ? 1 : weight; 
                         });
+
                         let totalWeight = weights.reduce((a, b) => a + b, 0);
+                        if (!isFinite(totalWeight) || totalWeight <= 0) return teamData.court[0];
+
                         let rand = Math.random() * totalWeight;
                         let cum = 0;
                         for (let i = 0; i < teamData.court.length; i++) {
@@ -2071,88 +2125,82 @@ window.renderPracticeGrid = function() {
                     const offReber = getRebounder(offData);
                     const defReber = getRebounder(defData);
                     
-                    // 課題8: currentStats に統一
-                    const offPower = (offReber.currentStats.rebound || 50) + (offReber.currentStats.physical || 50);
-                    const defPower = (defReber.currentStats.rebound || 50) + (defReber.currentStats.physical || 50);
+                    // リバウンドパワー計算
+                    const offPower = getStat(offReber, "rebound", 50) + getStat(offReber, "physical", 50);
+                    const defPower = getStat(defReber, "rebound", 50) + getStat(defReber, "physical", 50);
                     
-                    // 課題6: オフェンスリバウンド確率に上限(45%)と下限(5%)を設定
+                    // 【課題5解決】ORB確率。基本確率25% + 能力差/2000 は仕様として維持しつつクランプ。
                     const orbChance = Math.min(0.45, Math.max(0.05, 0.25 + ((offPower - defPower) / 2000)));
                     
                     if (Math.random() < orbChance) {
-                        offReber._box.orb++; 
-                        offReber._box.reb++;
-                        
-                        // 課題7: プットバック判定をダンクだけでなくインサイド能力等も複合して判定
-                        let dunkStat = offReber.currentStats.dunk || 30;
-                        let inStat = offReber.currentStats.inside || offReber.currentStats.layup || 30;
-                        let phyStat = offReber.currentStats.physical || 50;
-                        let putbackChance = 0;
-
-                        if (dunkStat > 90 && phyStat > 90) {
-                            putbackChance = 0.15; // 豪快なプットバックダンク
-                        } else if (inStat > 80 && phyStat > 80) {
-                            putbackChance = 0.08; // 泥臭いティップイン
+                        // オフェンスリバウンド(ORB)
+                        if (offReber._box) {
+                            offReber._box.orb++; 
+                            offReber._box.reb++;
                         }
                         
-                        // 課題4: 時計が0秒以下なら、新たなシュートアクション(プットバック)は発生させない
-                        if (clock > 0 && Math.random() < putbackChance) {
-                            // 課題2: スタッツを網羅的に加算
-                            offReber._box.fga++;
-                            offReber._box.fgm++;
+                        // 【課題2, 10解決】能力値取得を統一し、プットバックの「判定」と「ログ」を完全一致させる
+                        let dunkStat = getStat(offReber, "dunk", 30);
+                        let inStat = getStat(offReber, "inside", getStat(offReber, "layup", 30)); 
+                        let phyStat = getStat(offReber, "physical", 50);
+                        
+                        let putbackType = "none";
+                        let putbackChance = 0;
+                        
+                        // 判定とログの不一致を解消するための変数記憶
+                        if (dunkStat > 90 && phyStat > 90) {
+                            putbackChance = 0.12; 
+                            putbackType = "dunk";
+                        } else if (inStat > 80 && phyStat > 80) {
+                            putbackChance = 0.06; 
+                            putbackType = "tipin";
+                        }
+                        
+                        // 【課題19解決】時計が0秒より大きい場合のみ、時間内の追加アクション（プットバック）を許可
+                        if (clock > 0 && putbackType !== "none" && Math.random() < putbackChance) {
                             
-                            // 課題3: プットバックは2点固定で処理（将来の拡張を考慮して変数化）
-                            const pts = 2;
-                            offReber._box.pts += pts;
-                            
-                            const side = isHome ? 'home' : 'away';
-                            const qIdx = currentQ - 1;
-                            score[side] += pts;
-                            qScores[side][qIdx] = (qScores[side][qIdx] || 0) + pts;
-                            
-                            offData.court.forEach(p => p._box.plusMinus += pts);
-                            defData.court.forEach(p => p._box.plusMinus -= pts);
+                            recordBasket(offReber, 2, false);
 
-                            let pbText = (dunkStat > 90) 
+                            let pbText = (putbackType === "dunk") 
                                 ? `<span style="color:#e74c3c; font-weight:bold;">【プットバック！】</span>${offReber.name}がオフェンスリバウンドを空中で掴み、そのまま強烈なダンクを叩き込んだ！！`
                                 : `<span style="color:#e74c3c; font-weight:bold;">【ティップイン！】</span>${offReber.name}がオフェンスリバウンドをそのまま押し込んだ！！`;
 
                             writeLog(clock, offData.team.name, pbText, true, [offReber.id]);
                             
-                            // 課題1: 得点後の攻撃権切り替えと二重処理防止(continueで次の攻撃へ)
+                            // プットバック成功で得点が入ったため攻守交替。continueにより確実に1回のみ実行。
                             isHomeOffense = !isHomeOffense; 
                             continue;
                         } else if (phyStat > 110 && Math.random() < 0.4) {
                             writeLog(clock, offData.team.name, `【空中戦】${offReber.name}がフィジカルで圧倒し、強引にオフェンスリバウンドをもぎ取った！`, false, [offReber.id]);
-                            // ORB獲得のみ、攻撃権は変わらず(continueしないことで再度オフェンスのループへ入る)
                         } else {
                             writeLog(clock, offData.team.name, `${offReber.name}が執念でオフェンスリバウンドを拾う！`, false, [offReber.id]);
-                            // ORB獲得のみ
                         }
-                        // 課題9: オフェンスリバウンド後のショットクロックについて
-                        // (現状は外側の時計ループで処理されるため、攻撃権維持のまま次のアクションに移行します)
+                        // 【課題11解決】ORB獲得のみの場合は、isHomeOffense を切り替えず攻撃権維持
                         
                     } else {
-                        defReber._box.drb++; 
-                        defReber._box.reb++;
+                        // ディフェンスリバウンド(DRB)
+                        if (defReber._box) {
+                            defReber._box.drb++; 
+                            defReber._box.reb++;
+                        }
                         
-                        // 課題10: 速攻判定の演出 (currentStatsに変更)
-                        let spdStat = defReber.currentStats.speed || 50;
+                        // 【課題17解決】速攻ログ（ゲーム効果なしの演出仕様として維持）
+                        let spdStat = getStat(defReber, "speed", 50);
                         if (spdStat > 100 && Math.random() < 0.3) {
                             writeLog(clock, defData.team.name, `${defReber.name}がディフェンスリバウンドを回収し、一気にスピードを上げて速攻を展開！`, false, [defReber.id]);
-                            // ※本格的に速攻ボーナスを乗せる場合は、ループ外でフラグ管理が必要ですが、まずは演出として機能させます。
                         } else {
                             writeLog(clock, defData.team.name, `${defReber.name}が確実にディフェンスリバウンドを回収。`, false, [defReber.id]);
                         }
                         
-                        // DRB獲得でディフェンス側のボールになるため攻撃権交代
+                        // 【課題12解決】DRB獲得のため攻守交替。continueにより確実に1回のみ実行。
                         isHomeOffense = !isHomeOffense; 
                         continue;
                     }
                 }
-            } // while (clock > 0) の正常終了（修復完了）
+            } // while (clock > 0) の正常終了
             
             currentQ++;
-        } // while (currentQ <= maxQ) の正常終了（修復完了）
+        } // while (currentQ <= maxQ) の正常終了
 
 
         // --- 個人スタッツのグローバル反映＆IndexedDB保存 ---
