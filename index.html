@@ -1647,7 +1647,7 @@ window.renderPracticeGrid = function() {
         let maxQ = 4;
         let isOverTime = false;
 
-        // --- 試合シミュレーションメインループ ---
+      // --- 試合シミュレーションメインループ ---
         while (currentQ <= maxQ) {
             let clock = (isOverTime) ? 300 : 720; 
             let qName = isOverTime ? `延長第${currentQ - 4}Q(OT)` : `第${currentQ}Q`;
