@@ -1145,46 +1145,58 @@ window.renderPracticeGrid = function() {
         return a > 0 ? ((m / a) * 100).toFixed(1) + "%" : "0.0%";
     }
     
-    function calcAdvanced(b) {
-        let ts = b.pts / (2 * (b.fga + 0.44 * b.fta));
-        let eff = (b.pts + b.reb + b.ast + b.stl + b.blk) - ((b.fga - b.fgm) + (b.fta - b.ftm) + b.to);
-        let usg = ((b.fga + 0.44 * b.fta + b.to) / Math.max(1, (b.min / 5))) * 100;
-        if(b.g > 0) usg = usg / b.g; 
-        return {
-            ts: isNaN(ts) || !isFinite(ts) ? "0.0%" : (ts * 100).toFixed(1) + "%",
-            eff: b.g > 0 ? (eff / b.g).toFixed(1) : eff.toFixed(1),
-            usg: isNaN(usg) || !isFinite(usg) ? "0.0%" : Math.min(100, Math.max(0, usg)).toFixed(1) + "%"
-        };
-    }
+        function calcAdvanced(b, isSeasonAvg = false) {
+        // 安全対策: データがまだ無い（undefined）場合に0を代入してNaNバグを防ぐ
+        let pts = b.pts || 0, fga = b.fga || 0, fgm = b.fgm || 0;
+        let fta = b.fta || 0, ftm = b.ftm || 0, reb = b.reb || 0;
+        let ast = b.ast || 0, stl = b.stl || 0, blk = b.blk || 0;
+        let to = b.to || 0, min = b.min || 0, g = b.g || 1;
 
-    function generateTableHeaderHtml() {
-        return `<tr><th>PLAYER</th><th>MIN</th><th>PTS</th><th>FG</th><th>FG%</th><th>3P</th><th>3P%</th><th>FT</th><th>FT%</th><th>ORB</th><th>DRB</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>PF</th><th>+/-</th><th>USG%</th><th>TS%</th><th>EFF</th></tr>`;
+        // TS% (True Shooting)
+        let tsDenom = 2 * (fga + 0.44 * fta);
+        let ts = tsDenom > 0 ? (pts / tsDenom) * 100 : 0;
+
+        // EFF (Efficiency)
+        let eff = (pts + reb + ast + stl + blk) - ((fga - fgm) + (fta - ftm) + to);
+        if (isSeasonAvg && g > 0) eff = eff / g; // EFFは累積スタッツなので試合数で割る
+
+        // USG% (Usage Rate: 簡易計算)
+        // バグ修正: 割合(%)データなので試合数で割ってはいけない
+        let usgDenom = Math.max(1, (min / 5));
+        let usg = ((fga + 0.44 * fta + to) / usgDenom) * 100;
+
+        return {
+            ts: ts.toFixed(1) + "%",
+            eff: eff.toFixed(1),
+            usg: Math.min(100, Math.max(0, usg)).toFixed(1) + "%"
+        };
     }
 
     function generatePlayerRowHtml(p, b, isSeasonAvg = false) {
         let div = isSeasonAvg ? (b.g || 1) : 1;
-        let adv = calcAdvanced(b);
-        let minDisplay = isSeasonAvg ? formatMIN(Math.floor(b.min / div)) : formatMIN(b.min);
-        let fgText = isSeasonAvg ? (b.fgm/div).toFixed(1) + "-" + (b.fga/div).toFixed(1) : `${b.fgm}-${b.fga}`;
-        let tpText = isSeasonAvg ? (b.tpm/div).toFixed(1) + "-" + (b.tpa/div).toFixed(1) : `${b.tpm}-${b.tpa}`;
-        let ftText = isSeasonAvg ? (b.ftm/div).toFixed(1) + "-" + (b.fta/div).toFixed(1) : `${b.ftm}-${b.fta}`;
+        let adv = calcAdvanced(b, isSeasonAvg); // ここも修正
+        let minDisplay = isSeasonAvg ? formatMIN(Math.floor((b.min || 0) / div)) : formatMIN(b.min || 0);
+        
+        let fgText = isSeasonAvg ? ((b.fgm||0)/div).toFixed(1) + "-" + ((b.fga||0)/div).toFixed(1) : `${b.fgm||0}-${b.fga||0}`;
+        let tpText = isSeasonAvg ? ((b.tpm||0)/div).toFixed(1) + "-" + ((b.tpa||0)/div).toFixed(1) : `${b.tpm||0}-${b.tpa||0}`;
+        let ftText = isSeasonAvg ? ((b.ftm||0)/div).toFixed(1) + "-" + ((b.fta||0)/div).toFixed(1) : `${b.ftm||0}-${b.fta||0}`;
 
         return `
             <td><span class="clickable-player" onclick="showPlayerDetail(${p.id})">#${p.num} ${p.name}</span></td>
             <td>${minDisplay}</td>
-            <td><strong>${(b.pts/div).toFixed(isSeasonAvg?1:0)}</strong></td>
-            <td>${fgText}</td><td>${formatPCT(b.fgm, b.fga)}</td>
-            <td>${tpText}</td><td>${formatPCT(b.tpm, b.tpa)}</td>
-            <td>${ftText}</td><td>${formatPCT(b.ftm, b.fta)}</td>
-            <td>${(b.orb/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${(b.drb/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td><strong>${(b.reb/div).toFixed(isSeasonAvg?1:0)}</strong></td>
-            <td>${(b.ast/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${(b.stl/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${(b.blk/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${(b.to/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td>${(b.pf/div).toFixed(isSeasonAvg?1:0)}</td>
-            <td style="color:${b.plusMinus>=0?'#2ecc71':'#e74c3c'}; font-weight:bold;">${b.plusMinus > 0 ? '+' : ''}${(b.plusMinus/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td><strong>${((b.pts||0)/div).toFixed(isSeasonAvg?1:0)}</strong></td>
+            <td>${fgText}</td><td>${formatPCT(b.fgm||0, b.fga||0)}</td>
+            <td>${tpText}</td><td>${formatPCT(b.tpm||0, b.tpa||0)}</td>
+            <td>${ftText}</td><td>${formatPCT(b.ftm||0, b.fta||0)}</td>
+            <td>${((b.orb||0)/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${((b.drb||0)/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td><strong>${((b.reb||0)/div).toFixed(isSeasonAvg?1:0)}</strong></td>
+            <td>${((b.ast||0)/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${((b.stl||0)/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${((b.blk||0)/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${((b.to||0)/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td>${((b.pf||0)/div).toFixed(isSeasonAvg?1:0)}</td>
+            <td style="color:${(b.plusMinus||0)>=0?'#2ecc71':'#e74c3c'}; font-weight:bold;">${(b.plusMinus||0) > 0 ? '+' : ''}${((b.plusMinus||0)/div).toFixed(isSeasonAvg?1:0)}</td>
             <td>${adv.usg}</td><td>${adv.ts}</td><td>${adv.eff}</td>
         `;
     }
