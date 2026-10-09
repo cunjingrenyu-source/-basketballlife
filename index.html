@@ -1394,16 +1394,26 @@ window.renderPracticeGrid = function() {
             const tbl = document.getElementById(tId);
             if (!tbl) return;
             
-            const rowsHtml = teams
-                .filter(t => t.conference === conf)
-                .sort((a, b) => b.w - a.w || a.id - b.id)
+            // バグ修正: プロパティ名のブレ（conference / conf）を両方許容。それでも空なら全チームを強引に表示
+            let targetTeams = teams.filter(t => t.conference === conf || t.conf === conf);
+            if (targetTeams.length === 0 && (conf === "East" || conf === "West")) {
+                // カンファレンス分け未設定のデータしかない場合、東に全チーム出すなどのフェイルセーフ
+                if(conf === "East") targetTeams = teams;
+                else return; // West側は空にする
+            }
+            
+            const rowsHtml = targetTeams
+                .sort((a, b) => (b.w || 0) - (a.w || 0) || (a.id || 0) - (b.id || 0))
                 .map((t, i) => {
-                    const wp = (t.w + t.l) > 0 ? (t.w / (t.w + t.l)).toFixed(3) : ".000";
+                    const w = t.w || 0;
+                    const l = t.l || 0;
+                    // 勝率の表記を .500 のようなバスケ標準形式に調整
+                    const wp = (w + l) > 0 ? (w / (w + l)).toFixed(3).replace(/^0\./, '.') : ".000";
                     return `<tr>
                         <td><strong>${i + 1}</strong></td>
                         <td class="clickable-team" onclick="showRoster(${t.id})">${t.name}</td>
-                        <td><strong>${t.w}</strong></td>
-                        <td>${t.l}</td>
+                        <td><strong>${w}</strong></td>
+                        <td>${l}</td>
                         <td>${wp}</td>
                     </tr>`;
                 }).join('');
@@ -1414,6 +1424,7 @@ window.renderPracticeGrid = function() {
         makeTable("east-table", "East"); 
         makeTable("west-table", "West");
     };
+
 
     const POS_ORDER = (typeof POSITIONS !== 'undefined') ? POSITIONS.reduce((acc, pos, idx) => (acc[pos] = idx, acc), {}) : {};
 
