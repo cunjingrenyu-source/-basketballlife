@@ -1647,14 +1647,14 @@ window.renderPracticeGrid = function() {
         let maxQ = 4;
         let isOverTime = false;
 
-           // =========================================================
+                 // =========================================================
         // 【追加】試合開始前に全選手へ「実質ステータス(currentStats)」を付与
         // =========================================================
-            // =========================================================
-        if (hTeam && hTeam.players) hTeam.players.forEach(p => p.currentStats = getEffectiveStats(p));
-        if (aTeam && aTeam.players) aTeam.players.forEach(p => p.currentStats = getEffectiveStats(p));
+        if (hTeam && hTeam.roster) hTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
+        if (aTeam && aTeam.roster) aTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
 
         // --- 試合シミュレーションメインループ ---
+
 
         while (currentQ <= maxQ) {
             let clock = (isOverTime) ? 300 : 720; 
