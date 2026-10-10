@@ -2336,7 +2336,7 @@ window.renderPracticeGrid = function() {
                     // 【課題5解決】ORB確率。基本確率25% + 能力差/2000 は仕様として維持しつつクランプ。
                     const orbChance = Math.min(0.45, Math.max(0.05, 0.25 + ((offPower - defPower) / 2000)));
                     
-                                     if (Math.random() < orbChance) {
+                                                         if (Math.random() < orbChance) {
                         // オフェンスリバウンド(ORB)
                         if (offReber._box) {
                             offReber._box.orb++; 
@@ -2406,24 +2406,12 @@ window.renderPracticeGrid = function() {
                         shotClock = 24; // 攻守交替なので24秒リセット
                         continue;
                     }
-
-                        // 【課題17解決】速攻ログ（ゲーム効果なしの演出仕様として維持）
-                        let spdStat = getStat(defReber, "speed", 50);
-                        if (spdStat > 100 && Math.random() < 0.3) {
-                            writeLog(clock, defData.team.name, `${defReber.name}がディフェンスリバウンドを回収し、一気にスピードを上げて速攻を展開！`, false, [defReber.id]);
-                        } else {
-                            writeLog(clock, defData.team.name, `${defReber.name}が確実にディフェンスリバウンドを回収。`, false, [defReber.id]);
-                        }
-                        
-                        // 【課題12解決】DRB獲得のため攻守交替。continueにより確実に1回のみ実行。
-                        isHomeOffense = !isHomeOffense; 
-                        continue;
-                    }
                 }
             } // while (clock > 0) の正常終了
             
             currentQ++;
         } // while (currentQ <= maxQ) の正常終了
+
 
 
         // --- 個人スタッツのグローバル反映＆IndexedDB保存 ---
