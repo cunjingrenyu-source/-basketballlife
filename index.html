@@ -1768,34 +1768,56 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-                // --- 1. パサーの選定（Playmaker Buffの現実化） & シュートタイプの決定 ---
-                const passerCandidates = offData.court.filter(p => p.id !== shooter.id);
-                let passWeights = passerCandidates.map(p => Math.max(1, Math.pow((p.currentStats.pass || 50) / 50, 2))); 
-                let totalPassWeight = passWeights.reduce((a, b) => a + b, 0);
-                let passRand = Math.random() * totalPassWeight;
-                let passer = passerCandidates[0];
-                let passCum = 0;
-                for (let i = 0; i < passerCandidates.length; i++) {
-                    passCum += passWeights[i];
-                    if (passRand < passCum) {
-                        passer = passerCandidates[i];
-                        break;
-                    }
-                }
-
-                let assistText = "";
+                  // --- 1. パス判断とボール保持者の更新 ---
+                // 【課題6,7 解決】パスとプレイメイキングの区別、及びボール保持者の遷移
                 let isAssist = false;
-                let playmakerBuff = 0; 
-                
-                let passAbility = passer.currentStats.pass || 50;
-                let assistProb = passAbility >= 70 ? (passAbility / 150) * 0.65 : (passAbility / 150) * 0.20; 
+                let playmakerBuff = 0;
+                let assistText = "";
+                let actualPasser = null;
+                let shooter = ballHolder; // デフォルトはハンドラーがそのまま打つ
 
-                if (Math.random() < assistProb) {
-                    isAssist = true;
-                    if (passAbility >= 80) {
-                        playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
+                // 判断力(Playmaking)ベースで「味方にパスするか」を決める
+                let playmakingStat = ballHolder.currentStats.playmaking || ballHolder.currentStats.pass || 50;
+                // 【課題4 解決】パス経由の攻撃を増やすため、プレイメイカーは最大75%の確率でパスを選択
+                let passDecisionProb = Math.min(0.75, (playmakingStat / 150) + 0.15); 
+
+                if (Math.random() < passDecisionProb) {
+                    // パスを選択：シューター（レシーバー）をオフェンス評価値から選ぶ
+                    const receiverCandidates = offData.court.filter(p => p.id !== ballHolder.id);
+                    let courtEvals = receiverCandidates.map(p => Math.max(1, evalPlayer(p)));
+                    let totalEval = courtEvals.reduce((a, b) => a + b, 0);
+                    let r = Math.random(); 
+                    let cum = 0; 
+                    let receiver = receiverCandidates[0];
+                    for(let i=0; i < receiverCandidates.length; i++) {
+                        cum += (courtEvals[i] / totalEval);
+                        if(r < cum) { receiver = receiverCandidates[i]; break; }
+                    }
+
+                    // 【課題3,5 解決】パス能力(Pass)に基づいて成功判定・バフ計算
+                    let passAbility = ballHolder.currentStats.pass || 50;
+                    let passSuccessProb = passAbility >= 70 ? 0.90 : 0.70; // 基礎的なパスは通りやすくする
+                    
+                    if (Math.random() < passSuccessProb) {
+                        // パス成功：ボール保持者がレシーバーに移る
+                        actualPasser = ballHolder;
+                        shooter = receiver; 
+                        isAssist = true; // このレシーバーが決めたらアシスト成立
+                        
+                        // キラーパス効果（キャッチ＆シュート等で成功率アップ）
+                        if (passAbility >= 80) {
+                            playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
+                        }
+                    } else {
+                        // 【課題8 解決】パス失敗（ターンオーバー）
+                        actualPasser = ballHolder;
+                        actualPasser._box.to++;
+                        writeLog(clock, offData.team.name, `${actualPasser.name}のパスが乱れ、ボールがコート外へ。ターンオーバー。`, false, [actualPasser.id]);
+                        isHomeOffense = !isHomeOffense; 
+                        continue;
                     }
                 }
+
 
                 let stat3 = shooter.currentStats.three || shooter.currentStats["3pt"] || shooter.currentStats.tpt || 30;
                 let statMid = shooter.currentStats.middle || shooter.currentStats.mid || 30;
