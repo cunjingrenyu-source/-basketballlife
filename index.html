@@ -1851,74 +1851,130 @@ window.renderPracticeGrid = function() {
 
                 let baseRate = shotType === "dunk" ? 0.75 : shotType === "layup" ? 0.55 : shotType === "middle" ? 0.45 : 0.37;
 
-                // --- 2. ファウル判定（シュートタイプ決定後・NBA公式スタッツ準拠） ---
-                const foulRisk = 0.08 - (defender.currentStats.defense / 1000) + (defender.currentStats.physical / 1500);
+                // --- 2. ファウル判定＆終盤ファウルゲーム（課題43〜51対応・超完全版） ---
+                let isFoulGame = false;
                 
-                if (Math.random() < Math.min(0.12, Math.max(0.02, foulRisk))) {
-                    defender._box.pf++;
+                // 【課題43】守備側の点差を正しく計算（負の値なら守備側がビハインド）
+                let defDiff = isHomeOffense ? (score.away - score.home) : (score.home - score.away);
+                
+                // 【課題43, 51】ファウルゲームの発動条件（守備側が1〜8点負けていて、第4Q残り90秒以内）
+                if (currentQ >= 4 && clock <= 90 && defDiff < 0 && defDiff >= -8) {
+                    isFoulGame = true;
+                }
+
+                // ファウルゲーム発動時は95%、通常時は能力に応じた確率
+                let foulRisk = isFoulGame ? 0.95 : (0.08 - ((defender.currentStats.defense || 50) / 1500) + ((defender.currentStats.physical || 50) / 1000));
+                
+                if (Math.random() < Math.min(0.95, Math.max(0.02, foulRisk))) {
+                    defender._box.pf++; // ファウルを加算
                     
-                    const side = isHome ? 'home' : 'away';
+                    const side = isHomeOffense ? 'home' : 'away';
                     const qIdx = currentQ - 1;
 
                     const addScore = (pts) => {
                         score[side] += pts;
-                        qScores[side][qIdx] = (qScores[side][qIdx] || 0) + pts;
-                        offData.court.forEach(p => p._box.plusMinus += pts);
-                        defData.court.forEach(p => p._box.plusMinus -= pts);
+                        if (qScores[side][qIdx] === undefined) qScores[side][qIdx] = 0;
+                        qScores[side][qIdx] += pts;
+                        if (Array.isArray(offData?.court)) offData.court.forEach(p => { if(p._box) p._box.plusMinus += pts; });
+                        if (Array.isArray(defData?.court)) defData.court.forEach(p => { if(p._box) p._box.plusMinus -= pts; });
                     };
 
-                    const midStat = shooter.currentStats.middle || shooter.currentStats.mid || 50;
-                    const ftRate = Math.max(0.40, (0.60 + ((midStat - 30) / 120) * 0.25) * shooter._cond * mentalBuff);
-                    
-                    let abilityBonus = ((statUsed - 30) / 120) * 0.30;
-                    let rawSuccessRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - (defensePressure * 0.7) + playmakerBuff;
-                    const and1Chance = Math.min(0.70, Math.max(0.10, rawSuccessRate * 0.8 + ((shooter.currentStats.physical / 200) * 0.2)));
-                    const isAnd1 = Math.random() < and1Chance && clock > 5;
+                    // 【課題47】フリースロー能力の直接反映（freeThrowやftが存在すれば優先、なければミドルとスリーの平均）
+                    let ftStat = shooter.currentStats.freeThrow || shooter.currentStats.ft;
+                    if (!ftStat) {
+                        const midStat = shooter.currentStats.middle || 50;
+                        const threeStat = shooter.currentStats.three || 50;
+                        ftStat = (midStat + threeStat) / 2;
+                    }
+                    const ftRate = Math.min(0.95, Math.max(0.50, 0.50 + ((ftStat / 150) * 0.45)));
 
-                    if (isAnd1) {
-                        shooter._box.fga++;
-                        shooter._box.fgm++; 
-                        const pts = (shotType === "three") ? 3 : 2;
-                        if(shotType === "three") {
-                            shooter._box.tpa++;
-                            shooter._box.tpm++;
-                        }
-                        shooter._box.pts += pts; 
-                        addScore(pts);
-
-                        const and1Text = `<span style="color:#e74c3c; font-weight:bold; font-size:14px;">🔥【AND-1!!!】🔥</span>${shooter.name}が${defender.name}の激しいファウルを受けながらも、強靭なフィジカルで${shotType === "three" ? "スリーポイント" : "シュート"}をねじ込んだ！！！`;
-                        writeLog(clock, offData.team.name, and1Text, true, [shooter.id, defender.id]);
-
-                        shooter._box.fta += 1;
-                        if (Math.random() < ftRate) {
-                            shooter._box.ftm++; 
-                            shooter._box.pts++;
-                            addScore(1);
-                            writeLog(clock, shooter.name, `ボーナススロー：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
-                        } else {
-                            writeLog(clock, shooter.name, `ボーナススロー：外れる！`, false, [shooter.id]);
-                        }
-                    } else {
-                        const ftCount = (shotType === "three") ? 3 : 2; 
-                        writeLog(clock, defData.team.name, `${defender.name}が激しいファウル！${shooter.name}がフリースロー獲得（${ftCount}投）！`, false, [shooter.id, defender.id]);
+                    // 【課題44, 50】ファウルゲーム（意図的ファウル）と通常ファウルの完全分離
+                    if (isFoulGame) {
+                        // 意図的ファウル：シュート動作前（ノンシューティング）とみなし、ボーナスによる2スローとする。AND-1は発生しない。
+                        writeLog(clock, defData.team.name, `${defender.name}が時計を止める意図的なファウル！${shooter.name}がフリースロー獲得（2投）！`, false, [shooter.id, defender.id]);
+                        shooter._box.fta += 2;
                         
-                        shooter._box.fta += ftCount;
-                        
-                        for (let f = 1; f <= ftCount; f++) {
+                        for (let f = 1; f <= 2; f++) {
                             if (Math.random() < ftRate) {
                                 shooter._box.ftm++; 
                                 shooter._box.pts++;
                                 addScore(1);
-                                writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, false, [shooter.id]);
+                                writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${score.home} - ${score.away}]`, false, [shooter.id]);
                             } else {
                                 writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`, false, [shooter.id]);
                             }
                         }
+                    } else {
+                        // 【課題45, 46】通常のシュートファウル（AND-1判定と整合性の修正）
+                        let rawSuccessRate = baseRate * shooter._cond * mentalBuff - (defensePressure * 0.7) + playmakerBuff;
+                        
+                        // 実際のシュート成功率に依存してAND-1確率を算出
+                        let and1Chance = 0.01;
+                        if (shotType === "dunk" || shotType === "layup") {
+                            and1Chance = Math.max(0.05, rawSuccessRate * 0.6 + (((shooter.currentStats.physical || 50) / 200) * 0.15));
+                        } else if (shotType === "middle") {
+                            and1Chance = Math.max(0.02, rawSuccessRate * 0.3);
+                        } else if (shotType === "three") {
+                            and1Chance = Math.max(0.01, rawSuccessRate * 0.1); // 3PでのAND-1確率（レアケース）
+                        }
+                        
+                        const isAnd1 = Math.random() < and1Chance && clock > 5;
+
+                        if (isAnd1) {
+                            shooter._box.fga++;
+                            shooter._box.fgm++; 
+                            const pts = (shotType === "three") ? 3 : 2;
+                            if(shotType === "three") {
+                                shooter._box.tpa++;
+                                shooter._box.tpm++;
+                            }
+                            shooter._box.pts += pts; 
+                            addScore(pts);
+
+                            const and1Text = `<span style="color:#e74c3c; font-weight:bold; font-size:14px;">🔥【AND-1!!!】🔥</span>${shooter.name}が${defender.name}のファウルを受けながらも、執念で${shotType === "three" ? "3P" : "シュート"}をねじ込んだ！！！${shotType === "three" ? "4点プレーのチャンス！" : ""}`;
+                            writeLog(clock, offData.team.name, and1Text, true, [shooter.id, defender.id]);
+
+                            shooter._box.fta += 1;
+                            if (Math.random() < ftRate) {
+                                shooter._box.ftm++; 
+                                shooter._box.pts++;
+                                addScore(1);
+                                writeLog(clock, shooter.name, `ボーナススロー：決まった！ [${score.home} - ${score.away}]`, false, [shooter.id]);
+                            } else {
+                                writeLog(clock, shooter.name, `ボーナススロー：外れる！`, false, [shooter.id]);
+                            }
+                        } else {
+                            // シュート失敗、フリースローのみ
+                            const ftCount = (shotType === "three") ? 3 : 2; 
+                            writeLog(clock, defData.team.name, `${defender.name}がシュートモーションに対してファウル！${shooter.name}がフリースロー獲得（${ftCount}投）！`, false, [shooter.id, defender.id]);
+                            
+                            shooter._box.fta += ftCount;
+                            
+                            for (let f = 1; f <= ftCount; f++) {
+                                if (Math.random() < ftRate) {
+                                    shooter._box.ftm++; 
+                                    shooter._box.pts++;
+                                    addScore(1);
+                                    writeLog(clock, shooter.name, `フリースロー ${f}本目：決まった！ [${score.home} - ${score.away}]`, false, [shooter.id]);
+                                } else {
+                                    writeLog(clock, shooter.name, `フリースロー ${f}本目：外れる！`, false, [shooter.id]);
+                                }
+                            }
+                        }
                     }
                     
+                    // 【課題49】ファウルアウト（退場）処理の厳密化
+                    if (defender._box.pf >= 6) {
+                        writeLog(clock, defData.team.name, `<span style="color:red; font-weight:bold;">【ファウルアウト】</span>${defender.name}が6回目のファウル！退場となります！`, true, [defender.id]);
+                        // 強制交代を実行（ここで defData.court 等の内部参照が更新されることを前提）
+                        checkSubstitution(defData, clock, !isHomeOffense, true); 
+                    }
+
+                    // 【課題48】フリースロー中はクロックを進めない仕様を維持し、ポゼッションを切り替えて次のプレーへ
                     isHomeOffense = !isHomeOffense; 
-                    continue;
+                    continue; // 判定が終了したため、通常のシュート処理には進まずループを抜ける
                 }
+
 
                 // ファウルが起きなかった場合のみ、正規のシュートとしてFGAを加算
                 shooter._box.fga++;
