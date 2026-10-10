@@ -1711,49 +1711,58 @@ window.renderPracticeGrid = function() {
                     checkSubstitution(aData, clock, false);
                 }
 
-                let courtEvals = offData.court.map(p => Math.max(1, evalPlayer(p)));
-                let totalEval = courtEvals.reduce((a,b)=>a+b, 0);
-                let r = Math.random(); let cum = 0; let shooter = offData.court[4];
-                for(let i=0; i<5; i++) {
-                    cum += (courtEvals[i] / totalEval);
-                    if(r < cum) { shooter = offData.court[i]; break; }
-                }
+                         // 【課題1,2 解決】ボール運び役（メインハンドラー）の決定
+                // PG固定ではなく、Playmaking(判断力)とDribble(キープ力)を重視して選出
+                const getBallHandler = (teamData) => {
+                    let weights = teamData.court.map(p => {
+                        let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
+                        let drb = p.currentStats.dribble || 50;
+                        let pass = p.currentStats.pass || 50;
+                        let handlerScore = (pm * 1.5) + (drb * 1.0) + (pass * 0.5);
+                        // PGじゃなくてもセンターが運ぶ事故を防ぐため2乗で差を広げる
+                        return Math.pow(Math.max(1, handlerScore / 50), 2);
+                    });
+                    let totalWeight = weights.reduce((a, b) => a + b, 0);
+                    let rand = Math.random() * totalWeight;
+                    let cum = 0;
+                    for (let i = 0; i < teamData.court.length; i++) {
+                        cum += weights[i];
+                        if (rand < cum) return teamData.court[i];
+                    }
+                    return teamData.court[0];
+                };
 
+                let ballHolder = getBallHandler(offData);
                 let defender = defData.court[Math.floor(Math.random()*5)];
                 
                 let prevDiff = isHome ? (score.home - score.away) : (score.away - score.home);
                 let isClutchTime = (currentQ >= 4 && clock < 120 && Math.abs(prevDiff) <= 5);
                 let mentalBuff = 1.0;
                 if (isClutchTime && prevDiff < 0) {
-                    // ★stats から currentStats に変更
-                    mentalBuff = 1.0 + (shooter.currentStats.mental / 500);
+                    mentalBuff = 1.0 + ((ballHolder.currentStats.mental || 50) / 500);
                 }
 
                 let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
-                // ★stats から currentStats に変更
-                let defensePressure = ((defender.currentStats.defense * 0.35) / 150) + defPressureBonus; 
+                let defensePressure = (((defender.currentStats.defense || 50) * 0.35) / 150) + defPressureBonus; 
 
-                                // --- A. ターンオーバー & スティール判定 ---
-                // ★stats から currentStats に変更
-                let toRisk = 0.18 - (((shooter.currentStats.dribble + shooter.currentStats.pass + (shooter.currentStats.speed*0.5)) * mentalBuff) / 500);
-                if(shooter._condStr === "不調") toRisk += 0.05;
+                // --- A. ハンドラーのターンオーバー & スティール判定 ---
+                // 【課題8 解決】パス失敗とボールロストを区別する土台
+                let toRisk = 0.18 - ((((ballHolder.currentStats.dribble || 50) + (ballHolder.currentStats.pass || 50) + ((ballHolder.currentStats.speed || 50)*0.5)) * mentalBuff) / 500);
+                if(ballHolder._condStr === "不調") toRisk += 0.05;
 
                 if(Math.random() < Math.max(0.04, toRisk)) {
-                    shooter._box.to++;
-                    // ★stats から currentStats に変更
-                    if(Math.random() < ((defender.currentStats.speed / 200) + defPressureBonus)) {
+                    ballHolder._box.to++;
+                    if(Math.random() < (((defender.currentStats.speed || 50) / 200) + defPressureBonus)) {
                         defender._box.stl++;
-                        // ★stats から currentStats に変更
-                        let stlText = defender.currentStats.defense > 120 
+                        let stlText = (defender.currentStats.defense || 50) > 120 
                             ? `${defender.name}がコースを完全によみきり、戦慄のパスカット！！ボールを強奪！`
-                            : `${shooter.name}が仕掛けるも、${defender.name}が電光石火のスティール！`;
-                        writeLog(clock, offData.team.name, stlText, true, [shooter.id, defender.id]);
+                            : `${ballHolder.name}が仕掛けるも、${defender.name}が電光石火のスティール！`;
+                        writeLog(clock, offData.team.name, stlText, true, [ballHolder.id, defender.id]);
                     } else {
-                        // ★stats から currentStats に変更
-                        let toText = shooter.currentStats.pass < 60 && Math.random() < 0.5 
-                            ? `${shooter.name}の無謀なパスが味方に合わずターンオーバー。`
-                            : `${shooter.name}のボールハンドリングが乱れターンオーバー。`;
-                        writeLog(clock, offData.team.name, toText, false, [shooter.id]);
+                        let toText = (ballHolder.currentStats.pass || 50) < 60 && Math.random() < 0.5 
+                            ? `${ballHolder.name}の無謀なパスが味方に合わずターンオーバー。`
+                            : `${ballHolder.name}のボールハンドリングが乱れターンオーバー。`;
+                        writeLog(clock, offData.team.name, toText, false, [ballHolder.id]);
                     }
                     isHomeOffense = !isHomeOffense; 
                     continue;
