@@ -1772,8 +1772,7 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-
-                  // --- 1. パス判断とボール保持者の更新 ---
+                // --- 1. パス判断とボール保持者の更新 ---
                 // 【課題6,7 解決】パスとプレイメイキングの区別、及びボール保持者の遷移
                 let isAssist = false;
                 let playmakerBuff = 0;
@@ -1783,7 +1782,6 @@ window.renderPracticeGrid = function() {
 
                 // 判断力(Playmaking)ベースで「味方にパスするか」を決める
                 let playmakingStat = ballHolder.currentStats.playmaking || ballHolder.currentStats.pass || 50;
-                // 【課題4 解決】パス経由の攻撃を増やすため、プレイメイカーは最大75%の確率でパスを選択
                 let passDecisionProb = Math.min(0.75, (playmakingStat / 150) + 0.15); 
 
                 if (Math.random() < passDecisionProb) {
@@ -1799,9 +1797,10 @@ window.renderPracticeGrid = function() {
                         if(r < cum) { receiver = receiverCandidates[i]; break; }
                     }
 
-                    // 【課題3,5 解決】パス能力(Pass)に基づいて成功判定・バフ計算
+                    // 【修正】パス成功率が最大90%で頭打ちになっていたのを、能力値依存で最大98.5%までスケールさせる
                     let passAbility = ballHolder.currentStats.pass || 50;
-                    let passSuccessProb = passAbility >= 70 ? 0.90 : 0.70; // 基礎的なパスは通りやすくする
+                    // パス能力150なら98.5%、50なら約83%の成功率
+                    let passSuccessProb = Math.min(0.985, 0.75 + (passAbility / 150) * 0.235);
                     
                     if (Math.random() < passSuccessProb) {
                         // パス成功：ボール保持者がレシーバーに移る
@@ -1822,6 +1821,7 @@ window.renderPracticeGrid = function() {
                         continue;
                     }
                 }
+
 
 
                 let stat3 = shooter.currentStats.three || shooter.currentStats["3pt"] || shooter.currentStats.tpt || 30;
