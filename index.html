@@ -1706,13 +1706,28 @@ window.renderPracticeGrid = function() {
                 offData.court.forEach(p => p._box.min += (timeSpent / 60));
                 defData.court.forEach(p => p._box.min += (timeSpent / 60));
 
-                if(Math.random() < 0.15) {
+                          if(Math.random() < 0.15) {
                     checkSubstitution(hData, clock, true);
                     checkSubstitution(aData, clock, false);
                 }
 
+                // 【完全対応1: 課題1, 2, 20解決】毎ポゼッション、ポジションベースの完全なマッチアップを構築
+                const assignMatchups = (off, def) => {
+                    let matchups = new Map();
+                    // ポジションの重みでソートしてマッチさせる（PG同士、C同士が当たるようにする）
+                    const posRank = {"PG":1, "SG":2, "SF":3, "PF":4, "C":5};
+                    let sortedOff = [...off.court].sort((a,b) => (posRank[a.pos]||3) - (posRank[b.pos]||3));
+                    let sortedDef = [...def.court].sort((a,b) => (posRank[a.pos]||3) - (posRank[b.pos]||3));
+                    for(let i = 0; i < 5; i++) {
+                        matchups.set(sortedOff[i].id, sortedDef[i]);
+                    }
+                    return matchups;
+                };
+                let currentMatchups = assignMatchups(offData, defData);
+
                          // 【課題1,2 解決】ボール運び役（メインハンドラー）の決定
                 // PG固定ではなく、Playmaking(判断力)とDribble(キープ力)を重視して選出
+
                 const getBallHandler = (teamData) => {
                     let weights = teamData.court.map(p => {
                         let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
