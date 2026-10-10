@@ -1981,25 +1981,27 @@ window.renderPracticeGrid = function() {
                     let playText = "";
                     let isHigh = false;
                     const involved = [shooter.id, defender.id];
-
-                    if (isAssist) {
-                        passer._box.ast++;
-                        involved.push(passer.id);
+                    // 【課題11 解決】旧システムの後付けサイコロアシストを廃止。実際のパサー(actualPasser)が記録される。
+                    if (isAssist && actualPasser) {
+                        actualPasser._box.ast++;
+                        involved.push(actualPasser.id);
                         
                         const dunkVal = shooter.currentStats.dunk || 50;
                         const layupVal = shooter.currentStats.layup || shooter.currentStats.inside || 50;
-                        const passVal = passer.currentStats.pass || 50;
+                        const passVal = actualPasser.currentStats.pass || 50;
 
+                        // 【課題9 解決】キャッチ＆シュートをただの演出ではなく、実際のパス連携の結果として表示
                         const isAlleyOop = (shotType === "dunk" || shotType === "layup") && passVal > 100 && (dunkVal > 90 || layupVal > 100);
                         if (isAlleyOop && Math.random() < 0.3) {
-                            playText = `<span style="color:#9b59b6; font-weight:bold;">【アリウープ！】</span>${passer.name}の絶妙なロブパスを、空中で受け取った${shooter.name}がそのまま豪快にリングへ叩き込んだ！！！`;
+                            playText = `<span style="color:#9b59b6; font-weight:bold;">【アリウープ！】</span>${actualPasser.name}の絶妙なロブパスを、空中で受け取った${shooter.name}がそのまま豪快にリングへ叩き込んだ！！！`;
                             isHigh = true;
                         } else if (passVal > 120 && Math.random() < 0.3) {
-                            assistText = `<span class="log-assist">#${passer.num} ${passer.name}の変態的なノールックパス ➔ </span>`;
+                            assistText = `<span class="log-assist">#${actualPasser.num} ${actualPasser.name}の変態的なノールックパス ➔ </span>`;
                         } else {
-                            assistText = `<span class="log-assist">#${passer.num} ${passer.name}の的確なアシスト ➔ </span>`;
+                            assistText = `<span class="log-assist">#${actualPasser.num} ${actualPasser.name}の的確なアシスト ➔ </span>`;
                         }
                     }
+
 
 
                     // --- 個人技テキスト（すべての条件分岐と記述を完全維持） ---
