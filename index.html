@@ -1678,8 +1678,10 @@ window.renderPracticeGrid = function() {
         if (hTeam && hTeam.roster) hTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
         if (aTeam && aTeam.roster) aTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
 
-        // --- 試合シミュレーションメインループ ---
-
+           // --- 試合シミュレーションメインループ ---
+        // 【新概念追加】ショットクロックと速攻フラグをQの外（試合全体）で管理する変数として準備
+        let shotClock = 24;
+        let isFastBreak = false;
 
         while (currentQ <= maxQ) {
             let clock = (isOverTime) ? 300 : 720; 
@@ -1695,18 +1697,11 @@ window.renderPracticeGrid = function() {
             }
 
             while(clock > 0) {
-                let timeSpent = Math.floor(Math.random()*12) + 8; 
-                if (clock - timeSpent < 0) timeSpent = clock;
-                clock -= timeSpent;
-
                 let offData = isHomeOffense ? hData : aData;
                 let defData = isHomeOffense ? aData : hData;
                 let isHome = isHomeOffense;
 
-                offData.court.forEach(p => p._box.min += (timeSpent / 60));
-                defData.court.forEach(p => p._box.min += (timeSpent / 60));
-
-                          if(Math.random() < 0.15) {
+                if(Math.random() < 0.15) {
                     checkSubstitution(hData, clock, true);
                     checkSubstitution(aData, clock, false);
                 }
@@ -1714,7 +1709,6 @@ window.renderPracticeGrid = function() {
                 // 【完全対応1: 課題1, 2, 20解決】毎ポゼッション、ポジションベースの完全なマッチアップを構築
                 const assignMatchups = (off, def) => {
                     let matchups = new Map();
-                    // ポジションの重みでソートしてマッチさせる（PG同士、C同士が当たるようにする）
                     const posRank = {"PG":1, "SG":2, "SF":3, "PF":4, "C":5};
                     let sortedOff = [...off.court].sort((a,b) => (posRank[a.pos]||3) - (posRank[b.pos]||3));
                     let sortedDef = [...def.court].sort((a,b) => (posRank[a.pos]||3) - (posRank[b.pos]||3));
@@ -1725,16 +1719,17 @@ window.renderPracticeGrid = function() {
                 };
                 let currentMatchups = assignMatchups(offData, defData);
 
-                         // 【課題1,2 解決】ボール運び役（メインハンドラー）の決定
-                // PG固定ではなく、Playmaking(判断力)とDribble(キープ力)を重視して選出
-
+                // 【課題1,2 解決】ボール運び役（メインハンドラー）の決定
                 const getBallHandler = (teamData) => {
+                    if (isFastBreak) {
+                        // 速攻時はスピードとハンドリングが高い選手が運ぶ
+                        return [...teamData.court].sort((a,b) => ((b.currentStats.speed||50)+(b.currentStats.dribble||50)) - ((a.currentStats.speed||50)+(a.currentStats.dribble||50)))[0];
+                    }
                     let weights = teamData.court.map(p => {
                         let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
                         let drb = p.currentStats.dribble || 50;
                         let pass = p.currentStats.pass || 50;
                         let handlerScore = (pm * 1.5) + (drb * 1.0) + (pass * 0.5);
-                        // PGじゃなくてもセンターが運ぶ事故を防ぐため2乗で差を広げる
                         return Math.pow(Math.max(1, handlerScore / 50), 2);
                     });
                     let totalWeight = weights.reduce((a, b) => a + b, 0);
@@ -1747,10 +1742,11 @@ window.renderPracticeGrid = function() {
                     return teamData.court[0];
                 };
 
-                                let ballHolder = getBallHandler(offData);
+                let ballHolder = getBallHandler(offData);
                 
-                // 【完全対応2: 課題1, 48解決】ランダムディフェンダーを廃止し、マッチアップ相手を割り当て
+                // 【完全対応2: 課題1, 48解決】マッチアップ相手を割り当て
                 let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
+
                 
                 let prevDiff = isHome ? (score.home - score.away) : (score.away - score.home);
                 let isClutchTime = (currentQ >= 4 && clock < 120 && Math.abs(prevDiff) <= 5);
