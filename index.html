@@ -1874,11 +1874,51 @@ window.renderPracticeGrid = function() {
                 else if (shotType === "middle") statUsed = statMid;
                 else if (shotType === "three") statUsed = stat3;
 
-                let baseRate = shotType === "dunk" ? 0.75 : shotType === "layup" ? 0.55 : shotType === "middle" ? 0.45 : 0.37;
+                                let baseRate = shotType === "dunk" ? 0.75 : shotType === "layup" ? 0.55 : shotType === "middle" ? 0.45 : 0.37;
+
+                // 【完全対応4: 課題5, 6, 9, 10, 12, 13, 14, 21解決】シュートタイプに応じた守備・ドライブ判定とヘルプ
+                // シューターに対するマッチアップを再取得（パスで人が変わっている場合があるため）
+                defender = currentMatchups.get(shooter.id) || defData.court[0];
+                
+                let isDriveBeaten = false; 
+                let helpDefender = null;
+
+                // インサイドへのドライブの場合、スピードとフィジカルで突破判定
+                if (shotType === "dunk" || shotType === "layup") {
+                    let driveScore = (shooter.currentStats.speed || 50) + (shooter.currentStats.dribble || 50);
+                    let defScore = (defender.currentStats.speed || 50) + (defender.currentStats.defense || 50);
+                    
+                    if (driveScore > defScore + 10 && Math.random() < 0.6) {
+                        isDriveBeaten = true; // ドライブでマークマンを抜いた
+                    }
+
+                    // 抜かれた、あるいはインサイド攻撃にはビッグマンがヘルプ（リムプロテクト）に来る
+                    let bigmen = defData.court.filter(p => p.pos === "C" || p.pos === "PF").sort((a,b) => (b.currentStats.defense || 50) - (a.currentStats.defense || 50));
+                    if (bigmen.length > 0 && bigmen[0].id !== defender.id) {
+                        helpDefender = bigmen[0];
+                    }
+                }
+
+                // シュートタイプに応じたディフェンスプレッシャー（シュートチェック）の再計算
+                defensePressure = 0;
+                if (shotType === "three" || shotType === "middle") {
+                    // アウトサイド：間合いを詰めるスピードとディフェンス力重視
+                    defensePressure = (((defender.currentStats.defense || 50) * 0.6 + (defender.currentStats.speed || 50) * 0.4) / 150) + defPressureBonus;
+                } else {
+                    // インサイド：フィジカルとディフェンス力重視。ヘルプがいれば圧力が加算される。
+                    let primaryDefEffect = isDriveBeaten ? 0 : (((defender.currentStats.defense || 50) * 0.5 + (defender.currentStats.physical || 50) * 0.5) / 150);
+                    let helpDefEffect = helpDefender ? (((helpDefender.currentStats.defense || 50) * 0.7 + (helpDefender.currentStats.physical || 50) * 0.3) / 200) : 0;
+                    defensePressure = primaryDefEffect + helpDefEffect + defPressureBonus;
+                    
+                    // ヘルプディフェンダーがいれば、ブロック判定の対象（ブロッカー）をビッグマンに切り替える
+                    if (helpDefender && (isDriveBeaten || Math.random() < 0.5)) {
+                        defender = helpDefender; 
+                    }
+                }
 
                 // --- 2. ファウル判定＆終盤ファウルゲーム（課題43〜51対応・超完全版） ---
                 let isFoulGame = false;
-                
+
                 // 【課題43】守備側の点差を正しく計算（負の値なら守備側がビハインド）
                 let defDiff = isHomeOffense ? (score.away - score.home) : (score.home - score.away);
                 
