@@ -1748,43 +1748,89 @@ window.renderPracticeGrid = function() {
                 let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
 
                 
-                let prevDiff = isHome ? (score.home - score.away) : (score.away - score.home);
+                                let prevDiff = isHome ? (score.home - score.away) : (score.away - score.home);
                 let isClutchTime = (currentQ >= 4 && clock < 120 && Math.abs(prevDiff) <= 5);
                 let mentalBuff = 1.0;
                 if (isClutchTime && prevDiff < 0) {
                     mentalBuff = 1.0 + ((ballHolder.currentStats.mental || 50) / 500);
                 }
 
+                // 【新概念：時間消費の根本的再構築と24秒ルールの導入】
+                let timeSpent = 0;
+                if (isFastBreak) {
+                    // 速攻時は2〜5秒で完結
+                    timeSpent = Math.floor(Math.random() * 4) + 2;
+                } else {
+                    // オフェンスIQとディフェンス圧力から組み立て時間を計算
+                    let offIQ = (ballHolder.currentStats.playmaking || 50) + (ballHolder.currentStats.pass || 50);
+                    let defPres = (defender.currentStats.defense || 50) + (defender.currentStats.speed || 50);
+                    let timeBase = 12 + ((defPres - offIQ) / 40); 
+                    
+                    // 終盤で負けている場合は急いで攻める（時間短縮）
+                    if (currentQ >= 4 && clock < 180 && prevDiff < 0) {
+                        timeBase *= 0.6;
+                    }
+                    timeSpent = Math.max(5, Math.min(24, Math.floor(timeBase) + Math.floor(Math.random() * 6) - 2));
+                }
+
+                if (clock - timeSpent < 0) timeSpent = clock;
+                clock -= timeSpent;
+                shotClock -= timeSpent;
+
+                offData.court.forEach(p => p._box.min += (timeSpent / 60));
+                defData.court.forEach(p => p._box.min += (timeSpent / 60));
+
                 let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
                 let defensePressure = (((defender.currentStats.defense || 50) * 0.35) / 150) + defPressureBonus; 
 
+                // 【新概念：24秒バイオレーション判定】
+                if (shotClock <= 0 && clock > 0 && !isFastBreak) {
+                    writeLog(clock, offData.team.name, `⏰ショットクロックバイオレーション！${defData.team.name}の厳しいディフェンスの前に24秒使い切ってしまった！`, false, []);
+                    isHomeOffense = !isHomeOffense;
+                    shotClock = 24;
+                    isFastBreak = false;
+                    continue;
+                }
+
+                // 【新概念：バックコートバイオレーション（8秒ルール等のボール運び失敗）】
+                if (!isFastBreak && shotClock <= 16 && Math.random() < 0.015 - ((ballHolder.currentStats.dribble || 50)/5000)) {
+                    writeLog(clock, offData.team.name, `バックコートバイオレーション！${defender.name}の激しいプレッシャーに遭い、ボール運びでミス！`, false, [ballHolder.id, defender.id]);
+                    ballHolder._box.to++;
+                    isHomeOffense = !isHomeOffense;
+                    shotClock = 24;
+                    isFastBreak = false;
+                    continue;
+                }
+
                 // --- A. ハンドラーのターンオーバー & スティール判定 ---
-                // 【修正】ドリブルとパスの重みを見直し、最低TO確率(0.04)をエリートガード向けに(0.015)まで緩和
                 let handlerStat = ((ballHolder.currentStats.dribble || 50) * 1.2) + ((ballHolder.currentStats.pass || 50) * 0.8) + ((ballHolder.currentStats.speed || 50) * 0.5);
-                let toRisk = 0.15 - ((handlerStat * mentalBuff) / 600);
+                let toRisk = isFastBreak ? 0.08 : (0.15 - ((handlerStat * mentalBuff) / 600)); // 速攻時は少しミスりやすい
                 if(ballHolder._condStr === "不調") toRisk += 0.05;
 
-                // エリートハンドラーは最低1.5%までTO率を下げる (以前は一律4%の底があった)
                 if(Math.random() < Math.max(0.015, toRisk)) {
                     ballHolder._box.to++;
-                    
-                    // 【完全対応3: 課題7, 45解決】スティールはスピード重視かつポジション適性（ガード有利）を加味
                     let stlPosBonus = (defender.pos === "PG" || defender.pos === "SG") ? 1.2 : (defender.pos === "C" || defender.pos === "PF") ? 0.7 : 1.0;
                     let stlChance = ((((defender.currentStats.speed || 50) * 1.5) + ((defender.currentStats.defense || 50) * 0.5)) / 500) * stlPosBonus + defPressureBonus;
                     
                     if(Math.random() < stlChance) {
                         defender._box.stl++;
-                        let stlText = (defender.currentStats.defense || 50) > 120 
-                            ? `${defender.name}がコースを完全によみきり、戦慄のパスカット！！ボールを強奪！`
-                            : `${ballHolder.name}が仕掛けるも、${defender.name}が電光石火のスティール！`;
+                        let stlText = isFastBreak ? `${ballHolder.name}の速攻のパスを${defender.name}が見事にパスカット！` : `${ballHolder.name}が仕掛けるも、${defender.name}が電光石火のスティール！`;
                         writeLog(clock, offData.team.name, stlText, true, [ballHolder.id, defender.id]);
+                        
+                        // 【新概念：スティールからの速攻発生】
+                        if ((defender.currentStats.speed || 50) > 80 && Math.random() < 0.6) {
+                            isFastBreak = true;
+                            writeLog(clock, defData.team.name, `⚡スティールからそのまま速攻へ走る！！！`, true, [defender.id]);
+                        } else {
+                            isFastBreak = false;
+                        }
                     } else {
-                        let toText = (ballHolder.currentStats.pass || 50) < 60 && Math.random() < 0.5 
-                            ? `${ballHolder.name}の無謀なパスが味方に合わずターンオーバー。`
-                            : `${ballHolder.name}のボールハンドリングが乱れターンオーバー。`;
+                        let toText = isFastBreak ? `${ballHolder.name}が速攻で急ぎすぎてボールをこぼしターンオーバー！` : `${ballHolder.name}のボールハンドリングが乱れターンオーバー。`;
                         writeLog(clock, offData.team.name, toText, false, [ballHolder.id]);
+                        isFastBreak = false; // 普通のTOからは速攻なしとする
                     }
                     isHomeOffense = !isHomeOffense; 
+                    shotClock = 24;
                     continue;
                 }
 
