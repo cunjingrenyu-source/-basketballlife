@@ -1745,14 +1745,18 @@ window.renderPracticeGrid = function() {
                 let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
                 let defensePressure = (((defender.currentStats.defense || 50) * 0.35) / 150) + defPressureBonus; 
 
-                // --- A. ハンドラーのターンオーバー & スティール判定 ---
-                // 【課題8 解決】パス失敗とボールロストを区別する土台
-                let toRisk = 0.18 - ((((ballHolder.currentStats.dribble || 50) + (ballHolder.currentStats.pass || 50) + ((ballHolder.currentStats.speed || 50)*0.5)) * mentalBuff) / 500);
+                                // --- A. ハンドラーのターンオーバー & スティール判定 ---
+                // 【修正】ドリブルとパスの重みを見直し、最低TO確率(0.04)をエリートガード向けに(0.015)まで緩和
+                let handlerStat = ((ballHolder.currentStats.dribble || 50) * 1.2) + ((ballHolder.currentStats.pass || 50) * 0.8) + ((ballHolder.currentStats.speed || 50) * 0.5);
+                let toRisk = 0.15 - ((handlerStat * mentalBuff) / 600);
                 if(ballHolder._condStr === "不調") toRisk += 0.05;
 
-                if(Math.random() < Math.max(0.04, toRisk)) {
+                // エリートハンドラーは最低1.5%までTO率を下げる (以前は一律4%の底があった)
+                if(Math.random() < Math.max(0.015, toRisk)) {
                     ballHolder._box.to++;
-                    if(Math.random() < (((defender.currentStats.speed || 50) / 200) + defPressureBonus)) {
+                    // スティール判定（相手のスピード＋ディフェンスを加味）
+                    let stlChance = (((defender.currentStats.speed || 50) + (defender.currentStats.defense || 50)) / 400) + defPressureBonus;
+                    if(Math.random() < stlChance) {
                         defender._box.stl++;
                         let stlText = (defender.currentStats.defense || 50) > 120 
                             ? `${defender.name}がコースを完全によみきり、戦慄のパスカット！！ボールを強奪！`
@@ -1767,6 +1771,7 @@ window.renderPracticeGrid = function() {
                     isHomeOffense = !isHomeOffense; 
                     continue;
                 }
+
 
                   // --- 1. パス判断とボール保持者の更新 ---
                 // 【課題6,7 解決】パスとプレイメイキングの区別、及びボール保持者の遷移
