@@ -1840,7 +1840,7 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-                // --- 1. パス判断とボール保持者の更新 ---
+                            // --- 1. パス判断とボール保持者の更新 ---
                 // 【課題6,7 解決】パスとプレイメイキングの区別、及びボール保持者の遷移
                 let isAssist = false;
                 let playmakerBuff = 0;
@@ -1851,6 +1851,12 @@ window.renderPracticeGrid = function() {
                 // 判断力(Playmaking)ベースで「味方にパスするか」を決める
                 let playmakingStat = ballHolder.currentStats.playmaking || ballHolder.currentStats.pass || 50;
                 let passDecisionProb = Math.min(0.75, (playmakingStat / 150) + 0.15); 
+
+                // 💡【課題解決】ショットクロック残り5秒以下ならパスを極力出さず自分で打ちに行く
+                if (shotClock <= 5) {
+                    passDecisionProb *= 0.15; 
+                }
+
 
                 if (Math.random() < passDecisionProb) {
                     // パスを選択：シューター（レシーバー）をオフェンス評価値から選ぶ
