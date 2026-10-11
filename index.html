@@ -1755,7 +1755,7 @@ window.renderPracticeGrid = function() {
                     mentalBuff = 1.0 + ((ballHolder.currentStats.mental || 50) / 500);
                 }
 
-                // 【新概念：時間消費の根本的再構築と24秒ルールの導入】
+                               // 【新概念：時間消費の根本的再構築と24秒ルールの導入】
                 let timeSpent = 0;
                 if (isFastBreak) {
                     // 速攻時は2〜5秒で完結
@@ -1766,11 +1766,16 @@ window.renderPracticeGrid = function() {
                     let defPres = (defender.currentStats.defense || 50) + (defender.currentStats.speed || 50);
                     let timeBase = 12 + ((defPres - offIQ) / 40); 
                     
-                    // 終盤で負けている場合は急いで攻める（時間短縮）
+                    // 終盤で負けている場合は急いで攻める
                     if (currentQ >= 4 && clock < 180 && prevDiff < 0) {
                         timeBase *= 0.6;
                     }
                     timeSpent = Math.max(5, Math.min(24, Math.floor(timeBase) + Math.floor(Math.random() * 6) - 2));
+
+                    // 💡【課題解決】残りショットクロックが少ない場合、強引にシュートへ行くため消費時間を短縮（自滅バイオレーション防止）
+                    if (shotClock > 0 && shotClock <= timeSpent && Math.random() < 0.85) {
+                        timeSpent = Math.max(1, shotClock - 1); 
+                    }
                 }
 
                 if (clock - timeSpent < 0) timeSpent = clock;
@@ -1783,24 +1788,25 @@ window.renderPracticeGrid = function() {
                 let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
                 let defensePressure = (((defender.currentStats.defense || 50) * 0.35) / 150) + defPressureBonus; 
 
-                // 【新概念：24秒バイオレーション判定】
+                // 【修正】24秒バイオレーション判定（強制シュートロジックにより適正頻度へ減少）
                 if (shotClock <= 0 && clock > 0 && !isFastBreak) {
-                    writeLog(clock, offData.team.name, `⏰ショットクロックバイオレーション！${defData.team.name}の厳しいディフェンスの前に24秒使い切ってしまった！`, false, []);
+                    writeLog(clock, defData.team.name, `⏰ショットクロックバイオレーション！${defender.name}ら守備陣の息詰まるプレッシャーが24秒を守り切った！`, false, [defender.id]);
                     isHomeOffense = !isHomeOffense;
                     shotClock = 24;
                     isFastBreak = false;
                     continue;
                 }
 
-                // 【新概念：バックコートバイオレーション（8秒ルール等のボール運び失敗）】
+                // 【修正】バックコートバイオレーションとプレッシャーの表現強化
                 if (!isFastBreak && shotClock <= 16 && Math.random() < 0.015 - ((ballHolder.currentStats.dribble || 50)/5000)) {
-                    writeLog(clock, offData.team.name, `バックコートバイオレーション！${defender.name}の激しいプレッシャーに遭い、ボール運びでミス！`, false, [ballHolder.id, defender.id]);
+                    writeLog(clock, defData.team.name, `🛡️${defender.name}がボール運びに強烈なプレッシャー！相手は後退を余儀なくされバックコートバイオレーション！`, false, [ballHolder.id, defender.id]);
                     ballHolder._box.to++;
                     isHomeOffense = !isHomeOffense;
                     shotClock = 24;
                     isFastBreak = false;
                     continue;
                 }
+
 
                 // --- A. ハンドラーのターンオーバー & スティール判定 ---
                 let handlerStat = ((ballHolder.currentStats.dribble || 50) * 1.2) + ((ballHolder.currentStats.pass || 50) * 0.8) + ((ballHolder.currentStats.speed || 50) * 0.5);
