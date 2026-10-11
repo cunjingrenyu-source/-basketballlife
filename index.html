@@ -1820,7 +1820,7 @@ window.renderPracticeGrid = function() {
 
 
 
-                          // --- A. ハンドラーのターンオーバー & スティール判定 ---
+                // --- A. ハンドラーのターンオーバー & スティール判定 ---
                 let handlerStat = ((ballHolder.currentStats.dribble || 50) * 1.2) + ((ballHolder.currentStats.pass || 50) * 0.8) + ((ballHolder.currentStats.speed || 50) * 0.5);
                 
                 // 【ターンオーバー適正化】基礎リスクを引き上げ、ディフェンス圧力(defensePressure)を直接リスクに加算
@@ -1831,7 +1831,12 @@ window.renderPracticeGrid = function() {
                 if(ballHolder._stamina < 40) toRisk += 0.05;
                 if(ballHolder._condStr === "不調") toRisk += 0.05;
 
-                               let willFastBreak = false;
+                // 🔴【修正】消し飛んでいた TO判定のif文 と stlChanceの計算 を復元
+                if (Math.random() < toRisk) {
+                    ballHolder._box.to++;
+                    let stlChance = ((defender.currentStats.defense || 50) / 150) + (defensePressure * 0.2);
+                    let willFastBreak = false;
+
                     if(Math.random() < Math.max(0.02, stlChance)) {
                         defender._box.stl++;
                         let stlText = isFastBreak ? `${ballHolder.name}の速攻のパスを${defender.name}が見事にパスカット！` : `${ballHolder.name}の隙を突き、${defender.name}が鋭いスティール！`;
@@ -1848,7 +1853,7 @@ window.renderPracticeGrid = function() {
                     
                     switchPossession(24, willFastBreak); // 🔴新関数適用
                     continue;
-
+                }
 
 
                             // --- 1. パス判断とボール保持者の更新 ---
