@@ -2159,19 +2159,35 @@ window.renderPracticeGrid = function() {
                 shooter._box.fga++;
                 if(shotType === "three") shooter._box.tpa++;
 
-                // --- 3. ブロック＆シュート成功判定（確率キャップ・排他制御） ---
+                              // --- 3. ブロック＆シュート成功判定（オープン度とタフショット処理） ---
                 let abilityBonus = ((statUsed - 30) / 120) * 0.30;
-                let rawRate = (baseRate + abilityBonus) * shooter._cond * mentalBuff - (defensePressure * 0.7) + playmakerBuff;
+                
+                // 【課題1】シューターのIQ・シュート力による「タフショット適性（ペナルティ軽減）」
+                // 優秀なシューターは Heavily Contested でもペナルティを軽減してねじ込める
+                let toughShotMaker = ((statUsed + (shooter.currentStats.mental || 50)) / 250); 
+                let actualPenalty = contestPenalty > 0 ? Math.max(0, contestPenalty - (toughShotMaker * 0.15)) : contestPenalty;
+                
+                // 【課題54】クラッチタイムのスーパーエースはペナルティをほぼ無視する（メンタルバフ）
+                if (isClutchTime && (shooter.currentStats.mental || 50) > 90) actualPenalty *= 0.5;
+
+                // 基礎確率 ＋ 能力ボーナス ＋ アシストバフ − 状況ペナルティ(オープン度)
+                let rawRate = (baseRate + abilityBonus) * shooter._cond - actualPenalty + playmakerBuff;
+
+                // スタミナ低下によるシュート確率減衰
+                if (shooter._stamina < 30) rawRate -= 0.08;
 
                 let ankleBreak = false;
                 if(shooter.currentStats.dribble > defender.currentStats.defense + 20 && Math.random() < 0.15 * shooter._cond) {
                     ankleBreak = true;
-                    rawRate += 0.20; 
+                    rawRate += 0.20; // アンクルブレイク時は実質Wide Open相当のバフ
                 }
 
-                let blockChance = ((defender.currentStats.defense + defender.currentStats.physical) / 300) * 0.08 + defPressureBonus;
-                if(shotType === "dunk") blockChance -= 0.03; 
-                if(shotType === "layup" && statUsed > 110) blockChance -= 0.04; 
+                // ブロック確率（オープン度が高い＝密着しているほどブロックされやすい）
+                let blockChance = ((defender.currentStats.defense + defender.currentStats.physical) / 300) * 0.08;
+                if (contestLevel === "Smothered") blockChance += 0.06;
+                if (contestLevel === "Heavily Contested") blockChance += 0.03;
+                if (shotType === "dunk") blockChance -= 0.03; 
+                if (shotType === "layup" && statUsed > 110) blockChance -= 0.04; 
 
                 if(Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
                     defender._box.blk++;
@@ -2191,7 +2207,11 @@ window.renderPracticeGrid = function() {
                     continue;
                 }
 
-                let finalSuccessRate = Math.min(0.92, Math.max(0.25, rawRate));
+                // 【課題1】最終成功率のキャップ。Wide Openなら最大95%、Smotheredなら最低15%など状況でキャップを変える
+                let minRate = (contestLevel === "Smothered" || contestLevel === "Heavily Contested") ? 0.15 : 0.25;
+                let maxRate = (contestLevel === "Wide Open") ? 0.95 : 0.85;
+                let finalSuccessRate = Math.min(maxRate, Math.max(minRate, rawRate));
+
 
                 if (Math.random() < finalSuccessRate) {
                     const isThree = (shotType === "three");
