@@ -1953,7 +1953,7 @@ window.renderPracticeGrid = function() {
                     }
                 }
 
-                // シュートタイプに応じたディフェンスプレッシャー（シュートチェック）の再計算
+                           // シュートタイプに応じたディフェンスプレッシャー（シュートチェック）の再計算
                 defensePressure = 0;
                 if (shotType === "three" || shotType === "middle") {
                     // アウトサイド：間合いを詰めるスピードとディフェンス力重視
@@ -1969,6 +1969,16 @@ window.renderPracticeGrid = function() {
                         defender = helpDefender; 
                     }
                 }
+                
+                // 💡【課題解決】見えないディフェンス貢献の可視化
+                if (shotClock <= 5 && !isFastBreak && Math.random() < 0.5) {
+                    writeLog(clock, defData.team.name, `⏰ショットクロック残りわずか！${defender.name}が厳しくシュートチェックに出る！`, false, [defender.id]);
+                } else if (defensePressure > 0.45 && Math.random() < 0.3) {
+                    writeLog(clock, defData.team.name, `🛡️${defender.name}が完璧なポジショニング！相手に自由なプレーを許さない！`, false, [defender.id]);
+                } else if (helpDefender && Math.random() < 0.4) {
+                    writeLog(clock, defData.team.name, `🛡️${helpDefender.name}の素早いヘルプディフェンス！ゴール下への侵入を阻む！`, false, [helpDefender.id]);
+                }
+
 
                 // --- 2. ファウル判定＆終盤ファウルゲーム（課題43〜51対応・超完全版） ---
                 let isFoulGame = false;
