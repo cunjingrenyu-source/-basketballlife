@@ -1953,7 +1953,7 @@ window.renderPracticeGrid = function() {
                     }
                 }
 
-                           // シュートタイプに応じたディフェンスプレッシャー（シュートチェック）の再計算
+                                       // シュートタイプに応じたディフェンスプレッシャー（シュートチェック）の再計算
                 defensePressure = 0;
                 if (shotType === "three" || shotType === "middle") {
                     // アウトサイド：間合いを詰めるスピードとディフェンス力重視
@@ -1970,13 +1970,30 @@ window.renderPracticeGrid = function() {
                     }
                 }
                 
-                // 💡【課題解決】見えないディフェンス貢献の可視化
+                // 💡【課題解決】見えないディフェンス貢献の可視化（ガチ守備バリエーション）
                 if (shotClock <= 5 && !isFastBreak && Math.random() < 0.5) {
-                    writeLog(clock, defData.team.name, `⏰ショットクロック残りわずか！${defender.name}が厳しくシュートチェックに出る！`, false, [defender.id]);
+                    const timeLogs = [
+                        `⏰ショットクロック残りわずか！${defender.name}が厳しくシュートチェックに出る！`,
+                        `⏰${defender.name}の激しいプレッシャー！相手は時間がなくなり苦しいシュートを強いられる！`,
+                        `⏰${defender.name}が相手の攻撃を完全に封じ込める！ショットクロックがゼロに迫る！`
+                    ];
+                    writeLog(clock, defData.team.name, timeLogs[Math.floor(Math.random() * timeLogs.length)], false, [defender.id]);
                 } else if (defensePressure > 0.45 && Math.random() < 0.3) {
-                    writeLog(clock, defData.team.name, `🛡️${defender.name}が完璧なポジショニング！相手に自由なプレーを許さない！`, false, [defender.id]);
+                    const presLogs = [
+                        `🛡️${defender.name}が完璧なポジショニング！相手に自由なプレーを許さない！`,
+                        `🛡️${defender.name}がマーク相手に密着！自由に動かせない！`,
+                        `🛡️${defender.name}の圧倒的な存在感！相手が完全に攻めあぐねている！`,
+                        `🛡️${defender.name}が相手の選択肢を奪い、オフェンスを停滞させる！`
+                    ];
+                    writeLog(clock, defData.team.name, presLogs[Math.floor(Math.random() * presLogs.length)], false, [defender.id]);
                 } else if (helpDefender && Math.random() < 0.4) {
-                    writeLog(clock, defData.team.name, `🛡️${helpDefender.name}の素早いヘルプディフェンス！ゴール下への侵入を阻む！`, false, [helpDefender.id]);
+                    const helpLogs = [
+                        `🛡️${helpDefender.name}の素早いヘルプディフェンス！ゴール下への侵入を阻む！`,
+                        `🛡️${helpDefender.name}が瞬時にヘルプへ！味方の突破を完璧にカバー！`,
+                        `🛡️${helpDefender.name}がペイントエリアを死守！相手のレイアップを断念させた！`,
+                        `🛡️相手のドライブを誘導し、${helpDefender.name}の強烈なヘルプに追い込んだ！`
+                    ];
+                    writeLog(clock, defData.team.name, helpLogs[Math.floor(Math.random() * helpLogs.length)], false, [helpDefender.id]);
                 }
 
 
