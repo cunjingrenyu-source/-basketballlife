@@ -2206,9 +2206,10 @@ window.renderPracticeGrid = function() {
                     } else {
                         blkText = `${shooter.name}のシュートを${defender.name}が見事にブロック！`;
                     }
-                    writeLog(clock, defData.team.name, blkText, isBlockHigh, [shooter.id, defender.id]);
-                    isHomeOffense = !isHomeOffense;
+                                      writeLog(clock, defData.team.name, blkText, isBlockHigh, [shooter.id, defender.id]);
+                    switchPossession(24, false); // 🔴新関数適用（ブロック後は一旦セットオフェンス）
                     continue;
+
                 }
 
                 // 【課題1】最終成功率のキャップ。Wide Openなら最大95%、Smotheredなら最低15%など状況でキャップを変える
