@@ -1803,12 +1803,10 @@ window.renderPracticeGrid = function() {
                 let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
                 let defensePressure = (((defender.currentStats.defense || 50) * 0.35) / 150) + defPressureBonus; 
 
-                // 【修正】24秒バイオレーション判定（強制シュートロジックにより適正頻度へ減少）
+                               // 【修正】24秒バイオレーション判定（強制シュートロジックにより適正頻度へ減少）
                 if (shotClock <= 0 && clock > 0 && !isFastBreak) {
                     writeLog(clock, defData.team.name, `⏰ショットクロックバイオレーション！${defender.name}ら守備陣の息詰まるプレッシャーが24秒を守り切った！`, false, [defender.id]);
-                    isHomeOffense = !isHomeOffense;
-                    shotClock = 24;
-                    isFastBreak = false;
+                    switchPossession(24, false); // 🔴新関数適用
                     continue;
                 }
 
@@ -1816,11 +1814,10 @@ window.renderPracticeGrid = function() {
                 if (!isFastBreak && shotClock <= 16 && Math.random() < 0.015 - ((ballHolder.currentStats.dribble || 50)/5000)) {
                     writeLog(clock, defData.team.name, `🛡️${defender.name}がボール運びに強烈なプレッシャー！相手は後退を余儀なくされバックコートバイオレーション！`, false, [ballHolder.id, defender.id]);
                     ballHolder._box.to++;
-                    isHomeOffense = !isHomeOffense;
-                    shotClock = 24;
-                    isFastBreak = false;
+                    switchPossession(24, false); // 🔴新関数適用
                     continue;
                 }
+
 
 
                           // --- A. ハンドラーのターンオーバー & スティール判定 ---
