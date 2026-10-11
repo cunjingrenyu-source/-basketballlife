@@ -2485,9 +2485,8 @@ window.renderPracticeGrid = function() {
                         } else {
                             writeLog(clock, offData.team.name, `${offReber.name}が執念でオフェンスリバウンドを拾う！`, false, [offReber.id]);
                         }
-                        // 【新概念】オフェンスリバウンド時は14秒にリセット
-                        shotClock = 14; 
-                        isFastBreak = false;
+                                        // 【新概念】オフェンスリバウンド時は14秒にリセット
+                        keepPossession(14); // 🔴新関数適用（攻撃権維持、14秒リセット、速攻解除）
                         
                     } else {
                         // ディフェンスリバウンド(DRB)
@@ -2498,10 +2497,11 @@ window.renderPracticeGrid = function() {
                         
                         let spdStat = getStat(defReber, "speed", 50);
                         let passStat = getStat(defReber, "pass", 50);
+                        let nextFb = false;
                         
                         // 【新概念：DRBからの速攻展開】
                         if ((spdStat > 90 || passStat > 90) && Math.random() < 0.35) {
-                            isFastBreak = true;
+                            nextFb = true;
                             if (passStat > 90 && Math.random() < 0.5) {
                                 writeLog(clock, defData.team.name, `⚡${defReber.name}がリバウンドから前線へ鋭いアウトレットパス！一気に速攻へ！`, true, [defReber.id]);
                             } else {
@@ -2509,13 +2509,12 @@ window.renderPracticeGrid = function() {
                             }
                         } else {
                             writeLog(clock, defData.team.name, `${defReber.name}が確実にディフェンスリバウンドを回収。`, false, [defReber.id]);
-                            isFastBreak = false;
                         }
                         
-                        isHomeOffense = !isHomeOffense; 
-                        shotClock = 24; // 攻守交替なので24秒リセット
+                        switchPossession(24, nextFb); // 🔴新関数適用（DRB後は攻守交代、24秒、速攻判定反映）
                         continue;
                     }
+
                 }
             } // while (clock > 0) の正常終了
             
