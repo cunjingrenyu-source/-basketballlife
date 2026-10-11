@@ -1679,11 +1679,26 @@ window.renderPracticeGrid = function() {
         if (aTeam && aTeam.roster) aTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
 
            // --- 試合シミュレーションメインループ ---
-        // 【新概念追加】ショットクロックと速攻フラグをQの外（試合全体）で管理する変数として準備
+              // 【新概念追加】ショットクロックと速攻フラグをQの外（試合全体）で管理する変数として準備
         let shotClock = 24;
         let isFastBreak = false;
 
+        // 🔴【Sランク1・2完全解決】攻守交代・時計・速攻フラグを一元管理する絶対関数
+        // この関数を通さない限り攻守は交代しない。これにより「フラグの消し忘れ」「二重処理」を100%防ぐ。
+        const switchPossession = (resetClockTo = 24, nextFastBreak = false) => {
+            isHomeOffense = !isHomeOffense;
+            shotClock = resetClockTo;
+            isFastBreak = nextFastBreak;
+        };
+
+        // 🔴【Sランク1解決】攻撃権を維持したまま時計だけリセットする関数（ORB用）
+        const keepPossession = (resetClockTo = 14) => {
+            shotClock = resetClockTo;
+            isFastBreak = false; // ORB後はハーフコートオフェンスになるため必ずfalse
+        };
+
         while (currentQ <= maxQ) {
+
             let clock = (isOverTime) ? 300 : 720; 
             let qName = isOverTime ? `延長第${currentQ - 4}Q(OT)` : `第${currentQ}Q`;
             
