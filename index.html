@@ -2035,7 +2035,14 @@ window.renderPracticeGrid = function() {
                 }
 
                 // ファウルゲーム発動時は95%、通常時は能力に応じた確率
-                let foulRisk = isFoulGame ? 0.95 : (0.08 - ((defender.currentStats.defense || 50) / 1500) + ((defender.currentStats.physical || 50) / 1000));
+                                // 【追加視点⑨】ファウル判定とオープン度の連動。激しいチェックはファウルリスクが跳ね上がる。
+                let baseFoulRisk = (0.08 - ((defender.currentStats.defense || 50) / 1500) + ((defender.currentStats.physical || 50) / 1000));
+                if (contestLevel === "Heavily Contested") baseFoulRisk += 0.04;
+                if (contestLevel === "Smothered") baseFoulRisk += 0.12; // 密着時はファウルしやすい
+                if (defender._stamina < 30) baseFoulRisk += 0.05; // 疲労による手を出してしまうファウル
+
+                let foulRisk = isFoulGame ? 0.95 : baseFoulRisk;
+
                 
                 if (Math.random() < Math.min(0.95, Math.max(0.02, foulRisk))) {
                     defender._box.pf++; // ファウルを加算
