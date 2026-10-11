@@ -2280,10 +2280,25 @@ window.renderPracticeGrid = function() {
                     writeLog(clock, offData.team.name, `${assistText}${playText} [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, isHigh, involved);
                     isHomeOffense = !isHomeOffense;
                 } 
-                                        // --- D. シュート失敗 & リバウンド判定 ---
+                // --- D. シュート失敗 & リバウンド判定 ---
                 else {
-                    const missText = (shotType === "three") ? `${shooter.name}の3Pシュートはリングに弾かれる。` : `${shooter.name}がシュートを放つもリングに弾かれる！`;
-                    writeLog(clock, offData.team.name, missText, false, [shooter.id]);
+                    // 💡【課題解決】ディフェンス圧力が高かった場合は「守備の勝利」としてログ出力
+                    let missText = "";
+                    if (defensePressure > 0.45) {
+                        const missLogs = [
+                            `🛡️${defender.name}のタフなディフェンス！${shooter.name}は苦しい体勢からシュートを強いられ外れる！`,
+                            `🛡️${defender.name}の厳しいチェック！${shooter.name}のシュートが大きく逸れた！`,
+                            `🛡️${defender.name}が相手を追い込み、${shooter.name}にタフショットを打たせた！スタッツに残らない好守備！`,
+                            `🛡️${defender.name}の守備に焦った${shooter.name}が無理なシュートを選択しミス！`,
+                            `🛡️${defender.name}が完璧なコースチェック！${shooter.name}のシュートをプレッシャーで外させた！`
+                        ];
+                        missText = missLogs[Math.floor(Math.random() * missLogs.length)];
+                        writeLog(clock, defData.team.name, missText, false, [shooter.id, defender.id]);
+                    } else {
+                        missText = (shotType === "three") ? `${shooter.name}の3Pシュートはリングに弾かれる。` : `${shooter.name}がシュートを放つもリングに弾かれる！`;
+                        writeLog(clock, offData.team.name, missText, false, [shooter.id]);
+                    }
+
                     
                     // 【課題8, 9解決】能力値を安全に取得（0を正常値として扱い、undefined/NaN/Infinityを完全保護）
                     const getStat = (player, key, fallback = 50) => {
