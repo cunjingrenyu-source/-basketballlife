@@ -837,7 +837,7 @@ window.onload = async function() {
 
         const currentId = (typeof playerIdCounter !== 'undefined') ? playerIdCounter++ : Date.now();
         
-        currentUser = {
+                currentUser = {
             id: currentId,
             isUser: true,
             name: name,
@@ -851,7 +851,21 @@ window.onload = async function() {
             teamId: null
         };
 
+        // --- ▼ 今回追加した「スタミナ初手最低C」処理 ▼ ---
+        if (currentUser.stats) {
+            // もしスタミナが数値(1〜100等)で管理されている場合、最低60(C相当)を保証する
+            if (typeof currentUser.stats.stamina === 'number') {
+                currentUser.stats.stamina = Math.max(currentUser.stats.stamina, 60);
+            } 
+            // もしスタミナ値が存在しなかった場合は、とりあえず60(C相当)を入れておく
+            else if (currentUser.stats.stamina === undefined) {
+                currentUser.stats.stamina = 60;
+            }
+        }
+   
+
         const targetTeam = teams[Math.floor(Math.random() * teams.length)];
+
         currentUser.teamId = targetTeam.id;
 
         if (targetTeam && Array.isArray(targetTeam.roster)) {
