@@ -1808,22 +1808,29 @@ window.renderPracticeGrid = function() {
                 }
 
 
-                // --- A. ハンドラーのターンオーバー & スティール判定 ---
+                          // --- A. ハンドラーのターンオーバー & スティール判定 ---
                 let handlerStat = ((ballHolder.currentStats.dribble || 50) * 1.2) + ((ballHolder.currentStats.pass || 50) * 0.8) + ((ballHolder.currentStats.speed || 50) * 0.5);
-                let toRisk = isFastBreak ? 0.08 : (0.15 - ((handlerStat * mentalBuff) / 600)); // 速攻時は少しミスりやすい
+                
+                // 【ターンオーバー適正化】基礎リスクを引き上げ、ディフェンス圧力(defensePressure)を直接リスクに加算
+                let baseToRisk = isFastBreak ? 0.12 : (0.22 - ((handlerStat * mentalBuff) / 1000));
+                let toRisk = baseToRisk + (defensePressure * 0.25); // 守備が強いとTO確率が跳ね上がる
+                
+                // スタミナ低下による疲労ミス
+                if(ballHolder._stamina < 40) toRisk += 0.05;
                 if(ballHolder._condStr === "不調") toRisk += 0.05;
 
-                if(Math.random() < Math.max(0.015, toRisk)) {
+                if(Math.random() < Math.max(0.04, toRisk)) {
                     ballHolder._box.to++;
                     let stlPosBonus = (defender.pos === "PG" || defender.pos === "SG") ? 1.2 : (defender.pos === "C" || defender.pos === "PF") ? 0.7 : 1.0;
-                    let stlChance = ((((defender.currentStats.speed || 50) * 1.5) + ((defender.currentStats.defense || 50) * 0.5)) / 500) * stlPosBonus + defPressureBonus;
                     
-                    if(Math.random() < stlChance) {
+                    // 【スティール確率適正化】ディフェンス能力によるスティール成功率を底上げ
+                    let stlChance = ((((defender.currentStats.speed || 50) * 1.5) + ((defender.currentStats.defense || 50) * 1.0)) / 600) * stlPosBonus + defPressureBonus;
+                    
+                    if(Math.random() < Math.max(0.02, stlChance)) {
                         defender._box.stl++;
-                        let stlText = isFastBreak ? `${ballHolder.name}の速攻のパスを${defender.name}が見事にパスカット！` : `${ballHolder.name}が仕掛けるも、${defender.name}が電光石火のスティール！`;
-                        writeLog(clock, offData.team.name, stlText, true, [ballHolder.id, defender.id]);
+                        let stlText = isFastBreak ? `${ballHolder.name}の速攻のパスを${defender.name}が見事にパスカット！` : `${ballHolder.name}の隙を突き、${defender.name}が鋭いスティール！`;
+                        writeLog(clock, defData.team.name, stlText, true, [ballHolder.id, defender.id]);
                         
-                        // 【新概念：スティールからの速攻発生】
                         if ((defender.currentStats.speed || 50) > 80 && Math.random() < 0.6) {
                             isFastBreak = true;
                             writeLog(clock, defData.team.name, `⚡スティールからそのまま速攻へ走る！！！`, true, [defender.id]);
@@ -1831,14 +1838,15 @@ window.renderPracticeGrid = function() {
                             isFastBreak = false;
                         }
                     } else {
-                        let toText = isFastBreak ? `${ballHolder.name}が速攻で急ぎすぎてボールをこぼしターンオーバー！` : `${ballHolder.name}のボールハンドリングが乱れターンオーバー。`;
+                        let toText = isFastBreak ? `${ballHolder.name}が速攻で急ぎすぎてボールをこぼしターンオーバー！` : `激しいマークに遭い、${ballHolder.name}がボールを失ってターンオーバー。`;
                         writeLog(clock, offData.team.name, toText, false, [ballHolder.id]);
-                        isFastBreak = false; // 普通のTOからは速攻なしとする
+                        isFastBreak = false; 
                     }
                     isHomeOffense = !isHomeOffense; 
                     shotClock = 24;
                     continue;
                 }
+
 
                             // --- 1. パス判断とボール保持者の更新 ---
                 // 【課題6,7 解決】パスとプレイメイキングの区別、及びボール保持者の遷移
