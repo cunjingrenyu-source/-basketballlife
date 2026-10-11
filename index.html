@@ -1898,12 +1898,13 @@ window.renderPracticeGrid = function() {
                             playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
                         }
                     } else {
-                        // 【課題8 解決】パス失敗（ターンオーバー）
+                                             // 【課題8 解決】パス失敗（ターンオーバー）
                         actualPasser = ballHolder;
                         actualPasser._box.to++;
                         writeLog(clock, offData.team.name, `${actualPasser.name}のパスが乱れ、ボールがコート外へ。ターンオーバー。`, false, [actualPasser.id]);
-                        isHomeOffense = !isHomeOffense; 
+                        switchPossession(24, false); // 🔴新関数適用
                         continue;
+
                     }
                 }
 
