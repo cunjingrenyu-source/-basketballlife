@@ -1938,70 +1938,88 @@ window.renderPracticeGrid = function() {
 
                                 let baseRate = shotType === "dunk" ? 0.75 : shotType === "layup" ? 0.55 : shotType === "middle" ? 0.45 : 0.37;
 
-                // 【完全対応4: 課題5, 6, 9, 10, 12, 13, 14, 21解決】シュートタイプに応じた守備・ドライブ判定とヘルプ
-                // シューターに対するマッチアップを再取得（パスで人が変わっている場合があるため）
+                         // 【完全対応4: 課題1, 2, 9解決】6段階オープン度判定（Shot Contest System）とドライブヘルプ
                 defender = currentMatchups.get(shooter.id) || defData.court[0];
                 
                 let isDriveBeaten = false; 
                 let helpDefender = null;
 
-                // インサイドへのドライブの場合、スピードとフィジカルで突破判定
                 if (shotType === "dunk" || shotType === "layup") {
                     let driveScore = (shooter.currentStats.speed || 50) + (shooter.currentStats.dribble || 50);
                     let defScore = (defender.currentStats.speed || 50) + (defender.currentStats.defense || 50);
                     
                     if (driveScore > defScore + 10 && Math.random() < 0.6) {
-                        isDriveBeaten = true; // ドライブでマークマンを抜いた
+                        isDriveBeaten = true; 
                     }
-
-                    // 抜かれた、あるいはインサイド攻撃にはビッグマンがヘルプ（リムプロテクト）に来る
                     let bigmen = defData.court.filter(p => p.pos === "C" || p.pos === "PF").sort((a,b) => (b.currentStats.defense || 50) - (a.currentStats.defense || 50));
                     if (bigmen.length > 0 && bigmen[0].id !== defender.id) {
                         helpDefender = bigmen[0];
                     }
                 }
 
-                                       // シュートタイプに応じたディフェンスプレッシャー（シュートチェック）の再計算
-                defensePressure = 0;
+                // 【課題1】オープン度（Contest Value）の算出。低いほどフリー、高いほど密着。
+                let contestValue = 0;
                 if (shotType === "three" || shotType === "middle") {
-                    // アウトサイド：間合いを詰めるスピードとディフェンス力重視
-                    defensePressure = (((defender.currentStats.defense || 50) * 0.6 + (defender.currentStats.speed || 50) * 0.4) / 150) + defPressureBonus;
+                    // アウトサイド：ディフェンスのスピードとIQによる間合い詰め
+                    contestValue = ((defender.currentStats.defense || 50) * 0.6 + (defender.currentStats.speed || 50) * 0.4) / 120;
                 } else {
-                    // インサイド：フィジカルとディフェンス力重視。ヘルプがいれば圧力が加算される。
-                    let primaryDefEffect = isDriveBeaten ? 0 : (((defender.currentStats.defense || 50) * 0.5 + (defender.currentStats.physical || 50) * 0.5) / 150);
-                    let helpDefEffect = helpDefender ? (((helpDefender.currentStats.defense || 50) * 0.7 + (helpDefender.currentStats.physical || 50) * 0.3) / 200) : 0;
-                    defensePressure = primaryDefEffect + helpDefEffect + defPressureBonus;
+                    // インサイド：フィジカルとリムプロテクト
+                    let primaryDef = isDriveBeaten ? 0 : ((defender.currentStats.defense || 50) * 0.5 + (defender.currentStats.physical || 50) * 0.5) / 120;
+                    let helpDef = helpDefender ? ((helpDefender.currentStats.defense || 50) * 0.7 + (helpDefender.currentStats.physical || 50) * 0.3) / 150 : 0;
+                    contestValue = primaryDef + helpDef;
                     
-                    // ヘルプディフェンダーがいれば、ブロック判定の対象（ブロッカー）をビッグマンに切り替える
-                    if (helpDefender && (isDriveBeaten || Math.random() < 0.5)) {
-                        defender = helpDefender; 
-                    }
+                    if (helpDefender && (isDriveBeaten || Math.random() < 0.5)) defender = helpDefender; 
                 }
-                
-                // 💡【課題解決】見えないディフェンス貢献の可視化（ガチ守備バリエーション）
-                if (shotClock <= 5 && !isFastBreak && Math.random() < 0.5) {
-                    const timeLogs = [
-                        `⏰ショットクロック残りわずか！${defender.name}が厳しくシュートチェックに出る！`,
-                        `⏰${defender.name}の激しいプレッシャー！相手は時間がなくなり苦しいシュートを強いられる！`,
-                        `⏰${defender.name}が相手の攻撃を完全に封じ込める！ショットクロックがゼロに迫る！`
-                    ];
-                    writeLog(clock, defData.team.name, timeLogs[Math.floor(Math.random() * timeLogs.length)], false, [defender.id]);
-                } else if (defensePressure > 0.45 && Math.random() < 0.3) {
-                    const presLogs = [
-                        `🛡️${defender.name}が完璧なポジショニング！相手に自由なプレーを許さない！`,
-                        `🛡️${defender.name}がマーク相手に密着！自由に動かせない！`,
-                        `🛡️${defender.name}の圧倒的な存在感！相手が完全に攻めあぐねている！`,
-                        `🛡️${defender.name}が相手の選択肢を奪い、オフェンスを停滞させる！`
-                    ];
-                    writeLog(clock, defData.team.name, presLogs[Math.floor(Math.random() * presLogs.length)], false, [defender.id]);
-                } else if (helpDefender && Math.random() < 0.4) {
-                    const helpLogs = [
-                        `🛡️${helpDefender.name}の素早いヘルプディフェンス！ゴール下への侵入を阻む！`,
-                        `🛡️${helpDefender.name}が瞬時にヘルプへ！味方の突破を完璧にカバー！`,
-                        `🛡️${helpDefender.name}がペイントエリアを死守！相手のレイアップを断念させた！`,
-                        `🛡️相手のドライブを誘導し、${helpDefender.name}の強烈なヘルプに追い込んだ！`
-                    ];
-                    writeLog(clock, defData.team.name, helpLogs[Math.floor(Math.random() * helpLogs.length)], false, [helpDefender.id]);
+
+                // ランダム要素と時間プレッシャーを加味して最終的な状況を決定
+                contestValue *= (0.7 + Math.random() * 0.6);
+                if (shotClock <= 3 && !isFastBreak) contestValue += 0.4; // 時間がないとタフショットになる
+                if (isFastBreak) contestValue -= 0.5; // 速攻は基本フリー
+
+                // 【課題1】6段階のオープン度(Shot Contest Level)の確定
+                let contestLevel = "Wide Open";
+                let contestPenalty = 0.0; // 成功率へのマイナス補正
+                let staminaDrain = 0;     // 攻撃・守備双方のスタミナ消費量
+
+                if (contestValue <= 0.2) {
+                    contestLevel = "Wide Open";
+                    contestPenalty = -0.15; // 逆に成功率アップ
+                    staminaDrain = 1;
+                } else if (contestValue <= 0.5) {
+                    contestLevel = "Open";
+                    contestPenalty = 0.0;
+                    staminaDrain = 2;
+                } else if (contestValue <= 0.8) {
+                    contestLevel = "Semi-Open";
+                    contestPenalty = 0.10;
+                    staminaDrain = 3;
+                } else if (contestValue <= 1.1) {
+                    contestLevel = "Lightly Contested";
+                    contestPenalty = 0.20;
+                    staminaDrain = 4;
+                } else if (contestValue <= 1.4) {
+                    contestLevel = "Heavily Contested";
+                    contestPenalty = 0.35;
+                    staminaDrain = 6;
+                } else {
+                    contestLevel = "Smothered";
+                    contestPenalty = 0.50; // 絶望的なチェック
+                    staminaDrain = 8;
+                }
+
+                // 【課題58】スタミナ消費の適用。激しいコンテストほど両者消耗する
+                if(shooter._stamina) shooter._stamina = Math.max(0, shooter._stamina - staminaDrain);
+                if(defender._stamina) defender._stamina = Math.max(0, defender._stamina - staminaDrain);
+
+                // 【課題4】オープン度に応じた守備ログの出力（ログと内部計算の完全一致）
+                if (contestLevel === "Smothered") {
+                    writeLog(clock, defData.team.name, `🛡️【Smothered】${defender.name}が完全に密着！息の詰まるようなパーフェクトディフェンス！`, false, [defender.id]);
+                } else if (contestLevel === "Heavily Contested") {
+                    writeLog(clock, defData.team.name, `🛡️【Heavily Contested】${defender.name}が厳しくシュートコースを塞ぐ！タフショットを強いる！`, false, [defender.id]);
+                } else if (contestLevel === "Wide Open") {
+                    writeLog(clock, offData.team.name, `🎯【Wide Open】ディフェンスがいない！${shooter.name}が完全にフリーな状態を作る！`, false, [shooter.id]);
+                } else if (helpDefender && (contestLevel === "Lightly Contested" || contestLevel === "Semi-Open")) {
+                    writeLog(clock, defData.team.name, `🛡️${helpDefender.name}が瞬時にヘルプに入り、シュートチェックに飛ぶ！`, false, [helpDefender.id]);
                 }
 
 
