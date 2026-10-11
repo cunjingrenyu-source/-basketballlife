@@ -2153,8 +2153,8 @@ window.renderPracticeGrid = function() {
                         checkSubstitution(defData, clock, !isHomeOffense, true); 
                     }
 
-                    // 【課題48】フリースロー中はクロックを進めない仕様を維持し、ポゼッションを切り替えて次のプレーへ
-                    isHomeOffense = !isHomeOffense; 
+                                       // 【課題48】フリースロー中はクロックを進めない仕様を維持し、ポゼッションを切り替えて次のプレーへ
+                    switchPossession(24, false); // 🔴新関数適用
                     continue; // 判定が終了したため、通常のシュート処理には進まずループを抜ける
                 }
 
