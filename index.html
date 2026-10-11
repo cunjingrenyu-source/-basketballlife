@@ -2334,10 +2334,10 @@ window.renderPracticeGrid = function() {
                             }
                         }
                     }
-
                     writeLog(clock, offData.team.name, `${assistText}${playText} [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, isHigh, involved);
-                    isHomeOffense = !isHomeOffense;
+                    switchPossession(24, false); // 🔴新関数適用（得点後は必ず相手の24秒スタート）
                 } 
+
                 // --- D. シュート失敗 & リバウンド判定 ---
                 else {
                     // 💡【課題解決】ディフェンス圧力が高かった場合は「守備の勝利」としてログ出力
