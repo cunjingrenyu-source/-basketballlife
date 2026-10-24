@@ -3398,6 +3398,26 @@ window.renderPracticeGrid = function() {
         GOD.ui.errHUD.innerText = '0';
         coreLog("🧹 ログ・エラー・全履歴バッファをクリアしました", "#00ffcc", "SYSTEM");
     });
+        // --- 【追加】マスター表示トグル処理 ---
+    const masterToggleBtn = document.getElementById('god-master-toggle');
+    const debugHud = document.getElementById('god-debug-hud');
+    const debugContainer = document.getElementById('custom-debug-container');
+    let isDebugVisible = true;
+
+    masterToggleBtn.addEventListener('click', () => {
+        isDebugVisible = !isDebugVisible;
+        
+        // HUD（上部）とコンソール（下部）の表示切り替え
+        debugHud.style.display = isDebugVisible ? 'flex' : 'none';
+        debugContainer.style.display = isDebugVisible ? 'block' : 'none';
+        
+        // ボタン自体の見た目変更
+        masterToggleBtn.innerText = isDebugVisible ? '▼ 隠す' : '▲ 開く';
+        masterToggleBtn.style.color = isDebugVisible ? '#00ffcc' : '#888';
+        masterToggleBtn.style.borderColor = isDebugVisible ? '#00ffcc' : '#444';
+        masterToggleBtn.style.background = isDebugVisible ? 'rgba(6,6,10,0.9)' : 'rgba(3,3,5,0.7)';
+    });
+
 
     // 初期起動＆自動スキャン
     window.addEventListener('load', () => {
