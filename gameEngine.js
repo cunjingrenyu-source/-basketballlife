@@ -1,4 +1,4 @@
-// gameEngine.js
+メモだよー
 function runGameSimulation(hTeam, aTeam, isVisual = true) {
     let logs = [];
     let score = { home: 0, away: 0 };
