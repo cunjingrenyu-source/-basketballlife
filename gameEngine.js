@@ -1,13 +1,9 @@
-メモだよー
-function runGameSimulation(hTeam, aTeam, isVisual = true) {
-    let logs = [];
-    let score = { home: 0, away: 0 };
-    let qScores = { home: [], away: [] };
-    
-    let hData = { team: hTeam, court: [...hTeam.roster.slice(0, 5)] };
-    let aData = { team: aTeam, court: [...aTeam.roster.slice(0, 5)] };
+let isHomeOffense = Math.random() > 0.5;
+        let currentQ = 1;
+        let maxQ = 4;
+        let isOverTime = false;
 
-    // ==========================================        // =========================================================
+                 // =========================================================
         // 【追加】試合開始前に全選手へ「実質ステータス(currentStats)」を付与
         // =========================================================
         if (hTeam && hTeam.roster) hTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
@@ -860,14 +856,112 @@ function runGameSimulation(hTeam, aTeam, isVisual = true) {
             
             currentQ++;
         } // while (currentQ <= maxQ) の正常終了
-    // 最後に結果を返す
-    return { score, qScores, logs, hData, aData };
-}
 
-let isHomeOffense = Math.random() > 0.5;
-        let currentQ = 1;
-        let maxQ = 4;
-        let isOverTime = false;
 
-         
 
+        // --- 個人スタッツのグローバル反映＆IndexedDB保存 ---
+        const commitToGlobalStats = (teamState, isH) => {
+            const joinedLogs = logs.join('');
+            const currentRnd = typeof currentRound !== 'undefined' ? currentRound : 1;
+            const oppTeamName = isH ? aTeam.name : hTeam.name;
+            const isWin = (isH && score.home > score.away) || (!isH && score.away > score.home);
+
+            teamState.team.roster.forEach(p => {
+                const gb = p._box; 
+                if (!gb) return;
+
+                p.box.g++; 
+                if (gb.gs) p.box.gs++;
+                Object.keys(gb).forEach(k => { 
+                    if (k !== 'g' && k !== 'gs') p.box[k] += gb[k]; 
+                });
+                
+                if (p.isUser) {
+                    const logId = `match_${Date.now()}_${currentRnd}_${p.id}`;
+                    
+                    p.gameLog.push({
+                        round: currentRnd, 
+                        oppName: oppTeamName,
+                        result: isWin ? "WIN" : "LOSE",
+                        teamScore: isH ? score.home : score.away, 
+                        oppScore: isH ? score.away : score.home,
+                        pts: gb.pts || 0, 
+                        reb: gb.reb || 0, 
+                        ast: gb.ast || 0,
+                        logId: logId, 
+                        matchDetails: {
+                            hTeamName: hTeam.name, 
+                            aTeamName: aTeam.name, 
+                            hScore: score.home, 
+                            aScore: score.away,
+                            qScoresHome: [...qScores.home], 
+                            qScoresAway: [...qScores.away]
+                        }
+                    });
+
+                    if (typeof saveToIDB === 'function') {
+                        saveToIDB(logId, { logsHtml: joinedLogs })
+                            .catch(e => console.error(`[IDB保存エラー] logId: ${logId}`, e));
+                    }
+                }
+            });
+        };
+
+        commitToGlobalStats(hData, true); 
+        commitToGlobalStats(aData, false);
+
+        // --- ビジュアル（UI）描画処理 ---
+        if(isVisual) {
+            const scoreEl = document.getElementById('match-score');
+            if (scoreEl) scoreEl.innerText = `${score.home} - ${score.away}`;
+            
+            const t1El = document.getElementById('match-team1');
+            if (t1El) t1El.innerText = hTeam.name;
+            
+            const t2El = document.getElementById('match-team2');
+            if (t2El) t2El.innerText = aTeam.name;
+            
+            let sbHtml = `<tr><th>TEAM</th>`;
+            for(let i=0; i<qScores.home.length; i++) sbHtml += `<th>${i<4 ? (i+1)+'Q' : 'OT'+(i-3)}</th>`;
+            sbHtml += `<th>TOT</th></tr>`;
+            
+            sbHtml += `<tr><td class="clickable-team" onclick="showRoster(${hTeam.id})">${hTeam.name}</td>`;
+            qScores.home.forEach(qs => sbHtml += `<td>${qs}</td>`);
+            sbHtml += `<td style="color:#e74c3c; font-weight:bold;">${score.home}</td></tr>`;
+            
+            sbHtml += `<tr><td class="clickable-team" onclick="showRoster(${aTeam.id})">${aTeam.name}</td>`;
+            qScores.away.forEach(qs => sbHtml += `<td>${qs}</td>`);
+            sbHtml += `<td style="color:#e74c3c; font-weight:bold;">${score.away}</td></tr>`;
+            
+            let sbElem = document.getElementById('match-scoreboard');
+            if(sbElem) sbElem.innerHTML = sbHtml;
+            
+            let logContainer = document.getElementById('match-log');
+            if(logContainer) logContainer.innerHTML = logs.reverse().join('');
+
+            let titleHome = document.getElementById('boxscore-title-home');
+            if(titleHome) titleHome.innerText = `🏠 ${hTeam.name} 個人スタッツ`;
+            
+            let titleAway = document.getElementById('boxscore-title-away');
+            if(titleAway) titleAway.innerText = `🚀 ${aTeam.name} 個人スタッツ`;
+
+            const fillBoxScoreTable = (targetTableId, roster) => {
+                let t = document.getElementById(targetTableId);
+                if(!t) return;
+                if(typeof generateTableHeaderHtml === "function" && typeof generatePlayerRowHtml === "function"){
+                    let html = generateTableHeaderHtml();
+                    roster.sort((a,b) => b._box.pts - a._box.pts).forEach(p => {
+                        html += `<tr>${generatePlayerRowHtml(p, p._box, false)}</tr>`;
+                    });
+                    t.innerHTML = html;
+                }
+            };
+
+            fillBoxScoreTable('match-box-home', hTeam.roster);
+            fillBoxScoreTable('match-box-away', aTeam.roster);
+            
+            if(typeof renderMiniScoreboard === "function") renderMiniScoreboard(hTeam.name, aTeam.name, qScores, score);
+            if(typeof switchMatchTab === "function") setTimeout(() => { switchMatchTab('full'); }, 50);
+        }
+    };
+</script>
