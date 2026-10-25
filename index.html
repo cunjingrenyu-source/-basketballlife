@@ -1700,19 +1700,31 @@ window.renderPracticeGrid = function() {
         if (hTeam && hTeam.roster) hTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
         if (aTeam && aTeam.roster) aTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
 
-        // 🔴【Sランク1・2完全解決】攻守交代・時計・速攻フラグを一元管理する絶対関数
-        // この関数を通さない限り攻守は交代しない。これにより「フラグの消し忘れ」「二重処理」を100%防ぐ。
+           // 🔴【第1章】攻守交代・時計・速攻フラグを一元管理する絶対関数（gameState連動）
+        // この関数を通さない限り攻守は交代しない。これにより不整合を100%防ぐ。
         const switchPossession = (resetClockTo = 24, nextFastBreak = false) => {
-            isHomeOffense = !isHomeOffense;
-            shotClock = resetClockTo;
-            isFastBreak = nextFastBreak;
+            gameState.isHomeOffense = !gameState.isHomeOffense;
+            gameState.shotClock = resetClockTo;
+            gameState.isFastBreak = nextFastBreak;
+            gameState.phase = 'live'; // 攻守交代で必ずライブ状態に戻る
         };
 
-        // 🔴【Sランク1解決】攻撃権を維持したまま時計だけリセットする関数（ORB用）
+        // 🔴【第1章】攻撃権を維持したまま時計だけリセットする関数（ORB用）
         const keepPossession = (resetClockTo = 14) => {
-            shotClock = resetClockTo;
-            isFastBreak = false; // ORB後はハーフコートオフェンスになるため必ずfalse
+            gameState.shotClock = resetClockTo;
+            gameState.isFastBreak = false; // ORB後は必ずハーフコートオフェンス
+            gameState.phase = 'live';
         };
+
+        // 🔴【第1章】タイマーの共通減算処理
+        // 試合時計とショットクロックを同時に減算し、0未満にならないように保護する
+        const consumeTime = (seconds) => {
+            let actualSpent = Math.min(gameState.clock, seconds);
+            gameState.clock -= actualSpent;
+            gameState.shotClock -= actualSpent;
+            return actualSpent;
+        };
+
 
         while (currentQ <= maxQ) {
 
