@@ -1726,31 +1726,32 @@ window.renderPracticeGrid = function() {
         };
 
 
-        while (currentQ <= maxQ) {
-
-            let clock = (isOverTime) ? 300 : 720; 
-            let qName = isOverTime ? `延長第${currentQ - 4}Q(OT)` : `第${currentQ}Q`;
+           while (gameState.currentQ <= gameState.maxQ) {
+            // 【第1章】各クォーター開始時の時計とフェーズのリセット
+            gameState.clock = gameState.isOverTime ? 300 : 720; 
+            let qName = gameState.isOverTime ? `延長第${gameState.currentQ - 4}Q(OT)` : `第${gameState.currentQ}Q`;
             
             if(isVisual) {
                 logs.push(`<div class="log-entry"><span class="log-time">残り--:--</span><span class="log-highlight">🏀 ${qName} 開始 🏀</span></div>`);
-                if(currentQ === 1) {
-                    writeLog(clock, hTeam.name, `【スターティング5】 ${getNames(hData.court)}`);
-                    writeLog(clock, aTeam.name, `【スターティング5】 ${getNames(aData.court)}`);
-                    writeLog(clock, "両チーム", `ティップオフ！試合開始！`);
+                if(gameState.currentQ === 1) {
+                    writeLog(gameState.clock, hTeam.name, `【スターティング5】 ${getNames(hData.court)}`);
+                    writeLog(gameState.clock, aTeam.name, `【スターティング5】 ${getNames(aData.court)}`);
+                    writeLog(gameState.clock, "両チーム", `ティップオフ！試合開始！`);
                 }
             }
 
-            while(clock > 0) {
-                let offData = isHomeOffense ? hData : aData;
-                let defData = isHomeOffense ? aData : hData;
-                let isHome = isHomeOffense;
+            while(gameState.clock > 0) {
+                let offData = gameState.isHomeOffense ? hData : aData;
+                let defData = gameState.isHomeOffense ? aData : hData;
+                let isHome = gameState.isHomeOffense;
 
+                // 交代チェック（既存ロジック維持・第2章でさらに拡張）
                 if(Math.random() < 0.15) {
-                    checkSubstitution(hData, clock, true);
-                    checkSubstitution(aData, clock, false);
+                    checkSubstitution(hData, gameState.clock, true);
+                    checkSubstitution(aData, gameState.clock, false);
                 }
 
-                // 【完全対応1: 課題1, 2, 20解決】毎ポゼッション、ポジションベースの完全なマッチアップを構築
+                // 【既存維持】毎ポゼッション、ポジションベースの完全なマッチアップを構築
                 const assignMatchups = (off, def) => {
                     let matchups = new Map();
                     const posRank = {"PG":1, "SG":2, "SF":3, "PF":4, "C":5};
@@ -1763,17 +1764,20 @@ window.renderPracticeGrid = function() {
                 };
                 let currentMatchups = assignMatchups(offData, defData);
 
-                // 【課題1,2 解決】ボール運び役（メインハンドラー）の決定
+                // 【付加価値UP】ボール運び役の決定に「ポジション適性(PG)」と「疲労度」の概念を追加
                 const getBallHandler = (teamData) => {
-                    if (isFastBreak) {
-                        // 速攻時はスピードとハンドリングが高い選手が運ぶ
+                    if (gameState.isFastBreak) {
                         return [...teamData.court].sort((a,b) => ((b.currentStats.speed||50)+(b.currentStats.dribble||50)) - ((a.currentStats.speed||50)+(a.currentStats.dribble||50)))[0];
                     }
                     let weights = teamData.court.map(p => {
                         let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
                         let drb = p.currentStats.dribble || 50;
                         let pass = p.currentStats.pass || 50;
-                        let handlerScore = (pm * 1.5) + (drb * 1.0) + (pass * 0.5);
+                        let posBonus = (p.pos === "PG") ? 1.5 : (p.pos === "SG") ? 1.2 : 1.0;
+                        // 疲労している選手はボール運びを避ける傾向
+                        let staminaFactor = (p._stamina !== undefined) ? Math.max(0.5, p._stamina / 100) : 1.0;
+                        
+                        let handlerScore = ((pm * 1.5) + (drb * 1.0) + (pass * 0.5)) * posBonus * staminaFactor;
                         return Math.pow(Math.max(1, handlerScore / 50), 2);
                     });
                     let totalWeight = weights.reduce((a, b) => a + b, 0);
@@ -1787,64 +1791,81 @@ window.renderPracticeGrid = function() {
                 };
 
                 let ballHolder = getBallHandler(offData);
-                
-                // 【完全対応2: 課題1, 48解決】マッチアップ相手を割り当て
                 let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
 
-                
-                                let prevDiff = isHome ? (score.home - score.away) : (score.away - score.home);
-                let isClutchTime = (currentQ >= 4 && clock < 120 && Math.abs(prevDiff) <= 5);
+                // 【既存維持】クラッチタイムとメンタルバフの計算
+                let prevDiff = isHome ? (score.home - score.away) : (score.away - score.home);
+                let isClutchTime = (gameState.currentQ >= 4 && gameState.clock < 120 && Math.abs(prevDiff) <= 5);
                 let mentalBuff = 1.0;
                 if (isClutchTime && prevDiff < 0) {
                     mentalBuff = 1.0 + ((ballHolder.currentStats.mental || 50) / 500);
                 }
 
-                               // 【新概念：時間消費の根本的再構築と24秒ルールの導入】
+                // =========================================================
+                // 🔴【超絶強化】高度なクロックマネジメントと時間消費ロジック
+                // 単なるランダムではなく、実際の戦術（2-for-1、ラストショット狙い）を再現
+                // =========================================================
                 let timeSpent = 0;
-                if (isFastBreak) {
-                    // 速攻時は2〜5秒で完結
-                    timeSpent = Math.floor(Math.random() * 4) + 2;
+                if (gameState.isFastBreak) {
+                    timeSpent = Math.floor(Math.random() * 4) + 2; // 速攻は2〜5秒
                 } else {
-                    // オフェンスIQとディフェンス圧力から組み立て時間を計算
                     let offIQ = (ballHolder.currentStats.playmaking || 50) + (ballHolder.currentStats.pass || 50);
                     let defPres = (defender.currentStats.defense || 50) + (defender.currentStats.speed || 50);
                     let timeBase = 12 + ((defPres - offIQ) / 40); 
                     
-                    // 終盤で負けている場合は急いで攻める
-                    if (currentQ >= 4 && clock < 180 && prevDiff < 0) {
+                    // 【戦術AI 1】ビハインド時の急ぎ
+                    if (gameState.currentQ >= 4 && gameState.clock < 180 && prevDiff < 0) {
                         timeBase *= 0.6;
                     }
+                    
                     timeSpent = Math.max(5, Math.min(24, Math.floor(timeBase) + Math.floor(Math.random() * 6) - 2));
 
-                    // 💡【課題解決】残りショットクロックが少ない場合、強引にシュートへ行くため消費時間を短縮（自滅バイオレーション防止）
-                    if (shotClock > 0 && shotClock <= timeSpent && Math.random() < 0.85) {
-                        timeSpent = Math.max(1, shotClock - 1); 
+                    // 【戦術AI 2】2-for-1 シチュエーション（残り30〜40秒なら早打ちして攻撃権をもう一度得る）
+                    if (gameState.clock > 30 && gameState.clock < 40 && gameState.shotClock === 24) {
+                        timeSpent = Math.floor(Math.random() * 4) + 5; // 5〜8秒で強引に攻める
+                    }
+                    // 【戦術AI 3】クォーターエンドのラストショット狙い（ショットクロック・オフ時）
+                    else if (gameState.clock <= 24 && gameState.shotClock >= gameState.clock) {
+                        // 残り時間が24秒以下なら、相手に時間を残さないよう残り1〜3秒までボールをキープする
+                        timeSpent = Math.max(1, gameState.clock - (Math.floor(Math.random() * 3) + 1));
+                    }
+                    // 残りショットクロックが少ない場合の自滅防止（既存ロジック維持）
+                    else if (gameState.shotClock > 0 && gameState.shotClock <= timeSpent && Math.random() < 0.85) {
+                        timeSpent = Math.max(1, gameState.shotClock - 1); 
                     }
                 }
 
-                if (clock - timeSpent < 0) timeSpent = clock;
-                clock -= timeSpent;
-                shotClock -= timeSpent;
+                // 共通関数を用いて安全に時計を進める（gameStateの同期）
+                let actualSpent = consumeTime(timeSpent);
 
-                offData.court.forEach(p => p._box.min += (timeSpent / 60));
-                defData.court.forEach(p => p._box.min += (timeSpent / 60));
+                // 【既存維持】出場時間の加算
+                offData.court.forEach(p => { if(p._box) p._box.min += (actualSpent / 60); });
+                defData.court.forEach(p => { if(p._box) p._box.min += (actualSpent / 60); });
 
                 let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
                 let defensePressure = (((defender.currentStats.defense || 50) * 0.35) / 150) + defPressureBonus; 
 
-                               // 【修正】24秒バイオレーション判定（強制シュートロジックにより適正頻度へ減少）
-                if (shotClock <= 0 && clock > 0 && !isFastBreak) {
-                    writeLog(clock, defData.team.name, `⏰ショットクロックバイオレーション！${defender.name}ら守備陣の息詰まるプレッシャーが24秒を守り切った！`, false, [defender.id]);
-                    switchPossession(24, false); // 🔴新関数適用
+                // =========================================================
+                // 🔴【修正・強化】バイオレーション判定の厳密化
+                // =========================================================
+                // 1. 24秒バイオレーション（ショットクロックが0以下に到達した場合）
+                if (gameState.shotClock <= 0 && gameState.clock > 0 && !gameState.isFastBreak) {
+                    writeLog(gameState.clock, defData.team.name, `⏰ショットクロックバイオレーション！${defender.name}ら守備陣の息詰まるプレッシャーが24秒を守り切った！`, false, [defender.id]);
+                    switchPossession(24, false);
                     continue;
                 }
 
-                // 【修正】バックコートバイオレーションとプレッシャーの表現強化
-                if (!isFastBreak && shotClock <= 16 && Math.random() < 0.015 - ((ballHolder.currentStats.dribble || 50)/5000)) {
-                    writeLog(clock, defData.team.name, `🛡️${defender.name}がボール運びに強烈なプレッシャー！相手は後退を余儀なくされバックコートバイオレーション！`, false, [ballHolder.id, defender.id]);
-                    ballHolder._box.to++;
-                    switchPossession(24, false); // 🔴新関数適用
-                    continue;
+                // 2. 8秒ルール（バックコートバイオレーション）の論理的判定
+                // 単なるランダムではなく「8秒以上経過(ショットクロック16以下) ＋ ディフェンス圧力がハンドラーの能力を凌駕」した場合に発生
+                if (!gameState.isFastBreak && actualSpent >= 8 && gameState.shotClock <= 16) {
+                    let dribbleSkill = ballHolder.currentStats.dribble || 50;
+                    // 守備圧力が高い、かつランダム要素（プレッシャーによるミス）
+                    if (Math.random() < (0.02 + defensePressure) - (dribbleSkill / 2500)) {
+                        writeLog(gameState.clock, defData.team.name, `🛡️【8秒バイオレーション】${defender.name}の激しいフルコートプレス！相手は8秒以内にハーフコートを越えられなかった！`, false, [ballHolder.id, defender.id]);
+                        if(ballHolder._box) ballHolder._box.to++;
+                        switchPossession(24, false);
+                        continue;
+                    }
                 }
 
 
