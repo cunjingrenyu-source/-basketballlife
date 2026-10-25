@@ -1681,21 +1681,24 @@ window.renderPracticeGrid = function() {
             teamData.bench.forEach(bp => { bp._stamina = Math.min(100, bp._stamina + 2.5); });
         };
 
-        let isHomeOffense = Math.random() > 0.5;
-        let currentQ = 1;
-        let maxQ = 4;
-        let isOverTime = false;
-
-                 // =========================================================
-        // 【追加】試合開始前に全選手へ「実質ステータス(currentStats)」を付与
+                // =========================================================
+        // 【第1章】状態管理 (gameState) の導入
+        // 試合全体の状態を単一のオブジェクトで一元管理し、不整合を防ぐ
         // =========================================================
+        const gameState = {
+            isHomeOffense: Math.random() > 0.5,
+            currentQ: 1,
+            maxQ: 4,
+            isOverTime: false,
+            clock: 720,      // クォーターの残り時間
+            shotClock: 24,   // ショットクロック
+            isFastBreak: false,
+            phase: 'live'    // 'live', 'dead', 'ft' 等のフェーズ管理用（拡張対応）
+        };
+
+        // 試合開始前に全選手へ「実質ステータス(currentStats)」を付与
         if (hTeam && hTeam.roster) hTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
         if (aTeam && aTeam.roster) aTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
-
-           // --- 試合シミュレーションメインループ ---
-              // 【新概念追加】ショットクロックと速攻フラグをQの外（試合全体）で管理する変数として準備
-        let shotClock = 24;
-        let isFastBreak = false;
 
         // 🔴【Sランク1・2完全解決】攻守交代・時計・速攻フラグを一元管理する絶対関数
         // この関数を通さない限り攻守は交代しない。これにより「フラグの消し忘れ」「二重処理」を100%防ぐ。
