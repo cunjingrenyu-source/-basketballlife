@@ -2387,12 +2387,17 @@ else {
                         isFastBreak ? `⚡ ${defReber.name}がリバウンドを回収し、自らドリブルで一気に速攻へ展開！` : 
                         `🛡️ ${defReber.name}が高さを活かして確実にディフェンスリバウンドを回収。`;
                         
+           
         writeLog(currentClock, defData.team.name, logText, (isOutletPass || isFastBreak), [defReber.id]);
         
         switchPossession(24, (isOutletPass || isFastBreak));
         continue;
     }
 }
+
+            } 
+        }
+
 // -------------------------------------------------------------
 
 
