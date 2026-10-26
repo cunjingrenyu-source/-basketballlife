@@ -2405,14 +2405,15 @@ if (Math.random() < Math.min(maxRate, Math.max(minRate, rawRate))) {
         isHigh = true;
     }
     
-    const hName = typeof hTeam !== 'undefined' ? hTeam.name : 'HOME';
-    const aName = typeof aTeam !== 'undefined' ? aTeam.name : 'AWAY';
-    writeLog(currentClock, offData.team.name, `${assistText}${playText} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]`, isHigh, involved);
-    
-    switchPossession(24, false);
-}
+                        const hName = typeof hTeam !== 'undefined' ? hTeam.name : 'HOME';
+                    const aName = typeof aTeam !== 'undefined' ? aTeam.name : 'AWAY';
+                    writeLog(gameState.clock, offData.team.name, `${assistText}${playText} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]`, isHigh, involved);
+                    
+                    switchPossession(24, false);
+                    continue; // 🚨【修正追加】これがないとバグります
+                }
+                else {
 
-else {
     // 1. シュート失敗テキストの拡充と詳細化
     let missText = "";
     
