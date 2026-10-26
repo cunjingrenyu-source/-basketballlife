@@ -2386,339 +2386,217 @@ if (Math.random() < Math.min(maxRate, Math.max(minRate, rawRate))) {
     switchPossession(24, false);
 }
 
-// --- C. シュート失敗 & リバウンド判定 ---
 else {
-    if (defensePressure > 0.45) {
-        writeLog(currentClock, defData.team.name, `🛡️ ${defender.name}の厳しいコンテスト！${shooter.name}のシュートが大きく逸れた！`, false, [shooter.id, defender.id]);
+    // 1. シュート失敗テキストの拡充と詳細化
+    let missText = "";
+    
+    // 直前のプレイ状況から失敗理由を分岐
+    const isToughDefense = (contestLevel === "Smothered" || contestLevel === "Heavily Contested");
+    const rMiss = Math.random();
+
+    if (isToughDefense) {
+        if (shotType === "three") {
+            const toughThreeLogs = [
+                `🛡️${defender.name}の執念のクローズアウト！${shooter.name}のタフな3Pはリングを叩く！`,
+                `🛡️${defender.name}が指先をかすめるような完璧なコンテスト！${shooter.name}の3Pはショートした！`,
+                `🛡️激しいプレッシャー！${shooter.name}は無理な体勢から長距離砲を放つも外れる！`
+            ];
+            missText = toughThreeLogs[Math.floor(rMiss * toughThreeLogs.length)];
+        } else if (shotType === "layup" || shotType === "dunk") {
+            const toughInsideLogs = [
+                `🛡️${defender.name}がリムプロテクト！${shooter.name}のインサイドへの侵入を完璧に阻んだ！`,
+                `🛡️空中のコンタクト！${defender.name}の体を張った守備に${shooter.name}がフィニッシュを決めきれない！`,
+                `🛡️${defender.name}が立ちはだかる！${shooter.name}のタフなショットはリングに嫌われた！`
+            ];
+            missText = toughInsideLogs[Math.floor(rMiss * toughInsideLogs.length)];
+        } else {
+            const toughMidLogs = [
+                `🛡️${defender.name}の完璧なシュートチェック！${shooter.name}はタフショットを強いられ外れる！`,
+                `🛡️${defender.name}がシュートコースを完全に塞いだ！${shooter.name}のミドルは不発！`,
+                `🛡️息の詰まるディフェンス！焦った${shooter.name}がバランスを崩してミス！`
+            ];
+            missText = toughMidLogs[Math.floor(rMiss * toughMidLogs.length)];
+        }
+        writeLog(currentClock, defData.team.name, missText, false, [shooter.id, defender.id]);
     } else {
-        const missFlavor = shotType === "three" ? "長距離砲はリングに嫌われる！" : "惜しくもリングを叩く！";
-        writeLog(currentClock, offData.team.name, `${shooter.name}がシュートを放つも、${missFlavor}`, false, [shooter.id]);
+        // 守備の影響が少ない場合のミス（シュート精度や運による外れ）
+        if (shotType === "three") {
+            const threeLogs = [
+                `${shooter.name}の放った3Pシュートは惜しくもリングに弾かれる。`, 
+                `${shooter.name}がオープンで長距離砲を狙うも、ボールはリムを叩く！`,
+                `${shooter.name}の3Pシュート！しかしわずかにロング！`,
+                `${shooter.name}がリズム良く3Pを放つも、イン＆アウトで外れる！`
+            ];
+            missText = threeLogs[Math.floor(rMiss * threeLogs.length)];
+        } else if (shotType === "dunk") {
+            const dunkLogs = [
+                `💥${shooter.name}が豪快にリムへアタックするも、ボールを叩きつけ損ねた！`,
+                `あっと！${shooter.name}のダンクは無情にもリングの奥に弾かれる！`,
+                `${shooter.name}が跳躍するも、フィニッシュのタイミングが合わずミス！`
+            ];
+            missText = dunkLogs[Math.floor(rMiss * dunkLogs.length)];
+        } else if (shotType === "layup") {
+            const layupLogs = [
+                `${shooter.name}が巧みにインサイドへ切れ込むも、最後のレイアップがこぼれる！`,
+                `${shooter.name}のフローターはわずかにショート！`,
+                `${shooter.name}がレイアップを放つも、ボールはリングをぐるぐると回って外れた！`
+            ];
+            missText = layupLogs[Math.floor(rMiss * layupLogs.length)];
+        } else {
+            const midLogs = [
+                `${shooter.name}のジャンプシュートはリングに嫌われる！`,
+                `${shooter.name}がフリーで放ったミドルシュートだったが、惜しくも外れる。`,
+                `${shooter.name}のプルアップジャンパーはリムの手前を叩く！`
+            ];
+            missText = midLogs[Math.floor(rMiss * midLogs.length)];
+        }
+        writeLog(currentClock, offData.team.name, missText, false, [shooter.id]);
     }
 
+    // 2. リバウンダー選出ロジック (全ポジション対応・異常時保護)
     const getRebounder = (teamData, isDefense) => {
-        if (!teamData?.court?.length) return { id: "dummy", _box: {}, currentStats: {} };
+        if (!teamData || !Array.isArray(teamData.court) || teamData.court.length === 0) {
+            return { id: "dummy", name: "不明な選手", _box: {}, currentStats: {} };
+        }
         
         let weights = teamData.court.map(p => {
-            let val = getSafeStat(p, 'rebound') + (getSafeStat(p, 'physical') * (isDefense ? 0.4 : 0.5)) + (isDefense ? getSafeStat(p, 'defense') * 0.3 : 0);
-            let weight = Math.pow(Math.max(0.1, val / 50), 1.5) * (["C", "PF"].includes(p.pos) ? 1.3 : 1.0);
-            return Math.min(10, weight || 1);
+            let reb = getSafeStat(p, "rebound") || 50;
+            let phy = getSafeStat(p, "physical") || 50;
+            let def = getSafeStat(p, "defense") || 50;
+            
+            // ポジション補正を細分化
+            let posBonus = 1.0;
+            if (p.pos === "C") posBonus = 1.4;
+            else if (p.pos === "PF") posBonus = 1.25;
+            else if (p.pos === "SF") posBonus = 1.1;
+            
+            // リバウンド・フィジカル・守備の比重調整
+            let baseVal = isDefense 
+                ? (reb * 0.5 + phy * 0.3 + def * 0.2) / 50 
+                : (reb * 0.6 + phy * 0.4) / 50;
+                
+            // 上限を20に引き上げ、能力値の高い選手がより確実にリバウンドを取れるように設定
+            let weight = Math.min(20, Math.pow(Math.max(0.1, baseVal), 1.6) * posBonus); 
+            return (!isFinite(weight) || weight <= 0) ? 1 : weight; 
         });
 
-        let rand = Math.random() * weights.reduce((a, b) => a + b, 0);
-        for (let i = 0, cum = 0; i < weights.length; i++) {
-            if (rand < (cum += weights[i])) return teamData.court[i];
+        let totalWeight = weights.reduce((a, b) => a + b, 0);
+        if (!isFinite(totalWeight) || totalWeight <= 0) return teamData.court[0];
+
+        let rand = Math.random() * totalWeight;
+        for (let i = 0, cum = 0; i < teamData.court.length; i++) {
+            cum += weights[i];
+            if (rand < cum) return teamData.court[i];
         }
         return teamData.court[0];
     };
 
     const offReber = getRebounder(offData, false);
     const defReber = getRebounder(defData, true);
-    const orbChance = Math.min(0.45, Math.max(0.05, 0.25 + (((getSafeStat(offReber, 'rebound') + getSafeStat(offReber, 'physical')) - (getSafeStat(defReber, 'rebound') + getSafeStat(defReber, 'physical'))) / 2000)));
+    
+    // 3. ORB確率の調整 (基礎確率22%、能力差による変動幅を調整)
+    const offPower = (getSafeStat(offReber, "rebound") || 50) + (getSafeStat(offReber, "physical") || 50);
+    const defPower = (getSafeStat(defReber, "rebound") || 50) + (getSafeStat(defReber, "physical") || 50);
+    const orbChance = Math.min(0.40, Math.max(0.08, 0.22 + ((offPower - defPower) / 2500)));
     
     if (Math.random() < orbChance) {
-        updateBox(offReber, 'orb', 1);
-        updateBox(offReber, 'reb', 1);
+        // オフェンスリバウンド獲得
+        if (offReber._box) {
+            offReber._box.orb = (offReber._box.orb || 0) + 1;
+            offReber._box.reb = (offReber._box.reb || 0) + 1;
+        }
         
-        // 🏀プットバックダンク＆ティップインの追加
-        const hasPutbackDunk = currentClock > 0 && getSafeStat(offReber, 'dunk') > 90 && getSafeStat(offReber, 'physical') > 90 && Math.random() < 0.12;
-        const hasTipIn = !hasPutbackDunk && currentClock > 0 && getSafeStat(offReber, 'rebound') > 100 && Math.random() < 0.15;
+        let dunkStat = getSafeStat(offReber, "dunk") || 30;
+        let phyStat = getSafeStat(offReber, "physical") || 50;
+        let inStat = getSafeStat(offReber, "inside") || getSafeStat(offReber, "layup") || 30; 
+        
+        // 5. プットバックの種類と判定 (3種類に拡張)
+        const rPutback = Math.random();
+        let putbackType = "none";
+        
+        if (currentClock > 0) {
+            if (dunkStat > 95 && phyStat > 90 && rPutback < 0.10) {
+                putbackType = "putback_dunk";
+            } else if (inStat > 85 && phyStat > 80 && rPutback < 0.18) {
+                putbackType = "tip_in";
+            } else if (inStat > 75 && rPutback < 0.25) {
+                putbackType = "quick_layup";
+            }
+        }
 
-        if (hasPutbackDunk || hasTipIn) {
-            updateBox(offReber, 'pts', 2); updateBox(offReber, 'fgm', 1); updateBox(offReber, 'fga', 1); addScore(2);
-            let pbText = hasPutbackDunk ? `<span style="color:#e74c3c; font-weight:bold;">【プットバック！】</span>${offReber.name}がオフェンスリバウンドを空中で掴み、そのまま強烈なダンク！！` 
-                                        : `🔥 ${offReber.name}が弾かれたボールを指先で弾いてティップイン！！`;
-            writeLog(currentClock, offData.team.name, pbText, hasPutbackDunk, [offReber.id]);
+        if (putbackType !== "none") {
+            // 得点更新処理 (既存のupdateBoxとaddScoreで整合性を担保)
+            if (offReber._box) {
+                offReber._box.pts = (offReber._box.pts || 0) + 2;
+                offReber._box.fgm = (offReber._box.fgm || 0) + 1;
+                offReber._box.fga = (offReber._box.fga || 0) + 1;
+            }
+            addScore(2); 
+            
+            let pbText = "";
+            if (putbackType === "putback_dunk") {
+                pbText = `<span style="color:#e74c3c; font-weight:bold;">【プットバックダンク！】</span>${offReber.name}が空中でボールを掴み、そのまま豪快に叩き込んだ！！`;
+            } else if (putbackType === "tip_in") {
+                pbText = `🔥 ${offReber.name}がこぼれ球にいち早く反応し、指先でティップインをねじ込む！`;
+            } else {
+                pbText = `🏀 ${offReber.name}がオフェンスリバウンドから即座にシュート！セカンドチャンスをものにした！`;
+            }
+            
+            // 8. 得点後の整合性担保: 24秒リセットしてターンエンド
+            writeLog(currentClock, offData.team.name, pbText, true, [offReber.id]);
             switchPossession(24, false);
             continue;
         }
         
-        writeLog(currentClock, offData.team.name, `🔄 ${offReber.name}が執念でオフェンスリバウンドを拾い、セカンドチャンス！`, false, [offReber.id]);
+        // 6. プットバックしなかった場合のORB実況バリエーション
+        const rOrb = Math.random();
+        let orbText = "";
+        if (phyStat > 100 && rOrb < 0.4) {
+            orbText = `【空中戦】${offReber.name}が複数人に囲まれながらもフィジカルで圧倒し、オフェンスリバウンドをもぎ取った！`;
+        } else if (rOrb < 0.7) {
+            orbText = `🔄 ${offReber.name}が執念でオフェンスリバウンドを拾い、攻撃権をキープ！セカンドチャンス！`;
+        } else {
+            orbText = `🏀 ${offReber.name}が良いポジションに入り込み、こぼれ球を確実に確保！`;
+        }
+        
+        writeLog(currentClock, offData.team.name, orbText, false, [offReber.id]);
         keepPossession(14);
+        
     } else {
-        updateBox(defReber, 'drb', 1);
-        updateBox(defReber, 'reb', 1);
+        // 7. ディフェンスリバウンド獲得
+        if (defReber._box) {
+            defReber._box.drb = (defReber._box.drb || 0) + 1;
+            defReber._box.reb = (defReber._box.reb || 0) + 1;
+        }
         
-        // 🏀リバウンドからの超特急アウトレットパス（パス能力が高い選手限定）を追加
-        const isOutletPass = getSafeStat(defReber, 'pass') > 100 && Math.random() < 0.2;
-        const isFastBreak = !isOutletPass && (getSafeStat(defReber, 'speed') > 90) && Math.random() < 0.35;
+        let spdStat = getSafeStat(defReber, "speed") || 50;
+        let passStat = getSafeStat(defReber, "pass") || 50;
+        let defRebPhy = getSafeStat(defReber, "physical") || 50;
         
-        const logText = isOutletPass ? `🚀 ${defReber.name}がリバウンドを奪うや否や、前線へ正確なアウトレットパスを供給！速攻へ！` :
-                        isFastBreak ? `⚡ ${defReber.name}がリバウンドを回収し、自らドリブルで一気に速攻へ展開！` : 
-                        `🛡️ ${defReber.name}が高さを活かして確実にディフェンスリバウンドを回収。`;
+        const rDrb = Math.random();
+        
+        // アウトレットパスと速攻の排他制御・確率適正化
+        const isOutletPass = passStat > 95 && rDrb < 0.25;
+        const isFastBreak = !isOutletPass && spdStat > 90 && rDrb < 0.45;
+        
+        let logText = "";
+        if (isOutletPass) {
+            logText = `🚀 ${defReber.name}がリバウンドを奪うや否や、前線を走る味方へ完璧なアウトレットパス！一気に速攻へ！`;
+        } else if (isFastBreak) {
+            logText = `⚡ ${defReber.name}がディフェンスリバウンドを回収！そのまま自らドリブルプッシュし速攻を展開！`;
+        } else {
+            if (defRebPhy > 95 && Math.random() < 0.5) {
+                logText = `🛡️ ${defReber.name}が相手をしっかりボックスアウトし、力強くディフェンスリバウンドを死守！`;
+            } else {
+                logText = `🛡️ ${defReber.name}が高さを活かして確実にディフェンスリバウンドを回収した。`;
+            }
+        }
                         
-           
         writeLog(currentClock, defData.team.name, logText, (isOutletPass || isFastBreak), [defReber.id]);
-        
         switchPossession(24, (isOutletPass || isFastBreak));
         continue;
     }
 }
-
-            } 
-        }
-
-// -------------------------------------------------------------
-
-
-
-                    // --- 個人技テキスト（すべての条件分岐と記述を完全維持） ---
-                    if (!playText) {
-                        const r = Math.random();
-                        
-                        if (isBuzzerBeater) {
-                            playText = `<span style="color:#f1c40f; font-weight:bold; font-size:14px;">🚨【ブザービーター！！！】🚨</span>時間が無い！${shooter.name}が放った劇的なシュートがブザーと同時にネットを揺らす！！！`;
-                            isHigh = true;
-                        } else if (isClutch) {
-                            playText = `<span style="color:#f1c40f; font-weight:bold; font-size:14px;">🔥【大逆転クラッチ！】🔥</span>${shooter.name}が土壇場で起死回生のシュートをねじ込んだ！！！`;
-                            isHigh = true;
-                        } else if (ankleBreak) {
-                            playText = `<span style="color:#e67e22; font-weight:bold;">【アンクルブレイク！】</span>${shooter.name}の鋭いクロスオーバーに${defender.name}が足をもつれて転倒！！そのまま余裕で沈めた！！！`;
-                            isHigh = true;
-                        } else if (isThree) {
-                            if (shooter.stats.three > 120 && r < 0.3) {
-                                playText = `${shooter.name}がロゴ付近から放つディープスリー！！美しい弧を描きリングに吸い込まれた！！！`;
-                                isHigh = true;
-                            } else if (shooter.stats.three > 90 && defender.stats.defense > 90 && r < 0.7) {
-                                playText = `<span style="color:#e74c3c; font-weight:bold;">【タフショット！】</span>ディフェンスがガチガチに密着する厳しい状況下、${shooter.name}がタフな3Pを強引に沈めた！`;
-                                isHigh = true;
-                            } else {
-                                playText = r > 0.85 ? `${shooter.name}がスクリーンを使い3P！決まった！` : `${shooter.name}がキャッチ＆シュートで3Pを沈めた！`;
-                            }
-                        } else if (shotType === "dunk") {
-                            if (shooter.stats.dunk > 130 && r < 0.15) {
-                                playText = `<span style="color:#e74c3c; font-weight:bold;">【伝説級ダンク！】</span>${shooter.name}がフリースローラインから跳躍し、空を歩くようなダンクを叩き込んだ！！！`;
-                                isHigh = true;
-                            } else if (shooter.stats.dunk > 110 && r < 0.35) {
-                                playText = `${shooter.name}が空中で腕を回す豪快なウィンドミルダンク炸裂！！！`;
-                                isHigh = true;
-                            } else if (shooter.stats.physical > 100 && r < 0.6) {
-                                playText = `<span style="color:#e74c3c; font-weight:bold;">【ポスタライズ！】</span>${shooter.name}が${defender.name}ごと吹き飛ばす強烈なダンクを決めたーーーっ！！！`;
-                                isHigh = true;
-                            } else {
-                                playText = `${shooter.name}が豪快なボースハンドダンクを決めた！`;
-                            }
-                        } else if (shotType === "layup") {
-                            const lu = shooter.stats.layup;
-                            if (lu > 120 && r < 0.15) {
-                                playText = `<span style="color:#e74c3c; font-weight:bold;">【サーカスショット！】</span>ブロックを空中で2度躱す！${shooter.name}の変態的なトリプルクラッチ！！`;
-                                isHigh = true;
-                            } else if (lu > 100 && r < 0.3) {
-                                playText = `${shooter.name}がユーロステップでディフェンダーを嘲笑うかのように抜き去りレイアップ！`;
-                                isHigh = true;
-                            } else if (lu > 90 && r < 0.45) {
-                                playText = `${shooter.name}が空中でボールを動かす優雅なジェリー・レイアップを沈めた！`;
-                            } else if (lu > 80 && r < 0.6) {
-                                playText = `${shooter.name}がビッグマンのブロックを嘲笑うかのような高い弧を描くティアドロップ（フローター）！`;
-                            } else if (lu > 80 && r < 0.7) {
-                                playText = `${shooter.name}が意表を突くワンステップ（ヴェロ・ステップ）でタイミングをずらしレイアップ！`;
-                            } else if (shooter.stats.physical > 90 && r < 0.8) {
-                                playText = `${shooter.name}がギャロップステップ（プロホップ）で強引にスペースをこじ開けレイアップ！`;
-                            } else if (r < 0.9) {
-                                playText = `${shooter.name}がゴール下を潜り抜け、リング越しにリバース・レイアップ（リーチバック）！`;
-                            } else {
-                                playText = `${shooter.name}がダブルクラッチで華麗にレイアップを沈めた！`;
-                            }
-                        } else { 
-                            if (shooter.stats.dribble > 100 && r < 0.3) {
-                                playText = `${shooter.name}が鮮やかなスピンムーブからフェイダウェイ！美しく射抜いた！`;
-                                isHigh = true;
-                            } else if (shooter.stats.dribble > 90 && r < 0.6) {
-                                playText = `${shooter.name}がステップバックからジャンプシュート！綺麗に決まった！`;
-                            } else if (shooter.stats.middle > 100 && defender.stats.defense > 90 && r < 0.8) {
-                                playText = `タフな体勢から${shooter.name}がミドルシュートをねじ込む！`;
-                            } else {
-                                playText = `${shooter.name}がミドルレンジから確実なジャンプシュート！`;
-                            }
-                        }
-                    }
-                    writeLog(clock, offData.team.name, `${assistText}${playText} [${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}]`, isHigh, involved);
-                    switchPossession(24, false); // 🔴新関数適用（得点後は必ず相手の24秒スタート）
-                } 
-
-                // --- D. シュート失敗 & リバウンド判定 ---
-                else {
-                    // 💡【課題解決】ディフェンス圧力が高かった場合は「守備の勝利」としてログ出力
-                    let missText = "";
-                    if (defensePressure > 0.45) {
-                        const missLogs = [
-                            `🛡️${defender.name}のタフなディフェンス！${shooter.name}は苦しい体勢からシュートを強いられ外れる！`,
-                            `🛡️${defender.name}の厳しいチェック！${shooter.name}のシュートが大きく逸れた！`,
-                            `🛡️${defender.name}が相手を追い込み、${shooter.name}にタフショットを打たせた！スタッツに残らない好守備！`,
-                            `🛡️${defender.name}の守備に焦った${shooter.name}が無理なシュートを選択しミス！`,
-                            `🛡️${defender.name}が完璧なコースチェック！${shooter.name}のシュートをプレッシャーで外させた！`
-                        ];
-                        missText = missLogs[Math.floor(Math.random() * missLogs.length)];
-                        writeLog(clock, defData.team.name, missText, false, [shooter.id, defender.id]);
-                    } else {
-                        missText = (shotType === "three") ? `${shooter.name}の3Pシュートはリングに弾かれる。` : `${shooter.name}がシュートを放つもリングに弾かれる！`;
-                        writeLog(clock, offData.team.name, missText, false, [shooter.id]);
-                    }
-
-                    
-                    // 【課題8, 9解決】能力値を安全に取得（0を正常値として扱い、undefined/NaN/Infinityを完全保護）
-                    const getStat = (player, key, fallback = 50) => {
-                        if (!player || !player.currentStats) return fallback;
-                        const val = player.currentStats[key];
-                        return (typeof val === "number" && isFinite(val)) ? val : fallback;
-                    };
-
-                    // 【課題1, 4, 13, 14, 20解決】得点・スタッツ・プラスマイナスの共通記録処理
-                    const recordBasket = (player, pts, isThree = false) => {
-                        if (!player || !player._box) return; // _boxが存在しない場合のエラー防止
-                        player._box.pts += pts;
-                        player._box.fgm++;
-                        player._box.fga++;
-                        if (isThree) {
-                            player._box.tpm++;
-                            player._box.tpa++;
-                        }
-                        
-                        // 【課題1解決】得点先は「現在の攻撃チーム」に基づく
-                        const side = isHomeOffense ? 'home' : 'away';
-                        const qIdx = currentQ - 1;
-                        score[side] += pts;
-                        
-                        // 【課題20解決】配列の未初期化インデックスへの安全対策
-                        if (qScores[side][qIdx] === undefined) qScores[side][qIdx] = 0;
-                        qScores[side][qIdx] += pts;
-                        
-                        // 【課題4, 6解決】プラスマイナス更新時の安全ガード
-                        if (Array.isArray(offData?.court)) {
-                            offData.court.forEach(p => { if (p && p._box) p._box.plusMinus += pts; });
-                        }
-                        if (Array.isArray(defData?.court)) {
-                            defData.court.forEach(p => { if (p && p._box) p._box.plusMinus -= pts; });
-                        }
-                    };
-
-                                  // 【課題3, 7, 8解決】安全な重み付きリバウンダー選出
-                    // 【完全対応7: 課題16, 18解決】isDefense引数を追加し、DRB時にはディフェンス能力（ボックスアウト）を加味する
-                    const getRebounder = (teamData, isDefense) => {
-                        // 【課題3解決】コートが空の場合は、エラーを起こさない完全なモックダミーを返す
-                        if (!teamData || !Array.isArray(teamData.court) || teamData.court.length === 0) {
-                            return { 
-                                id: "dummy", 
-                                name: "不明な選手", 
-                                _box: { reb: 0, orb: 0, drb: 0, pts: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, plusMinus: 0 }, 
-                                currentStats: {} 
-                            };
-                        }
-                        
-                        let weights = teamData.court.map(p => {
-                            let reb = getStat(p, "rebound", 50);
-                            let phy = getStat(p, "physical", 50);
-                            let def = getStat(p, "defense", 50);
-                            let posBonus = (p.pos === "C" || p.pos === "PF") ? 1.3 : 1.0; 
-                            
-                            // 守備側ならディフェンス能力（ボックスアウト技術）をリバウンド力に加算
-                            let baseVal = isDefense 
-                                ? (reb + (phy * 0.4) + (def * 0.3)) / 50 
-                                : (reb + (phy * 0.5)) / 50;
-                            
-                            // 【課題8解決】極端な重みを防ぐため上限10を設ける
-                            let weight = Math.min(10, Math.pow(Math.max(0.1, baseVal), 1.5) * posBonus); 
-                            
-                            return (!isFinite(weight) || weight <= 0) ? 1 : weight; 
-                        });
-
-                        let totalWeight = weights.reduce((a, b) => a + b, 0);
-                        if (!isFinite(totalWeight) || totalWeight <= 0) return teamData.court[0];
-
-                        let rand = Math.random() * totalWeight;
-                        let cum = 0;
-                        for (let i = 0; i < teamData.court.length; i++) {
-                            cum += weights[i];
-                            if (rand < cum) return teamData.court[i];
-                        }
-                        return teamData.court[0];
-                    };
-
-                    // オフェンス側はisDefense=false、ディフェンス側はisDefense=true
-                    const offReber = getRebounder(offData, false);
-                    const defReber = getRebounder(defData, true);
-
-                    
-                    // リバウンドパワー計算
-                    const offPower = getStat(offReber, "rebound", 50) + getStat(offReber, "physical", 50);
-                    const defPower = getStat(defReber, "rebound", 50) + getStat(defReber, "physical", 50);
-                    
-                    // 【課題5解決】ORB確率。基本確率25% + 能力差/2000 は仕様として維持しつつクランプ。
-                    const orbChance = Math.min(0.45, Math.max(0.05, 0.25 + ((offPower - defPower) / 2000)));
-                    
-                                                         if (Math.random() < orbChance) {
-                        // オフェンスリバウンド(ORB)
-                        if (offReber._box) {
-                            offReber._box.orb++; 
-                            offReber._box.reb++;
-                        }
-                        
-                        let dunkStat = getStat(offReber, "dunk", 30);
-                        let inStat = getStat(offReber, "inside", getStat(offReber, "layup", 30)); 
-                        let phyStat = getStat(offReber, "physical", 50);
-                        
-                        let putbackType = "none";
-                        let putbackChance = 0;
-                        
-                        if (dunkStat > 90 && phyStat > 90) {
-                            putbackChance = 0.12; 
-                            putbackType = "dunk";
-                        } else if (inStat > 80 && phyStat > 80) {
-                            putbackChance = 0.06; 
-                            putbackType = "tipin";
-                        }
-                        
-                        if (clock > 0 && putbackType !== "none" && Math.random() < putbackChance) {
-                            recordBasket(offReber, 2, false);
-                            let pbText = (putbackType === "dunk") 
-                                ? `<span style="color:#e74c3c; font-weight:bold;">【プットバック！】</span>${offReber.name}がオフェンスリバウンドを空中で掴み、そのまま強烈なダンクを叩き込んだ！！`
-                                : `<span style="color:#e74c3c; font-weight:bold;">【ティップイン！】</span>${offReber.name}がオフェンスリバウンドをそのまま押し込んだ！！`;
-
-                                                        writeLog(clock, offData.team.name, pbText, true, [offReber.id]);
-                            switchPossession(24, false); // 🔴新関数適用（得点後は相手の24秒）
-                            continue;
-
-                        } else if (phyStat > 110 && Math.random() < 0.4) {
-                            writeLog(clock, offData.team.name, `【空中戦】${offReber.name}がフィジカルで圧倒し、強引にオフェンスリバウンドをもぎ取った！`, false, [offReber.id]);
-                        } else {
-                            writeLog(clock, offData.team.name, `${offReber.name}が執念でオフェンスリバウンドを拾う！`, false, [offReber.id]);
-                        }
-                                        // 【新概念】オフェンスリバウンド時は14秒にリセット
-                        keepPossession(14); // 🔴新関数適用（攻撃権維持、14秒リセット、速攻解除）
-                        
-                    } else {
-                        // ディフェンスリバウンド(DRB)
-                        if (defReber._box) {
-                            defReber._box.drb++; 
-                            defReber._box.reb++;
-                        }
-                        
-                        let spdStat = getStat(defReber, "speed", 50);
-                        let passStat = getStat(defReber, "pass", 50);
-                        let nextFb = false;
-                        
-                        // 【新概念：DRBからの速攻展開】
-                        if ((spdStat > 90 || passStat > 90) && Math.random() < 0.35) {
-                            nextFb = true;
-                            if (passStat > 90 && Math.random() < 0.5) {
-                                writeLog(clock, defData.team.name, `⚡${defReber.name}がリバウンドから前線へ鋭いアウトレットパス！一気に速攻へ！`, true, [defReber.id]);
-                            } else {
-                                writeLog(clock, defData.team.name, `⚡${defReber.name}がディフェンスリバウンドを回収し、自らドリブルで速攻を展開！`, true, [defReber.id]);
-                            }
-                        } else {
-                            writeLog(clock, defData.team.name, `${defReber.name}が確実にディフェンスリバウンドを回収。`, false, [defReber.id]);
-                        }
-                        
-                        switchPossession(24, nextFb); // 🔴新関数適用（DRB後は攻守交代、24秒、速攻判定反映）
-                        continue;
-                    }
-
-                }
-            } // while (clock > 0) の正常終了
-            
-            currentQ++;
-        } // while (currentQ <= maxQ) の正常終了
-
-
 
         // --- 個人スタッツのグローバル反映＆IndexedDB保存 ---
         const commitToGlobalStats = (teamState, isH) => {
