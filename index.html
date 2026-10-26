@@ -135,8 +135,7 @@
 <div class="app-container">
         <!-- ステータス定義モーダル -->
     <div id="stat-modal" class="modal-overlay" onclick="closeStatModal(event)">
-<div class="modal-content" onclick="stopProp(event)">
-
+        <div class="modal-content" onclick="event.stopPropagation()">
             <div class="modal-header" id="stat-modal-title">ステータス名</div>
             <div class="modal-body" id="stat-modal-desc">説明文がここに入ります。</div>
             <button class="modal-close" onclick="closeStatModal()">閉じる</button>
@@ -475,63 +474,6 @@ function loadFromIDB(logId) {
             }
         }
     }
-
-
-// ==========================================
-// UI・画面遷移用関数の補完＆グローバル登録
-// ==========================================
-
-function changeView(viewId) {
-    if (viewId !== 'match' && viewId !== 'player-detail' && viewId !== 'historical-match') {
-        previousView = viewId;
-    }
-    document.querySelectorAll('.content-area').forEach(el => el.style.display = 'none');
-    let targetView = document.getElementById(viewId + '-view');
-    if (targetView) targetView.style.display = 'block';
-    else document.getElementById('home-view').style.display = 'block';
-
-    document.querySelectorAll('.nav-menu button').forEach(b => b.classList.remove('active'));
-    let navBtn = document.getElementById('btn-nav-' + viewId);
-    if (navBtn) navBtn.classList.add('active');
-}
-
-function goHome() { changeView('home'); }
-function goBackFromDetail() { changeView(previousView); }
-function toggleMenu() {
-    let menu = document.getElementById('nav-menu');
-    menu.style.display = (menu.style.display === 'flex') ? 'none' : 'flex';
-}
-function forceSimulate() { alert("シミュレーション関数をここに紐付けます"); }
-function resetSave() {
-    if(confirm("データをリセットしますか？")) { localStorage.removeItem(SAVE_KEY); location.reload(); }
-}
-function registerPlayer() { changeView('home'); }
-
-// 🔴【欠損エラー完全防止】イベント伝播停止用の安全関数
-function stopEventProp(e) {
-    if (e && e.stopPropagation) e.stopPropagation();
-}
-
-// 🔴【欠損エラー完全防止】モーダル制御関数
-function closeStatModal(e) {
-    if (e && e.target && e.target.id !== 'stat-modal' && e.target.className !== 'modal-close') return;
-    const modal = document.getElementById('stat-modal');
-    if (modal) modal.style.display = 'none';
-}
-
-// ★ GOD MODEデバッガーの「死んだonclick」を100%消滅させるグローバル登録 ★
-window.closeStatModal = closeStatModal;
-window.openStatModal = openStatModal;
-window.switchMatchTab = switchMatchTab;
-window.changeView = changeView;
-window.goHome = goHome;
-window.goBackFromDetail = goBackFromDetail;
-window.toggleMenu = toggleMenu;
-window.forceSimulate = forceSimulate;
-window.resetSave = resetSave;
-window.registerPlayer = registerPlayer;
-window.stopProp = stopEventProp;
-
 
  // --- セーブ＆ロード (Firebase対応版) ---
 
