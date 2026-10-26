@@ -2336,10 +2336,11 @@ if (Math.random() < Math.min(maxRate, Math.max(minRate, rawRate))) {
     addScore(pts);
 
     const newDiff = currentIsHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
-    const isBuzzerBeater = (currentQtr >= 4 && currentClock <= 5 && typeof prevDiff !== 'undefined' && prevDiff <= 0 && newDiff >= 0);
-    const isClutch = (isClutchTime && typeof prevDiff !== 'undefined' && prevDiff < 0 && newDiff > 0);
+    // 条件の厳格化（真のブザービーターとクラッチ判定）
+    const isBuzzerBeater = (currentQtr >= 4 && currentClock <= 3 && typeof prevDiff !== 'undefined' && prevDiff <= 0 && newDiff > 0);
+    const isClutch = (isClutchTime && typeof prevDiff !== 'undefined' && prevDiff <= 3 && prevDiff >= -3 && newDiff > 0);
     
-    let playText = "", assistText = "";
+    let assistText = "";
     const involved = [shooter.id, defender.id];
     
     if (isAssist && actualPasser) {
@@ -2347,42 +2348,44 @@ if (Math.random() < Math.min(maxRate, Math.max(minRate, rawRate))) {
         involved.push(actualPasser.id);
         const isAlleyOop = ["dunk", "layup"].includes(shotType) && getSafeStat(actualPasser, 'pass') > 100 && getSafeStat(shooter, 'dunk') > 90;
         
-        if (isAlleyOop && Math.random() < 0.3) {
-            playText = `<span style="color:#9b59b6; font-weight:bold;">【アリウープ！】</span>${actualPasser.name}の絶妙なロブパスから${shooter.name}が空中でボールを押し込んだ！！！`;
+        if (isAlleyOop && Math.random() < 0.25) {
+            assistText = `<span style="color:#9b59b6; font-weight:bold;">【アリウープ！】</span>${actualPasser.name}の絶妙なロブパスから`;
+            shotType = "dunk"; // アリウープ演出用に上書き
         } else {
-            assistText = `<span class="log-assist">#${actualPasser.num || ''} ${actualPasser.name}の${getSafeStat(actualPasser, 'pass') > 120 && Math.random() < 0.3 ? '変態的なノールック' : '的確な'}アシスト ➔ </span>`;
+            const passQuality = getSafeStat(actualPasser, 'pass');
+            const passDesc = passQuality > 120 && Math.random() < 0.3 ? '変態的なノールックパス' : 
+                             passQuality > 100 && Math.random() < 0.5 ? 'ディフェンスを切り裂くキラーパス' : '的確なパス';
+            assistText = `<span class="log-assist">#${actualPasser.num || ''} ${actualPasser.name}の${passDesc} ➔ </span>`;
         }
     }
 
-    // 🏀多彩なプレイテキスト展開（既存のロジックを完全維持しつつ豪華に）
-    if (!playText) {
-        if (isBuzzerBeater) playText = `<span style="color:#f1c40f; font-weight:bold; font-size:15px;">🚨【ブザービーター！！！】🚨</span>時間が無い！${shooter.name}が放った劇的なシュートがブザーと共にネットを揺らす！！！`;
-        else if (isClutch) playText = `<span style="color:#f1c40f; font-weight:bold;">🔥【大逆転クラッチ！】🔥</span>${shooter.name}が土壇場で起死回生のビッグショットをねじ込んだ！！！`;
-        else if (ankleBreak) playText = `<span style="color:#e67e22; font-weight:bold;">【アンクルブレイク！】</span>${defender.name}が足をもつれて転倒！${shooter.name}が余裕で沈めた！`;
-        else {
-            // スキルに応じた通常シュートの描写バリエーション
-            if (shotType === "three") {
-                playText = getSafeStat(shooter, 'dribble') > 90 && Math.random() < 0.3 ? `${shooter.name}の鋭いステップバックからの3Pが決まった！` :
-                           contestLevel === "Wide Open" ? `${shooter.name}がフリーの状態で確実に3Pを沈めた！` :
-                           `${shooter.name}がディフェンス越しにタフな3Pを決めた！`;
-            } else if (shotType === "dunk") {
-                playText = contestLevel === "Smothered" ? `<span style="color:#c0392b; font-weight:bold;">【ポスタライズ！】</span>${shooter.name}が${defender.name}を吹き飛ばす強烈なダンク！！` :
-                           `${shooter.name}が豪快なダンクを叩き込んだ！`;
-            } else if (shotType === "layup") {
-                playText = getSafeStat(shooter, 'speed') > 90 && Math.random() < 0.4 ? `${shooter.name}がアクロバティックなダブルクラッチレイアップを決めた！` :
-                           `${shooter.name}が巧みにレイアップを沈めた。`;
-            } else {
-                playText = getSafeStat(shooter, 'middle') > 100 && Math.random() < 0.3 ? `${shooter.name}が美しいフェイダウェイジャンパーを決めた！` :
-                           `${shooter.name}がミドルシュートを確実に決めた。`;
-            }
-        }
+    // 🏀データベースシステムからテキストとハイライトフラグを取得
+    let playResult = getPlayText(shotType, shooter, defender, contestLevel, currentClock, prevDiff);
+    let playText = playResult.text;
+    let isHigh = playResult.high;
+
+    // クラッチやブザービーター、アンクルブレイクが成立した場合は最優先でテキストを上書き・付加
+    if (isBuzzerBeater) {
+        playText = `<span style="color:#f1c40f; font-weight:bold; font-size:15px;">🚨【ブザービーター！！！】🚨</span>時間が無い！${shooter.name}が放った劇的なシュートがブザーと共にネットを揺らす！試合を決めた！！！`;
+        isHigh = true;
+    } else if (isClutch) {
+        playText = `<span style="color:#f1c40f; font-weight:bold;">🔥【大逆転クラッチ！】🔥</span>${shooter.name}が土壇場で起死回生のビッグショット！！！ ${playText}`;
+        isHigh = true;
+    } else if (ankleBreak) {
+        playText = `<span style="color:#e67e22; font-weight:bold;">【アンクルブレイク！】</span>${defender.name}が足をもつれて転倒！ ${playText}`;
+        isHigh = true;
+    } else if (assistText.includes("アリウープ")) {
+        playText = `${shooter.name}が空中でボールを押し込んだ！！！`;
+        isHigh = true;
     }
     
     const hName = typeof hTeam !== 'undefined' ? hTeam.name : 'HOME';
     const aName = typeof aTeam !== 'undefined' ? aTeam.name : 'AWAY';
-    writeLog(currentClock, offData.team.name, `${assistText}${playText} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]`, (isBuzzerBeater || isClutch || ankleBreak), involved);
+    writeLog(currentClock, offData.team.name, `${assistText}${playText} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]`, isHigh, involved);
+    
     switchPossession(24, false);
-} 
+}
+
 // --- C. シュート失敗 & リバウンド判定 ---
 else {
     if (defensePressure > 0.45) {
