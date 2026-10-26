@@ -476,7 +476,10 @@ function loadFromIDB(logId) {
     }
 
 
-// まだ定義されていなかったUI用関数を補完
+// ==========================================
+// UI・画面遷移用関数の補完＆グローバル登録
+// ==========================================
+
 function changeView(viewId) {
     if (viewId !== 'match' && viewId !== 'player-detail' && viewId !== 'historical-match') {
         previousView = viewId;
@@ -501,13 +504,22 @@ function forceSimulate() { alert("シミュレーション関数をここに紐�
 function resetSave() {
     if(confirm("データをリセットしますか？")) { localStorage.removeItem(SAVE_KEY); location.reload(); }
 }
-function registerPlayer() { changeView('home'); } // 必要に応じて中身を作る
+function registerPlayer() { changeView('home'); }
 
-window.closeStatModal = function(event) {
-    if (event && event.target && event.target.id !== 'stat-modal') return;
+// 🔴【欠損エラー完全防止】イベント伝播停止用の安全関数
+function stopEventProp(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+}
+
+// 🔴【欠損エラー完全防止】モーダル制御関数
+function closeStatModal(e) {
+    if (e && e.target && e.target.id !== 'stat-modal' && e.target.className !== 'modal-close') return;
     const modal = document.getElementById('stat-modal');
     if (modal) modal.style.display = 'none';
-};
+}
+
+// ★ GOD MODEデバッガーの「死んだonclick」を100%消滅させるグローバル登録 ★
+window.closeStatModal = closeStatModal;
 window.openStatModal = openStatModal;
 window.switchMatchTab = switchMatchTab;
 window.changeView = changeView;
@@ -517,8 +529,7 @@ window.toggleMenu = toggleMenu;
 window.forceSimulate = forceSimulate;
 window.resetSave = resetSave;
 window.registerPlayer = registerPlayer;
-
-
+window.stopProp = stopEventProp;
 
 
  // --- セーブ＆ロード (Firebase対応版) ---
