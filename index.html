@@ -2769,7 +2769,7 @@ else {
 </script>
 
 <!-- ========================================== -->
-<!-- ▼▼ 究極神デバッガー V5 (The Omniscient Debugger & Engine Monitor V5) ▼▼ -->
+<!-- ▼▼ 究極神デバッガー V6 (The Omniscient Debugger & Engine Monitor V6 - God Mode) ▼▼ -->
 <!-- ========================================== -->
 <div id="god-debug-hud" style="position: fixed; top: 0; left: 0; width: 100%; background: rgba(5,5,9,0.94); color: #00ffcc; font-family: 'Consolas', 'Courier New', monospace; font-size: 11px; padding: 4px 10px; z-index: 9999999; pointer-events: none; border-bottom: 1px solid #00ffcc44; display: flex; gap: 12px; flex-wrap: wrap; box-sizing: border-box; backdrop-filter: blur(5px);">
     <span>FPS: <strong id="dbg-fps" style="color:#00ffcc;">0</strong></span>
@@ -2780,13 +2780,15 @@ else {
     <span style="color: #ffaa00;">状態: <strong id="dbg-game-status">監視中</strong></span>
     <span style="color: #00ffcc;">危険スコア: <strong id="dbg-risk-score">0</strong></span>
     <span style="color: #aaa;">最終セーブ: <strong id="dbg-last-save">未実行</strong></span>
+    <!-- 【V6追加】グローバル汚染数 -->
+    <span style="color: #e74c3c;">汚染変数: <strong id="dbg-global-leak">0</strong></span>
 </div>
 
 <div id="custom-debug-container" style="position: fixed; bottom: 0; left: 0; width: 100%; z-index: 9999998; font-family: 'Consolas', 'Courier New', monospace; font-size: 11px; box-sizing: border-box; line-height: 1.3;">
     <!-- ツールバー Header -->
     <div id="custom-debug-toggle" style="background: #06060a; color: #00ffcc; padding: 6px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #00ffcc; box-shadow: 0 -5px 20px rgba(0,0,0,0.95); user-select: none;">
         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-            <span id="debug-status-indicator" style="text-shadow: 0 0 8px #00ffcc;">👁️ OMNISCIENT V5</span>
+            <span id="debug-status-indicator" style="text-shadow: 0 0 8px #00ffcc;">👁️ OMNISCIENT V6</span>
             
             <!-- 【21. 強化検索】AND / OR(|) / NOT(!) / 正規表現対応 -->
             <input type="text" id="debug-search" placeholder="🔍 検索 (例: err|fetch, !DOM, /regex/i)..." style="background: #101018; color: #fff; border: 1px solid #00ffcc44; padding: 3px 6px; font-size: 10px; width: 170px; border-radius: 3px; outline: none;">
@@ -2801,12 +2803,18 @@ else {
             </select>
             <span id="debug-match-count" style="color: #888; font-size: 10px;">(0件)</span>
 
-            <!-- コマンドボタン群 (25項目完全網羅) -->
+            <!-- コマンドボタン群 (既存完全維持 + V6新規追加) -->
             <button id="debug-oneclick-btn" class="dbg-btn dbg-btn-super">⚡ 25項目ワンクリック全診断</button>
             <button id="debug-audit-btn" class="dbg-btn dbg-btn-highlight">🔍 階層onclick&重複監査</button>
             <button id="debug-perf-rank-btn" class="dbg-btn">⏱ 処理時間/依存ランク</button>
             <button id="debug-storage-btn" class="dbg-btn">💾 セーブ差分/復元テスト</button>
             <button id="debug-pre-events-btn" class="dbg-btn" style="color:#ffaa00;">⏪ エラー直前50履歴</button>
+            
+            <!-- 【V6 新規追加ボタン群】 -->
+            <button id="debug-picker-btn" class="dbg-btn" style="background: #004488; border-color: #0088ff; color: #fff;">🎯 DOMピッカー</button>
+            <button id="debug-storage-edit-btn" class="dbg-btn" style="background: #884400; border-color: #ff8800; color: #fff;">🗄️ ストレージ管理</button>
+            <button id="debug-trap-btn" class="dbg-btn" style="background: #440088; border-color: #8800ff; color: #fff;">🛑 罠(Debugger)設置</button>
+            
             <button id="debug-report-btn" class="dbg-btn" style="background: #710000; border-color: #ff0055; font-weight: bold;">🚨 バグレポート生成</button>
             <button id="debug-clear-btn" class="dbg-btn">🗑 クリア</button>
         </div>
@@ -2815,7 +2823,13 @@ else {
 
     <!-- コンソール本体 -->
     <div id="custom-debug-console" style="height: 38vh; min-height: 260px; background: rgba(6,6,10,0.97); overflow-y: scroll; padding: 8px 12px; transition: height 0.2s; border-top: 1px solid #222; position: relative;">
-        <div id="custom-debug-log" style="padding-bottom: 20px;"></div>
+        <div id="custom-debug-log" style="padding-bottom: 30px;"></div>
+    </div>
+    
+    <!-- 【V6追加】REPL（コマンド入力）コンソール -->
+    <div id="custom-debug-repl" style="background: #06060a; padding: 4px 10px; border-top: 1px solid #00ffcc44; display: flex; align-items: center; gap: 8px;">
+        <span style="color: #00ffcc; font-weight: bold;">&gt;</span>
+        <input type="text" id="debug-repl-input" placeholder="JSコードを入力してEnter (例: console.log(window), document.body.style.background='red')" style="flex-grow: 1; background: transparent; border: none; color: #fff; font-family: 'Consolas', monospace; font-size: 12px; outline: none;">
     </div>
 </div>
 
@@ -2823,6 +2837,9 @@ else {
 <div id="god-master-toggle" style="position: fixed; right: 0; top: 50%; transform: translateY(-50%); background: rgba(6,6,10,0.9); border: 1px solid #00ffcc; border-right: none; color: #00ffcc; padding: 12px 4px; cursor: pointer; z-index: 9999999; border-radius: 4px 0 0 4px; font-family: 'Consolas', monospace; font-size: 10px; writing-mode: vertical-rl; user-select: none; box-shadow: -2px 0 8px rgba(0,0,0,0.8); transition: all 0.2s;">
     ▼ 隠す
 </div>
+
+<!-- 【V6追加】DOMピッカー用ハイライト要素 -->
+<div id="god-dom-highlighter" style="position: fixed; pointer-events: none; z-index: 9999997; border: 2px solid #0088ff; background: rgba(0, 136, 255, 0.2); display: none; transition: all 0.05s ease-out;"></div>
 
 <style>
     .dbg-btn { background: #14141f; color: #eee; border: 1px solid #333; padding: 3px 7px; font-size: 10px; cursor: pointer; border-radius: 3px; transition: all 0.15s; font-family: monospace; }
@@ -2837,6 +2854,16 @@ else {
     .dbg-warn { background: rgba(255, 170, 0, 0.12); border-left: 4px solid #ffaa00; padding-left: 6px; }
     .dbg-game { background: rgba(0, 255, 204, 0.08); border-left: 4px solid #00ffcc; padding-left: 6px; }
     .dbg-audit { background: rgba(155, 89, 182, 0.15); border-left: 4px solid #9b59b6; padding-left: 6px; }
+    
+    /* 【V6追加】オブジェクトインスペクタ用スタイル */
+    .dbg-tree-details { margin-left: 10px; }
+    .dbg-tree-summary { cursor: pointer; color: #3498db; user-select: none; outline: none; }
+    .dbg-tree-summary:hover { color: #00ffcc; text-decoration: underline; }
+    .dbg-tree-key { color: #9b59b6; }
+    .dbg-tree-string { color: #2ecc71; }
+    .dbg-tree-number { color: #f1c40f; }
+    .dbg-tree-boolean { color: #e74c3c; }
+    .dbg-tree-null { color: #7f8c8d; font-style: italic; }
 </style>
 
 <script>
@@ -2871,6 +2898,12 @@ else {
             gameStatusHUD: document.getElementById('dbg-game-status'),
             riskHUD: document.getElementById('dbg-risk-score'),
             lastSaveHUD: document.getElementById('dbg-last-save')
+        },
+        // 【V6追加】状態
+        v6: {
+            initialWindowKeys: new Set(Object.keys(window)), // グローバル汚染監視用
+            isPickerMode: false,
+            trapTargets: [] // 強制停止関数リスト
         }
     };
 
@@ -2948,14 +2981,22 @@ else {
         }, 2000);
     }
 
-    function _printLogToDOM(time, type, msg, color, cssClass = '', score = 0) {
+    function _printLogToDOM(time, type, msg, color, cssClass = '', score = 0, rawObjectForV6 = null) {
         safeExecute(() => {
             const div = document.createElement('div');
             div.className = `dbg-log-row ${cssClass}`;
             div.dataset.type = type;
             div.dataset.score = score;
             div.style.color = color;
-            div.innerHTML = `<span style="color:#555;font-size:10px;">[${time}]</span> <strong style="font-size:10px;padding:1px 3px;border-radius:2px;background:rgba(255,255,255,0.05);">[${type}]</strong> <span style="color:#666;font-size:9px;">(S:${score})</span> ${msg}`;
+            
+            // 【V6拡張】オブジェクトインスペクタの注入
+            if(rawObjectForV6 !== null && typeof rawObjectForV6 === 'object') {
+                const header = `<span style="color:#555;font-size:10px;">[${time}]</span> <strong style="font-size:10px;padding:1px 3px;border-radius:2px;background:rgba(255,255,255,0.05);">[${type}]</strong> <span style="color:#666;font-size:9px;">(S:${score})</span> `;
+                div.innerHTML = header;
+                div.appendChild(buildObjectTreeV6(rawObjectForV6, msg));
+            } else {
+                div.innerHTML = `<span style="color:#555;font-size:10px;">[${time}]</span> <strong style="font-size:10px;padding:1px 3px;border-radius:2px;background:rgba(255,255,255,0.05);">[${type}]</strong> <span style="color:#666;font-size:9px;">(S:${score})</span> ${msg}`;
+            }
             
             GOD.ui.logger.appendChild(div);
             if(GOD.ui.logger.children.length > 700) GOD.ui.logger.firstChild.remove();
@@ -2974,7 +3015,8 @@ else {
         return 5;
     }
 
-    function coreLog(msg, color, type, isError = false, isWarn = false, customClass = '') {
+    // 【V6引数追加】rawObject: インスペクタ用に生のオブジェクトを渡す
+    function coreLog(msg, color, type, isError = false, isWarn = false, customClass = '', rawObject = null) {
         if(isDebuggerActive) return;
         isDebuggerActive = true;
         safeExecute(() => {
@@ -3002,17 +3044,30 @@ else {
 
             let cssClass = customClass;
             if(!cssClass) cssClass = isError ? 'dbg-critical' : (isWarn ? 'dbg-warn' : '');
-            _printLogToDOM(time, type, finalMsg, color, cssClass, score);
+            _printLogToDOM(time, type, finalMsg, color, cssClass, score, rawObject);
         });
         isDebuggerActive = false;
     }
 
-    // --- 【3】Consoleフック (完全復元) ---
+    // --- 【3】Consoleフック (完全復元 + V6オブジェクト渡し対応) ---
     const rawConsole = { log: console.log, warn: console.warn, error: console.error, table: console.table, trace: console.trace };
     
-    console.log = (...args) => { rawConsole.log(...args); coreLog(args.map(a => safeStringify(a)).join(" "), "#2ecc71", "LOG"); };
-    console.warn = (...args) => { rawConsole.warn(...args); coreLog(args.map(a => safeStringify(a)).join(" "), "#ffaa00", "WARN", false, true); };
-    console.error = (...args) => { rawConsole.error(...args); coreLog(args.map(a => safeStringify(a)).join(" "), "#ff0055", "ERROR", true); };
+    // 【V6拡張】引数が1つでオブジェクトの場合、ツリー表示用に渡す
+    console.log = (...args) => { 
+        rawConsole.log(...args); 
+        const rawObj = (args.length === 1 && typeof args[0] === 'object') ? args[0] : null;
+        coreLog(args.map(a => safeStringify(a)).join(" "), "#2ecc71", "LOG", false, false, '', rawObj); 
+    };
+    console.warn = (...args) => { 
+        rawConsole.warn(...args); 
+        const rawObj = (args.length === 1 && typeof args[0] === 'object') ? args[0] : null;
+        coreLog(args.map(a => safeStringify(a)).join(" "), "#ffaa00", "WARN", false, true, '', rawObj); 
+    };
+    console.error = (...args) => { 
+        rawConsole.error(...args); 
+        const rawObj = (args.length === 1 && typeof args[0] === 'object') ? args[0] : null;
+        coreLog(args.map(a => safeStringify(a)).join(" "), "#ff0055", "ERROR", true, false, '', rawObj); 
+    };
     
     console.table = (data) => { 
         rawConsole.table(data); 
@@ -3113,7 +3168,7 @@ else {
             });
             const res = orig.apply(this, args);
             if(method === 'getElementById' && !res && typeof args[0] === 'string') {
-                if(!args[0].startsWith('dbg-') && !args[0].startsWith('custom-debug-')) {
+                if(!args[0].startsWith('dbg-') && !args[0].startsWith('custom-debug-') && !args[0].startsWith('god-')) {
                     coreLog(`⚠️ [DOM] getElementById("${args[0]}") が null を返しました。`, "#ffaa00", "DOM_NULL", false, true);
                 }
             }
@@ -3172,6 +3227,14 @@ else {
 
     // クリック診断 (6, 9)
     window.addEventListener('click', e => {
+        // 【V6拡張】DOMピッカーモード時は通常の処理をバイパス
+        if(GOD.v6.isPickerMode) {
+            e.preventDefault();
+            e.stopPropagation();
+            executeDOMPickerAction(e.target);
+            return;
+        }
+
         safeExecute(() => {
             let target = e.target;
             while(target && target !== document.body && target.tagName !== 'BUTTON' && !target.onclick && !target.getAttribute('onclick')) {
@@ -3284,6 +3347,11 @@ else {
                 }
 
                 GOD.ui.gameStatusHUD.innerText = statusText.length > 0 ? statusText.join(' | ') : '未初期化';
+                
+                // 【V6拡張】グローバル汚染チェック (数秒に1回程度の負荷分散のため条件を入れるのもありだが、現状は毎秒)
+                const currentKeys = Object.keys(window);
+                const leakCount = currentKeys.filter(k => !GOD.v6.initialWindowKeys.has(k)).length;
+                document.getElementById('dbg-global-leak').innerText = leakCount;
             });
 
             GOD.frameCount = 0;
@@ -3376,6 +3444,13 @@ else {
         // メモリ＆タイマー状態 (18)
         coreLog(`⏱ 登録イベント数: ${GOD.listeners.size}件 | 実行済みユニーク関数: ${Object.keys(GOD.funcProf).length}件`, "#00ffcc", "SUPER");
         coreLog("⚡ ワンクリック全診断が完了しました。上記のエラー/警告を確認してください。", "#a020f0", "SUPER");
+        
+        // 【V6追加】グローバル汚染のリストアップ
+        const currentKeys = Object.keys(window);
+        const leaked = currentKeys.filter(k => !GOD.v6.initialWindowKeys.has(k));
+        if(leaked.length > 0) {
+            coreLog(`👽 [グローバル汚染] 起動後に意図せず追加された可能性のあるグローバル変数 (${leaked.length}件): ${leaked.join(', ')}`, "#e74c3c", "SUPER_LEAK", true);
+        }
     }
 
     // --- 【12】21. 高度検索・NOT(!)/AND/OR/スコアフィルター ---
@@ -3517,7 +3592,8 @@ else {
         GOD.ui.errHUD.innerText = '0';
         coreLog("🧹 ログ・エラー・全履歴バッファをクリアしました", "#00ffcc", "SYSTEM");
     });
-        // --- 【追加】マスター表示トグル処理 ---
+    
+    // --- 【追加】マスター表示トグル処理 ---
     const masterToggleBtn = document.getElementById('god-master-toggle');
     const debugHud = document.getElementById('god-debug-hud');
     const debugContainer = document.getElementById('custom-debug-container');
@@ -3537,7 +3613,6 @@ else {
         masterToggleBtn.style.background = isDebugVisible ? 'rgba(6,6,10,0.9)' : 'rgba(3,3,5,0.7)';
     });
 
-
     // 初期起動＆自動スキャン
     window.addEventListener('load', () => {
         setTimeout(() => {
@@ -3550,10 +3625,211 @@ else {
         }, 1500);
     });
 
-    coreLog('🚀 OMNISCIENT DEBUGGER V5 起動完了。25項目の超全能プロトコル完全稼働。', '#00ffcc', 'SYSTEM');
+    // =========================================================================
+    // ▼▼ ここから V6 神格化拡張モジュール (The Engine Monitor V6) ▼▼
+    // =========================================================================
+
+    // 【V6.1】REPLコンソールエンジン
+    const replInput = document.getElementById('debug-repl-input');
+    replInput.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter') {
+            const code = replInput.value.trim();
+            if(!code) return;
+            coreLog(`> ${code}`, '#fff', 'REPL_IN');
+            try {
+                // evalを使用してスコープ内で実行
+                const result = eval(code);
+                console.log(result); // 拡張されたconsole.logを通り、オブジェクトならインスペクタに渡る
+            } catch(err) {
+                coreLog(`❌ [REPL Error] ${err.message}`, '#ff0055', 'REPL_ERR', true);
+            }
+            replInput.value = '';
+        }
+    });
+
+    // 【V6.2】オブジェクトインスペクタ (Tree View生成器)
+    function buildObjectTreeV6(obj, label = "Object", depth = 0) {
+        const container = document.createElement('details');
+        container.className = 'dbg-tree-details';
+        const summary = document.createElement('summary');
+        summary.className = 'dbg-tree-summary';
+        
+        let typeStr = Array.isArray(obj) ? `Array(${obj.length})` : typeof obj;
+        if(obj === null) typeStr = 'null';
+        else if(obj instanceof HTMLElement) typeStr = `DOM:${obj.tagName}`;
+        
+        summary.innerText = `${label} [${typeStr}]`;
+        container.appendChild(summary);
+
+        if(depth > 5 || obj === null || typeof obj !== 'object' || obj instanceof HTMLElement) {
+            const span = document.createElement('span');
+            span.style.color = '#aaa';
+            span.innerText = " (展開不可/制限到達)";
+            summary.appendChild(span);
+            return container;
+        }
+
+        let loaded = false;
+        container.addEventListener('toggle', () => {
+            if(!container.open || loaded) return;
+            loaded = true;
+            try {
+                for(let key in obj) {
+                    const val = obj[key];
+                    const row = document.createElement('div');
+                    row.style.marginLeft = "16px";
+                    
+                    const keySpan = document.createElement('span');
+                    keySpan.className = 'dbg-tree-key';
+                    keySpan.innerText = `${key}: `;
+                    row.appendChild(keySpan);
+
+                    if(typeof val === 'object' && val !== null) {
+                        row.appendChild(buildObjectTreeV6(val, '', depth + 1));
+                    } else {
+                        const valSpan = document.createElement('span');
+                        if(typeof val === 'string') { valSpan.className = 'dbg-tree-string'; valSpan.innerText = `"${val}"`; }
+                        else if(typeof val === 'number') { valSpan.className = 'dbg-tree-number'; valSpan.innerText = val; }
+                        else if(typeof val === 'boolean') { valSpan.className = 'dbg-tree-boolean'; valSpan.innerText = val; }
+                        else if(typeof val === 'undefined') { valSpan.className = 'dbg-tree-null'; valSpan.innerText = 'undefined'; }
+                        else if(typeof val === 'function') { valSpan.style.color = '#e67e22'; valSpan.innerText = `f ${val.name}()`; }
+                        else { valSpan.innerText = String(val); }
+                        row.appendChild(valSpan);
+                    }
+                    container.appendChild(row);
+                }
+            } catch(e) {
+                const errDiv = document.createElement('div');
+                errDiv.style.color = '#ff0055';
+                errDiv.innerText = `[読取エラー: ${e.message}]`;
+                container.appendChild(errDiv);
+            }
+        });
+        return container;
+    }
+
+    // 【V6.3】DOMピッカー (要素選択＆編集)
+    const pickerBtn = document.getElementById('debug-picker-btn');
+    const highlighter = document.getElementById('god-dom-highlighter');
+    let hoverHandler = null;
+
+    pickerBtn.addEventListener('click', () => {
+        GOD.v6.isPickerMode = !GOD.v6.isPickerMode;
+        if(GOD.v6.isPickerMode) {
+            pickerBtn.style.background = '#00ffcc';
+            pickerBtn.style.color = '#000';
+            pickerBtn.innerText = '🎯 ピッカー起動中 (クリックで選択)';
+            highlighter.style.display = 'block';
+            
+            hoverHandler = (e) => {
+                const rect = e.target.getBoundingClientRect();
+                highlighter.style.top = rect.top + 'px';
+                highlighter.style.left = rect.left + 'px';
+                highlighter.style.width = rect.width + 'px';
+                highlighter.style.height = rect.height + 'px';
+            };
+            document.addEventListener('mouseover', hoverHandler);
+        } else {
+            pickerBtn.style.background = '#004488';
+            pickerBtn.style.color = '#fff';
+            pickerBtn.innerText = '🎯 DOMピッカー';
+            highlighter.style.display = 'none';
+            document.removeEventListener('mouseover', hoverHandler);
+        }
+    });
+
+    function executeDOMPickerAction(target) {
+        GOD.v6.isPickerMode = false;
+        pickerBtn.style.background = '#004488';
+        pickerBtn.style.color = '#fff';
+        pickerBtn.innerText = '🎯 DOMピッカー';
+        highlighter.style.display = 'none';
+        document.removeEventListener('mouseover', hoverHandler);
+
+        window.$0 = target; // F12おなじみの $0 に格納
+        coreLog(`🎯 要素を選択しました (変数 $0 で操作可能)`, '#00ffcc', 'DOM_PICK');
+        console.log(target); // インスペクタへ渡る
+        
+        // 簡単なCSS情報などを出力
+        const styles = window.getComputedStyle(target);
+        coreLog(`[ID: ${target.id || 'なし'}] [Class: ${target.className || 'なし'}] [Size: ${target.offsetWidth}x${target.offsetHeight}] [Display: ${styles.display}]`, '#aaa', 'DOM_INFO');
+    }
+
+    // 【V6.4】ストレージ完全管理エディタ
+    const storageBtn = document.getElementById('debug-storage-edit-btn');
+    storageBtn.addEventListener('click', () => {
+        let list = "=== 🗄️ LocalStorage 一覧 (全" + localStorage.length + "件) ===\n";
+        for(let i=0; i<localStorage.length; i++){
+            const k = localStorage.key(i);
+            const v = localStorage.getItem(k);
+            list += `[${i}] ${k} (${v.length} bytes)\n`;
+        }
+        list += "--------------------------------------\n※REPLにて localStorage.removeItem('キー名') や localStorage.clear() が可能です。";
+        coreLog(list, '#f39c12', 'STORAGE_MGR');
+        
+        // 全データをオブジェクト化してインスペクタに投げる
+        const storageObj = {};
+        for(let i=0; i<localStorage.length; i++) storageObj[localStorage.key(i)] = localStorage.getItem(localStorage.key(i));
+        console.log({ "[LocalStorage Data]": storageObj });
+    });
+
+    // 【V6.5】罠 (Debugger) 設置機能
+    const trapBtn = document.getElementById('debug-trap-btn');
+    trapBtn.addEventListener('click', () => {
+        const funcName = prompt('罠(ブレークポイント)を仕掛けるグローバル関数名を入力してください:\n例: "updateGame", "player.attack"');
+        if(!funcName) return;
+        
+        try {
+            const parts = funcName.split('.');
+            let parent = window;
+            let targetName = parts.pop();
+            for(let p of parts) parent = parent[p];
+            
+            if(typeof parent[targetName] === 'function') {
+                const orig = parent[targetName];
+                parent[targetName] = function(...args) {
+                    coreLog(`🛑 [TRAP発動] 関数 ${funcName}() が実行されました！処理を一時停止します。`, '#ff00ff', 'TRAP', true);
+                    debugger; // ブラウザが対応していればここで強制停止する
+                    return orig.apply(this, args);
+                };
+                coreLog(`🎯 関数 ${funcName}() に罠(Debugger)を設置しました。次回実行時に停止します。`, '#00ffcc', 'TRAP_SET');
+            } else {
+                alert('指定された関数が見つかりません。');
+            }
+        } catch(e) {
+            alert('関数のパースに失敗しました。');
+        }
+    });
+
+    // 【V6.6】SyntaxError防護ブートローダー関数 (外部から呼べるようにwindowに露出)
+    window.GodBootLoader = async function(scriptUrl) {
+        coreLog(`🛡️ [BootLoader] ${scriptUrl} を安全に読み込みます...`, '#3498db', 'BOOT');
+        try {
+            const res = await fetch(scriptUrl);
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            const code = await res.text();
+            
+            // 構文チェック (new Function でパースだけさせる)
+            try {
+                new Function(code);
+                coreLog(`✅ [BootLoader] ${scriptUrl} 構文チェック通過。実行します。`, '#2ecc71', 'BOOT');
+                // 実行
+                const scriptEl = document.createElement('script');
+                scriptEl.textContent = code;
+                document.body.appendChild(scriptEl);
+            } catch(syntaxErr) {
+                coreLog(`💥 [BootLoader 致命的構文エラー] ${scriptUrl}\n${syntaxErr.message}`, '#ff0055', 'BOOT_ERR', true);
+                console.error("Syntax Error Code Snippet:", code.substring(0, 500) + '...');
+            }
+        } catch(netErr) {
+            coreLog(`❌ [BootLoader 通信エラー] ${scriptUrl} を取得できませんでした。`, '#ff0055', 'BOOT_ERR', true);
+        }
+    };
+
+    coreLog('👑 OMNISCIENT DEBUGGER V6 [GOD MODE] 起動完了。F12代替機能がアクティブになりました。', '#f1c40f', 'SYSTEM_V6');
 })();
 </script>
-<!-- ▲▲ 究極神デバッガー V5 ここまで ▲▲ -->
+<!-- ▲▲ 究極神デバッガー V6 ここまで ▲▲ -->
 
 　
 </body>
