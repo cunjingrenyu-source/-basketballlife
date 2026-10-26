@@ -1781,6 +1781,32 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
 };
 
 　　　　
+        // 🚨【修正追加】ループの外に出して軽量化
+        const updateBox = (player, key, val = 1) => {
+            if (player && player._box) {
+                player._box[key] = (player._box[key] || 0) + val;
+            }
+        };
+
+        const addScore = (pts, qtr, isHomeOffense, hData, aData) => {
+            const offSide = isHomeOffense ? 'home' : 'away';
+            if (typeof score !== 'undefined' && score) score[offSide] = (score[offSide] || 0) + pts;
+            const qIdx = qtr - 1;
+            if (typeof qScores !== 'undefined' && qScores && qScores[offSide]) {
+                qScores[offSide][qIdx] = (qScores[offSide][qIdx] || 0) + pts;
+            }
+            if (Array.isArray(hData?.court) && Array.isArray(aData?.court)) {
+                let offData = isHomeOffense ? hData : aData;
+                let defData = isHomeOffense ? aData : hData;
+                offData.court.forEach(p => updateBox(p, 'plusMinus', pts));
+                defData.court.forEach(p => updateBox(p, 'plusMinus', -pts));
+            }
+        };
+
+        const getSafeStat = (player, key, fallback = 50) => {
+            const val = player?.currentStats?.[key];
+            return (typeof val === "number" && isFinite(val)) ? val : fallback;
+        };
 
            while (gameState.currentQ <= gameState.maxQ) {
             // 【第1章】各クォーター開始時の時計とフェーズのリセット
