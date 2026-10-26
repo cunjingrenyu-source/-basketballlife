@@ -1724,7 +1724,63 @@ window.renderPracticeGrid = function() {
             gameState.shotClock -= actualSpent;
             return actualSpent;
         };
+        // =========================================================
+// 【演出データベース＆選択システム】（課題3-1〜3-11完全対応）
+// 乱数の使い回しを廃止し、能力・状況・乱数の独立抽選で演出を決定する
+// =========================================================
 
+const playDb = {
+    three: [
+        { type: "god", condition: (s, d, cl, clk, diff) => s.three > 120 && clk < 10, prob: 0.05, text: "{shooter}がロゴ付近から放つディープスリー！！美しい弧を描きネットを揺らした！！！", high: true },
+        { type: "rare", condition: (s, d, cl, clk, diff) => s.three > 90 && cl === "Smothered", prob: 0.15, text: "<span style='color:#e74c3c; font-weight:bold;'>【タフショット！】</span>ディフェンスがガチガチに密着する中、{shooter}が強引に3Pを沈めた！", high: true },
+        { type: "upper", condition: (s, d, cl, clk, diff) => s.dribble > 90, prob: 0.25, text: "{shooter}の鋭いステップバックからの3Pが決まった！", high: false },
+        { type: "normal", condition: (s, d, cl, clk, diff) => cl === "Wide Open" || cl === "Open", prob: 0.6, text: "{shooter}がフリーの状態で確実に3Pを沈めた！", high: false },
+        { type: "normal", condition: (s, d, cl, clk, diff) => true, prob: 0.5, text: "{shooter}がスクリーンを使い3P！決まった！", high: false },
+        { type: "normal", condition: (s, d, cl, clk, diff) => true, prob: 1.0, text: "{shooter}がキャッチ＆シュートで3Pを沈めた！", high: false }
+    ],
+    dunk: [
+        { type: "god", condition: (s, d, cl, clk, diff) => s.dunk > 130, prob: 0.02, text: "<span style='color:#e74c3c; font-weight:bold;'>【伝説級ダンク！】</span>{shooter}がフリースローラインから跳躍し、空を歩くようなダンクを叩き込んだ！！！", high: true },
+        { type: "rare", condition: (s, d, cl, clk, diff) => s.dunk > 110, prob: 0.1, text: "{shooter}が空中で腕を回す豪快なウィンドミルダンク炸裂！！！", high: true },
+        { type: "rare", condition: (s, d, cl, clk, diff) => s.physical > 100 && (cl === "Smothered" || cl === "Heavily Contested"), prob: 0.2, text: "<span style='color:#c0392b; font-weight:bold;'>【ポスタライズ！】</span>{shooter}が{defender}を吹き飛ばす強烈なダンク！！", high: true },
+        { type: "normal", condition: (s, d, cl, clk, diff) => true, prob: 0.5, text: "{shooter}が豪快なボースハンドダンクを決めた！", high: false },
+        { type: "normal", condition: (s, d, cl, clk, diff) => true, prob: 1.0, text: "{shooter}が力強いワンハンドダンクを叩き込んだ！", high: false }
+    ],
+    layup: [
+        { type: "god", condition: (s, d, cl, clk, diff) => s.layup > 120 && cl === "Smothered", prob: 0.05, text: "<span style='color:#e74c3c; font-weight:bold;'>【サーカスショット！】</span>ブロックを空中で2度躱す！{shooter}の変態的なトリプルクラッチ！！", high: true },
+        { type: "rare", condition: (s, d, cl, clk, diff) => s.speed > 100 && s.layup > 100, prob: 0.15, text: "{shooter}が空中でボールを動かす優雅なジェリー・レイアップを沈めた！", high: true },
+        { type: "upper", condition: (s, d, cl, clk, diff) => s.layup > 90, prob: 0.25, text: "{shooter}がユーロステップで{defender}を嘲笑うかのように抜き去りレイアップ！", high: false },
+        { type: "upper", condition: (s, d, cl, clk, diff) => s.layup > 80, prob: 0.3, text: "{shooter}が高い弧を描くティアドロップ（フローター）を沈めた！", high: false },
+        { type: "normal", condition: (s, d, cl, clk, diff) => true, prob: 0.5, text: "{shooter}がゴール下を潜り抜け、リバース・レイアップ！", high: false },
+        { type: "normal", condition: (s, d, cl, clk, diff) => true, prob: 1.0, text: "{shooter}が巧みにレイアップを沈めた。", high: false }
+    ],
+    middle: [
+        { type: "rare", condition: (s, d, cl, clk, diff) => s.middle > 100 && s.dribble > 100, prob: 0.15, text: "{shooter}が鮮やかなスピンムーブからフェイダウェイ！美しく射抜いた！", high: true },
+        { type: "upper", condition: (s, d, cl, clk, diff) => s.dribble > 90, prob: 0.25, text: "{shooter}が急停止からのプルアップジャンパー！綺麗に決まった！", high: false },
+        { type: "upper", condition: (s, d, cl, clk, diff) => s.middle > 90 && cl === "Heavily Contested", prob: 0.3, text: "タフな体勢から{shooter}がミドルシュートをねじ込む！", high: false },
+        { type: "normal", condition: (s, d, cl, clk, diff) => true, prob: 0.5, text: "{shooter}がディフェンスの隙を突いたミドルシュートを確実に決めた。", high: false },
+        { type: "normal", condition: (s, d, cl, clk, diff) => true, prob: 1.0, text: "{shooter}がミドルレンジから確実なジャンプシュート！", high: false }
+    ]
+};
+
+const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
+    const sStats = shooter?.currentStats || {};
+    const dStats = defender?.currentStats || {};
+    const options = playDb[type] || playDb.middle;
+    
+    for (let opt of options) {
+        if (opt.condition(sStats, dStats, contestLevel, clock, diff)) {
+            // 条件を満たしても確率で通常技にフォールバックさせる（超絶プレイの乱発防止）
+            if (Math.random() < opt.prob) {
+                let text = opt.text.replace(/{shooter}/g, shooter.name).replace(/{defender}/g, defender.name);
+                return { text, high: opt.high };
+            }
+        }
+    }
+    // フェイルセーフ
+    return { text: `${shooter.name}がシュートを決めた！`, high: false };
+};
+
+　　　　
 
            while (gameState.currentQ <= gameState.maxQ) {
             // 【第1章】各クォーター開始時の時計とフェーズのリセット
