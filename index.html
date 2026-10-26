@@ -475,6 +475,52 @@ function loadFromIDB(logId) {
         }
     }
 
+
+// まだ定義されていなかったUI用関数を補完
+function changeView(viewId) {
+    if (viewId !== 'match' && viewId !== 'player-detail' && viewId !== 'historical-match') {
+        previousView = viewId;
+    }
+    document.querySelectorAll('.content-area').forEach(el => el.style.display = 'none');
+    let targetView = document.getElementById(viewId + '-view');
+    if (targetView) targetView.style.display = 'block';
+    else document.getElementById('home-view').style.display = 'block';
+
+    document.querySelectorAll('.nav-menu button').forEach(b => b.classList.remove('active'));
+    let navBtn = document.getElementById('btn-nav-' + viewId);
+    if (navBtn) navBtn.classList.add('active');
+}
+
+function goHome() { changeView('home'); }
+function goBackFromDetail() { changeView(previousView); }
+function toggleMenu() {
+    let menu = document.getElementById('nav-menu');
+    menu.style.display = (menu.style.display === 'flex') ? 'none' : 'flex';
+}
+function forceSimulate() { alert("シミュレーション関数をここに紐付けます"); }
+function resetSave() {
+    if(confirm("データをリセットしますか？")) { localStorage.removeItem(SAVE_KEY); location.reload(); }
+}
+function registerPlayer() { changeView('home'); } // 必要に応じて中身を作る
+
+window.closeStatModal = function(event) {
+    if (event && event.target && event.target.id !== 'stat-modal') return;
+    const modal = document.getElementById('stat-modal');
+    if (modal) modal.style.display = 'none';
+};
+window.openStatModal = openStatModal;
+window.switchMatchTab = switchMatchTab;
+window.changeView = changeView;
+window.goHome = goHome;
+window.goBackFromDetail = goBackFromDetail;
+window.toggleMenu = toggleMenu;
+window.forceSimulate = forceSimulate;
+window.resetSave = resetSave;
+window.registerPlayer = registerPlayer;
+
+
+
+
  // --- セーブ＆ロード (Firebase対応版) ---
 
 // 🔑 自分専用のユーザーID（端末ごとに自動生成して記憶）
