@@ -2619,11 +2619,18 @@ if (Math.random() < Math.min(maxRate, Math.max(minRate, rawRate))) {
             }
         }
                         
-        writeLog(currentClock, defData.team.name, logText, (isOutletPass || isFastBreak), [defReber.id]);
-        switchPossession(24, (isOutletPass || isFastBreak));
-        continue;
-    }
-}
+                                writeLog(gameState.clock, defData.team.name, logText, (isOutletPass || isFastBreak), [defReber.id]);
+                        switchPossession(24, (isOutletPass || isFastBreak));
+                        continue;
+                    }
+                }
+            } // 🚨【修正追加】while(gameState.clock > 0) を閉じる
+            
+            // クォーター終了時の処理（次のクォーターへ）
+            gameState.currentQ++;
+
+        } // 🚨【修正追加】while (gameState.currentQ <= gameState.maxQ) を閉じる
+
 
         // --- 個人スタッツのグローバル反映＆IndexedDB保存 ---
         const commitToGlobalStats = (teamState, isH) => {
