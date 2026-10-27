@@ -2303,24 +2303,40 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 }
 
 
-                // 【課題1】オープン度（Contest Value）の算出。低いほどフリー、高いほど密着。
-                let contestValue = 0;
-                if (shotType === "three" || shotType === "middle") {
-                    // アウトサイド：ディフェンスのスピードとIQによる間合い詰め
-                    contestValue = ((activeDefStats.defense || 50) * 0.6 + (activeDefStats.speed || 50) * 0.4) / 120;
-                } else {
-                    // インサイド：フィジカルとリムプロテクト
-                    let primaryDef = isDriveBeaten ? 0 : ((activeDefStats.defense || 50) * 0.5 + (activeDefStats.physical || 50) * 0.5) / 120;
-                    let helpDef = helpDefender ? ((helpDefender.currentStats?.defense || 50) * 0.7 + (helpDefender.currentStats?.physical || 50) * 0.3) / 150 : 0;
-                    contestValue = primaryDef + helpDef;
-                    
-                    if (helpDefender && (isDriveBeaten || Math.random() < 0.5)) defender = helpDefender; 
+                          // 【課題1-1, 1-2, 1-7】ディフェンダーとの「距離」の概念をシミュレート（0.0:密着 〜 1.0:完全に離れている）
+                let defDistance = 0.5; // 基準値
+                
+                // 【課題2-5】速攻時の距離判定（確定でフリーにしない。戻りの速さを考慮）
+                if (gameState.isFastBreak) {
+                    let transitionDefense = (activeDefStats.speed ?? 50) * 0.7 + (activeDefStats.defense ?? 50) * 0.3;
+                    defDistance = transitionDefense > 75 ? 0.4 : 0.8; // 守備が速ければ距離を詰める
                 }
 
-                // ランダム要素と時間プレッシャーを加味して最終的な状況を決定
-                contestValue *= (0.7 + Math.random() * 0.6);
-                if (gameState.shotClock <= 3 && !gameState.isFastBreak) contestValue += 0.4; // 時間がないとタフショットになる
-                if (gameState.isFastBreak) contestValue -= 0.5; // 速攻は基本フリー
+                let contestValue = 0;
+                if (shotType === "three" || shotType === "middle") {
+                    // アウトサイド：距離とクローズアウト（接近）の能力で計算
+                    let closeOutAbility = ((activeDefStats.defense ?? 50) * 0.6 + (activeDefStats.speed ?? 50) * 0.4) / 100;
+                    // 距離が遠い(1.0に近い)ほどコンテストは下がる
+                    contestValue = closeOutAbility * (1.0 - defDistance);
+                } else {
+                    // インサイド：ブロックとヘルプの計算
+                    let primaryDef = isDriveBeaten ? 0 : ((activeDefStats.defense ?? 50) * 0.5 + (activeDefStats.physical ?? 50) * 0.5) / 100;
+                    let helpDef = 0;
+                    
+                    if (helpDefender) {
+                        let hStats = helpDefender.currentStats ?? {};
+                        helpDef = ((hStats.defense ?? 50) * 0.6 + (hStats.physical ?? 50) * 0.4) / 100;
+                        actualContester = helpDefender; // 【課題10-4】元の primaryDefender は維持し、コンテスターだけ更新
+                    }
+                    contestValue = primaryDef + helpDef;
+                }
+
+                // 【課題2-6】乱数依存の軽減。ベース値に少し揺らぎを入れる程度（0.85 〜 1.15）
+                contestValue *= (0.85 + Math.random() * 0.3);
+
+                // 【課題2-4】ショットクロックのプレッシャー（コンテスト値とは切り離すため、タフショット係数として別管理）
+                let shotClockPressure = (gameState.shotClock <= 3 && !gameState.isFastBreak) ? 0.15 : 0.0;
+
 
                 // 【課題1】6段階のオープン度(Shot Contest Level)の確定
                 let contestLevel = "Wide Open";
