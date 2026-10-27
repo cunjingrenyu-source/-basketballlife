@@ -2337,41 +2337,49 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 // 【課題2-4】ショットクロックのプレッシャー（コンテスト値とは切り離すため、タフショット係数として別管理）
                 let shotClockPressure = (gameState.shotClock <= 3 && !gameState.isFastBreak) ? 0.15 : 0.0;
 
-
-                // 【課題1】6段階のオープン度(Shot Contest Level)の確定
+                // 【課題1-3, 1-4, 2-1】6段階のオープン度確定と、成功率補正（乗算・加算のベースとして扱いやすい数値）
                 let contestLevel = "Wide Open";
-                let contestPenalty = 0.0; // 成功率へのマイナス補正
-                let staminaDrain = 0;     // 攻撃・守備双方のスタミナ消費量
+                let contestPenalty = 0.0; 
+                let defStaminaDrain = 0; // 守備側の追加スタミナ消費
+                
+                // プレッシャーを加味した最終判定用スコア
+                let finalContestScore = contestValue + shotClockPressure;
 
-                if (contestValue <= 0.2) {
+                if (finalContestScore <= 0.15) {
                     contestLevel = "Wide Open";
-                    contestPenalty = -0.15; // 逆に成功率アップ
-                    staminaDrain = 1;
-                } else if (contestValue <= 0.5) {
+                    contestPenalty = -0.10; // 成功率上昇ボーナス
+                    defStaminaDrain = 0; // 守備は間に合っていない
+                } else if (finalContestScore <= 0.35) {
                     contestLevel = "Open";
-                    contestPenalty = 0.0;
-                    staminaDrain = 2;
-                } else if (contestValue <= 0.8) {
+                    contestPenalty = 0.05; // わずかな影響
+                    defStaminaDrain = 1;
+                } else if (finalContestScore <= 0.60) {
                     contestLevel = "Semi-Open";
-                    contestPenalty = 0.10;
-                    staminaDrain = 3;
-                } else if (contestValue <= 1.1) {
+                    contestPenalty = 0.15;
+                    defStaminaDrain = 2;
+                } else if (finalContestScore <= 0.85) {
                     contestLevel = "Lightly Contested";
-                    contestPenalty = 0.20;
-                    staminaDrain = 4;
-                } else if (contestValue <= 1.4) {
+                    contestPenalty = 0.25;
+                    defStaminaDrain = 3;
+                } else if (finalContestScore <= 1.15) {
                     contestLevel = "Heavily Contested";
-                    contestPenalty = 0.35;
-                    staminaDrain = 6;
+                    contestPenalty = 0.40;
+                    defStaminaDrain = 5;
                 } else {
                     contestLevel = "Smothered";
-                    contestPenalty = 0.50; // 絶望的なチェック
-                    staminaDrain = 8;
+                    contestPenalty = 0.60; // 絶望的なチェック
+                    defStaminaDrain = 7;
                 }
 
-                // 【課題58】スタミナ消費の適用。激しいコンテストほど両者消耗する
-                if (shooter?._stamina !== undefined) shooter._stamina = Math.max(0, shooter._stamina - staminaDrain);
-                if (defender?._stamina !== undefined) defender._stamina = Math.max(0, defender._stamina - staminaDrain);
+                // 【課題6-2, 6-3】スタミナ消費の再設計。シュート自体の基本消費(1) ＋ 接触による追加消費
+                if (shooter?._stamina !== undefined) {
+                    let offStaminaDrain = 1 + (contestLevel === "Heavily Contested" || contestLevel === "Smothered" ? 2 : 0);
+                    shooter._stamina = Math.max(0, shooter._stamina - offStaminaDrain);
+                }
+                if (actualContester?._stamina !== undefined) {
+                    actualContester._stamina = Math.max(0, actualContester._stamina - defStaminaDrain);
+                }
+
 
                 // 【課題4】オープン度に応じた守備ログの出力（ログと内部計算の完全一致）
                 if (contestLevel === "Smothered") {
