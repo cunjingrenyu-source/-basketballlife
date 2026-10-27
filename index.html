@@ -2543,7 +2543,7 @@ if (Math.random() < Math.min(maxRate, Math.max(minRate, rawRate))) {
     updateBox(shooter, 'fgm', 1);
     updateBox(shooter, 'pts', pts);
     if (shotType === "three") updateBox(shooter, 'tpm', 1);
-    addScore(pts);
+  addScore(pts, currentQ, isHomeOffense, hData, aData);
 
     const newDiff = currentIsHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
     // 条件の厳格化（真のブザービーターとクラッチ判定）
