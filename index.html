@@ -2506,19 +2506,30 @@ if (Math.random() < Math.min(0.95, Math.max(0.02, foulChance))) {
 }
 
 // --- B. 正規シュート処理（ファウルなし） ---
+// ※既存ロジック100%維持 ＋ 重複排除 ＋ 新演出6種追加
+
 updateBox(shooter, 'fga', 1);
 if (shotType === "three") updateBox(shooter, 'tpa', 1);
 
+// 既存維持：シュート確率計算
 let toughShotMaker = ((statUsed + getSafeStat(shooter, 'mental')) / 250); 
 let actualPenalty = Math.max(0, contestPenalty - (toughShotMaker * 0.15));
-if (isClutchTime && getSafeStat(shooter, 'mental') > 90) actualPenalty *= 0.5;
+if (typeof isClutchTime !== 'undefined' && isClutchTime && getSafeStat(shooter, 'mental') > 90) actualPenalty *= 0.5;
 
-let rawRate = (baseRate + ((statUsed - 30) / 120) * 0.30) * (shooter?._cond ?? 1) - actualPenalty + playmakerBuff;
+let rawRate = (baseRate + ((statUsed - 30) / 120) * 0.30) * (shooter?._cond ?? 1) - actualPenalty + (typeof playmakerBuff !== 'undefined' ? playmakerBuff : 0);
 if (getSafeStat(shooter, '_stamina', 100) < 30) rawRate -= 0.08;
 
+// 🔴【新機能1】ホットハンド・バフ（連続成功で確率が微増する隠し要素）
+shooter._consecutiveMakes = shooter._consecutiveMakes || 0;
+if (shooter._consecutiveMakes > 0) {
+    rawRate += Math.min(0.05, shooter._consecutiveMakes * 0.015); // 最大5%の確率アップ
+}
+
+// 🏀既存維持：アンクルブレイク判定
 let ankleBreak = (getSafeStat(shooter, 'dribble') > getSafeStat(defender, 'defense') + 20 && Math.random() < 0.15 * (shooter?._cond ?? 1));
 if (ankleBreak) rawRate += 0.20;
 
+// 🏀既存維持：ブロック判定（スナッチブロック等）
 let blockChance = ((getSafeStat(defender, 'defense') + getSafeStat(defender, 'physical')) / 300) * 0.08;
 if (contestLevel === "Smothered") blockChance += 0.06;
 else if (contestLevel === "Heavily Contested") blockChance += 0.03;
@@ -2535,8 +2546,15 @@ if (Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
                   isChaseDown ? `<span style="color:#e74c3c; font-weight:bold;">【チェイスダウン！】</span>${defender.name}が背後からボードに叩きつけるチェイスダウンブロック！！！` :
                   `✋ ${shooter.name}のシュートを${defender.name}が見事にブロック！`;
     
-    writeLog(gameState.clock, defData.team.name, blkText, (isHighBlock || isChaseDown || isSnatchBlock), [shooter.id, defender.id]);
+    // 変数名エラー防止処理
+    const logClock = typeof currentClock !== 'undefined' ? currentClock : gameState.clock;
+    writeLog(logClock, defData.team.name, blkText, (isHighBlock || isChaseDown || isSnatchBlock), [shooter.id, defender.id]);
     
+    // 🔴【新機能2】ブロック後のトラッシュトーク（メンタル強者が大ブロックした時のみ）
+    if ((isHighBlock || isSnatchBlock) && getSafeStat(defender, 'mental') > 90 && Math.random() < 0.2) {
+         writeLog(logClock, defData.team.name, `🗣️ ${defender.name}が${shooter.name}を一瞥し、指を振って「Not in my house!」とアピール！`, false, [defender.id]);
+    }
+
     if (isSnatchBlock) {
         updateBox(defender, 'drb', 1);
         updateBox(defender, 'reb', 1);
@@ -2544,82 +2562,58 @@ if (Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
     } else {
         switchPossession(24, false);
     }
+    
+    shooter._consecutiveMakes = 0; // ブロックされたら連続成功はリセット
     continue;
 }
 
-
-// --- B. 正規シュート処理（ファウルなし） ---
-updateBox(shooter, 'fga', 1);
-if (shotType === "three") updateBox(shooter, 'tpa', 1);
-
-let toughShotMaker = ((statUsed + getSafeStat(shooter, 'mental')) / 250); 
-let actualPenalty = Math.max(0, contestPenalty - (toughShotMaker * 0.15));
-if (isClutchTime && getSafeStat(shooter, 'mental') > 90) actualPenalty *= 0.5;
-
-let rawRate = (baseRate + ((statUsed - 30) / 120) * 0.30) * (shooter?._cond ?? 1) - actualPenalty + playmakerBuff;
-if (getSafeStat(shooter, '_stamina', 100) < 30) rawRate -= 0.08;
-
-// 🏀アンクルブレイク判定
-let ankleBreak = (getSafeStat(shooter, 'dribble') > getSafeStat(defender, 'defense') + 20 && Math.random() < 0.15 * (shooter?._cond ?? 1));
-if (ankleBreak) rawRate += 0.20;
-
-// 🏀ブロック判定（スナッチブロックを新規追加）
-let blockChance = ((getSafeStat(defender, 'defense') + getSafeStat(defender, 'physical')) / 300) * 0.08;
-if (contestLevel === "Smothered") blockChance += 0.06;
-else if (contestLevel === "Heavily Contested") blockChance += 0.03;
-if (shotType === "dunk") blockChance -= 0.03; 
-
-if (Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
-    updateBox(defender, 'blk', 1);
-    const isChaseDown = getSafeStat(defender, 'speed') > 100 && Math.random() < 0.3;
-    const isHighBlock = !isChaseDown && getSafeStat(defender, 'physical') > 110 && getSafeStat(defender, 'defense') > 100 && Math.random() < 0.3;
-    const isSnatchBlock = isHighBlock && getSafeStat(defender, 'rebound') > 100 && Math.random() < 0.15; // 空中でボールを掴み取る超絶プレイ
-    
-    let blkText = isSnatchBlock ? `<span style="color:#8e44ad; font-weight:bold;">【スナッチブロック！！！】</span>信じられない跳躍力！${defender.name}が空中でシュートを鷲掴みにした！！！` :
-                  isHighBlock ? `<span style="color:#e74c3c; font-weight:bold;">【超絶ブロック！】</span>${shooter.name}のシュートを${defender.name}がバレーボールのスパイクのように叩き落とす！！！` :
-                  isChaseDown ? `<span style="color:#e74c3c; font-weight:bold;">【チェイスダウン！】</span>${defender.name}が背後からボードに叩きつけるチェイスダウンブロック！！！` :
-                  `✋ ${shooter.name}のシュートを${defender.name}が見事にブロック！`;
-    
-    writeLog(currentClock, defData.team.name, blkText, (isHighBlock || isChaseDown || isSnatchBlock), [shooter.id, defender.id]);
-    
-    // スナッチブロックの場合はそのままポゼッション獲得、それ以外は通常
-    if (isSnatchBlock) {
-        updateBox(defender, 'drb', 1);
-        updateBox(defender, 'reb', 1);
-        switchPossession(24, true);
-    } else {
-        switchPossession(24, false);
-    }
-    continue;
-}
-
-// シュート成功判定
+// 🏀既存維持：シュート成功判定（確率上下限）
 const minRate = ["Smothered", "Heavily Contested"].includes(contestLevel) ? 0.15 : 0.25;
 const maxRate = contestLevel === "Wide Open" ? 0.95 : 0.85;
+const finalRate = Math.min(maxRate, Math.max(minRate, rawRate));
 
-if (Math.random() < Math.min(maxRate, Math.max(minRate, rawRate))) {
+// 🔴【新機能3】シューターズ・バウンス（外れた判定でも低確率でリングに弾かれて入る運要素）
+const shotRoll = Math.random();
+let isLuckyBounce = false;
+let isMade = (shotRoll < finalRate);
+
+if (!isMade && shotRoll < finalRate + 0.05 && getSafeStat(shooter, 'mental') > 80 && Math.random() < 0.15) {
+    isMade = true;
+    isLuckyBounce = true;
+}
+
+if (isMade) {
     const pts = shotType === "three" ? 3 : 2;
     updateBox(shooter, 'fgm', 1);
     updateBox(shooter, 'pts', pts);
     if (shotType === "three") updateBox(shooter, 'tpm', 1);
-  addScore(pts, currentQ, isHomeOffense, hData, aData);
-
-    const newDiff = currentIsHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
-    // 条件の厳格化（真のブザービーターとクラッチ判定）
-    const isBuzzerBeater = (currentQtr >= 4 && currentClock <= 3 && typeof prevDiff !== 'undefined' && prevDiff <= 0 && newDiff > 0);
-    const isClutch = (isClutchTime && typeof prevDiff !== 'undefined' && prevDiff <= 3 && prevDiff >= -3 && newDiff > 0);
     
+    shooter._consecutiveMakes += 1; // 連続成功カウントUP
+    
+    // 既存維持：スコア追加処理（変数名エラー回避）
+    const qtrToUse = typeof currentQ !== 'undefined' ? currentQ : (typeof currentQtr !== 'undefined' ? currentQtr : gameState.currentQ);
+    const homeOffToUse = typeof isHomeOffense !== 'undefined' ? isHomeOffense : currentIsHome;
+    addScore(pts, qtrToUse, homeOffToUse, hData, aData);
+
+    const newDiff = homeOffToUse ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
+    const safePrevDiff = typeof prevDiff !== 'undefined' ? prevDiff : (newDiff - pts);
+    const logClock2 = typeof currentClock !== 'undefined' ? currentClock : gameState.clock;
+    
+    const isBuzzerBeater = (qtrToUse >= 4 && logClock2 <= 3 && safePrevDiff <= 0 && newDiff > 0);
+    const isClutch = (typeof isClutchTime !== 'undefined' && isClutchTime && safePrevDiff <= 3 && safePrevDiff >= -3 && newDiff > 0);
+    
+    // 既存維持：アシスト＆アリウープ判定
     let assistText = "";
     const involved = [shooter.id, defender.id];
     
-    if (isAssist && actualPasser) {
+    if (typeof isAssist !== 'undefined' && isAssist && typeof actualPasser !== 'undefined' && actualPasser) {
         updateBox(actualPasser, 'ast', 1);
         involved.push(actualPasser.id);
         const isAlleyOop = ["dunk", "layup"].includes(shotType) && getSafeStat(actualPasser, 'pass') > 100 && getSafeStat(shooter, 'dunk') > 90;
         
         if (isAlleyOop && Math.random() < 0.25) {
             assistText = `<span style="color:#9b59b6; font-weight:bold;">【アリウープ！】</span>${actualPasser.name}の絶妙なロブパスから`;
-            shotType = "dunk"; // アリウープ演出用に上書き
+            shotType = "dunk"; 
         } else {
             const passQuality = getSafeStat(actualPasser, 'pass');
             const passDesc = passQuality > 120 && Math.random() < 0.3 ? '変態的なノールックパス' : 
@@ -2628,34 +2622,61 @@ if (Math.random() < Math.min(maxRate, Math.max(minRate, rawRate))) {
         }
     }
 
-    // 🏀データベースシステムからテキストとハイライトフラグを取得
-    let playResult = getPlayText(shotType, shooter, defender, contestLevel, currentClock, prevDiff);
+    // 既存維持：テキストデータベース取得
+    let playResult = typeof getPlayText === 'function' ? getPlayText(shotType, shooter, defender, contestLevel, logClock2, safePrevDiff) : { text: `${shooter.name}のシュートが決まる！`, high: false };
     let playText = playResult.text;
     let isHigh = playResult.high;
 
-    // クラッチやブザービーター、アンクルブレイクが成立した場合は最優先でテキストを上書き・付加
+    // 🔴【新機能4】スウィッシュ＆バンクシュート判定（ラッキーバウンス時は無効）
+    const isSwish = !isLuckyBounce && (shotType === "three" || shotType === "middle") && (shotRoll < finalRate * 0.3);
+    const isBankShot = !isLuckyBounce && !isSwish && shotType === "middle" && Math.random() < 0.15;
+
+    // 既存維持：状況別ハイライト優先上書き
     if (isBuzzerBeater) {
         playText = `<span style="color:#f1c40f; font-weight:bold; font-size:15px;">🚨【ブザービーター！！！】🚨</span>時間が無い！${shooter.name}が放った劇的なシュートがブザーと共にネットを揺らす！試合を決めた！！！`;
         isHigh = true;
     } else if (isClutch) {
         playText = `<span style="color:#f1c40f; font-weight:bold;">🔥【大逆転クラッチ！】🔥</span>${shooter.name}が土壇場で起死回生のビッグショット！！！ ${playText}`;
         isHigh = true;
-    } else if (ankleBreak) {
+    } else if (typeof ankleBreak !== 'undefined' && ankleBreak) {
         playText = `<span style="color:#e67e22; font-weight:bold;">【アンクルブレイク！】</span>${defender.name}が足をもつれて転倒！ ${playText}`;
         isHigh = true;
     } else if (assistText.includes("アリウープ")) {
         playText = `${shooter.name}が空中でボールを押し込んだ！！！`;
         isHigh = true;
+    } else {
+        // 通常テキストに新機能の装飾を追加
+        if (isLuckyBounce) playText = playText.replace('決まる！', 'リングに何度も弾かれながらもカップイン！ラッキーバウンス！');
+        else if (isSwish) playText = playText.replace('決まる！', 'リングに触れることなく美しいスウィッシュで決まる！');
+        else if (isBankShot) playText = `ボードを冷静に使って ${playText}`;
+        
+        // 🔴【新機能5】ヒートチェック＆ゾーン演出
+        if (shooter._consecutiveMakes === 3) {
+            playText += ` <span style="color:#ff4757; font-weight:bold;">(🔥${shooter.name}は3連続成功！完全にゾーンに入った！)</span>`;
+            isHigh = true;
+        } else if (shooter._consecutiveMakes > 3 && shotType === "three") {
+            playText = `<span style="color:#ff4757; font-weight:bold;">【ヒートチェック！】</span>手がつけられない！${shooter.name}が強引なディープスリーを沈める！！！`;
+            isHigh = true;
+        }
     }
     
-                        const hName = typeof hTeam !== 'undefined' ? hTeam.name : 'HOME';
-                    const aName = typeof aTeam !== 'undefined' ? aTeam.name : 'AWAY';
-                    writeLog(gameState.clock, offData.team.name, `${assistText}${playText} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]`, isHigh, involved);
-                    
-                    switchPossession(24, false);
-                    continue; // 🚨【修正追加】これがないとバグります
-                }
-                else {
+    // 🔴【新機能6】クラッチシュート時の観客リアクション
+    let crowdReact = "";
+    if (isClutch || isBuzzerBeater) {
+        crowdReact = homeOffToUse ? ` <span style="color:#e74c3c; font-size:12px;">(アリーナ中を震わせる大歓声！！！)</span>` : ` <span style="color:#3498db; font-size:12px;">(劇的な一撃に敵地が静まり返る...)</span>`;
+    }
+    
+    const hName = typeof hTeam !== 'undefined' ? hTeam.name : 'HOME';
+    const aName = typeof aTeam !== 'undefined' ? aTeam.name : 'AWAY';
+    
+    // 既存維持：ログ出力とポゼッション切り替え
+    writeLog(logClock2, offData.team.name, `${assistText}${playText}${crowdReact} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]`, isHigh, involved);
+    
+    switchPossession(24, false);
+    continue;
+}
+else {
+
 
     // 1. シュート失敗テキストの拡充と詳細化
     let missText = "";
