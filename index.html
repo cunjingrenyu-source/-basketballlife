@@ -2390,15 +2390,29 @@ const getSafeStat = (player, key, fallback = 50) => {
     return (typeof val === "number" && isFinite(val)) ? val : fallback;
 };
 
-// 【ファウルゲーム判定】（※defDiffは上で計算済みのものを再利用、もしくは更新するなら別名に）
-let currentDefDiff = currentIsHome ? ((score?.away || 0) - (score?.home || 0)) : ((score?.home || 0) - (score?.away || 0));
-// 点差に応じて発動時間をスケール（例：3点差なら30秒前、8点差なら90秒前から）
-const timeThreshold = Math.max(10, Math.abs(currentDefDiff) * 12);
-const isFoulGame = (currentQtr >= 4 && currentDefDiff < 0 && currentDefDiff >= -8 && currentClock <= timeThreshold);
+// 【ファウルゲーム判定】
+// （※もし上で const defDiff を計算済みなら、以下の1行は消すかコメントアウトしてください）
+// const defDiff = currentIsHome ? ((score?.away || 0) - (score?.home || 0)) : ((score?.home || 0) - (score?.away || 0));
 
-const isFoulGame = (currentQtr >= 4 && defDiff < 0 && defDiff >= -8 && currentClock <= timeThreshold);
+// 点差に応じて発動時間をスケール（例：3点差なら30秒前、8点差なら90秒前から）
+const timeThreshold = Math.max(10, Math.abs(defDiff) * 12);
+let isFoulGame = (currentQtr >= 4 && defDiff < 0 && defDiff >= -8 && currentClock <= timeThreshold);
+
+// 🔴【新機能7】Hack-a-Shaq
+// 終盤（残り3分以内）でビハインド時、オフェンス側にフリースロー能力が極端に低い（50未満など）選手がいれば、ボールを持っていなくても故意にファウルする
+let isHackAShaq = false;
+let hackTarget = null;
+if (currentQtr >= 4 && currentClock < 180 && currentClock > timeThreshold && defDiff < 0) {
+    hackTarget = offData.court.find(p => getSafeStat(p, 'freeThrow') < 50 || getSafeStat(p, 'ft') < 50);
+    if (hackTarget) {
+        isFoulGame = true;
+        isHackAShaq = true;
+        shooter = hackTarget; // 強制的にこの選手がFTを打たされる
+    }
+}
 
 // 【ファウル実行者の選定（役割分担）】
+
 let fouler = defender;
 if (isFoulGame) {
     // 退場寸前（5PF以上）の選手や、エース級をファウル役から外す
