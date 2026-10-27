@@ -1926,12 +1926,27 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 };
                 let currentMatchups = assignMatchups(offData, defData);
 
-                // 【付加価値UP】ボール運び役の決定に「ポジション適性(PG)」と「疲労度」の概念を追加
+                           // 【付加価値UP＋新機能4】ボール運び役の決定。絶好調な選手(Hot Hand)にはボールを集める
                 const getBallHandler = (teamData) => {
                     if (gameState.isFastBreak) {
                         return [...teamData.court].sort((a,b) => ((b.currentStats.speed||50)+(b.currentStats.dribble||50)) - ((a.currentStats.speed||50)+(a.currentStats.dribble||50)))[0];
                     }
                     let weights = teamData.court.map(p => {
+                        let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
+                        let drb = p.currentStats.dribble || 50;
+                        let pass = p.currentStats.pass || 50;
+                        let posBonus = (p.pos === "PG") ? 1.5 : (p.pos === "SG") ? 1.2 : 1.0;
+                        
+                        // 【新機能4】Ride the Hot Hand: 直近のプレイで連続得点している（内部的に好調）選手に重み
+                        let hotHandBonus = (p._condStr === "絶好調") ? 2.0 : (p._condStr === "好調") ? 1.5 : 1.0;
+                        
+                        // 疲労している選手はボール運びを避ける傾向
+                        let staminaFactor = (p._stamina !== undefined) ? Math.max(0.5, p._stamina / 100) : 1.0;
+                        
+                        let handlerScore = ((pm * 1.5) + (drb * 1.0) + (pass * 0.5)) * posBonus * staminaFactor * hotHandBonus;
+                        return Math.pow(Math.max(1, handlerScore / 50), 2);
+                    });
+
                         let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
                         let drb = p.currentStats.dribble || 50;
                         let pass = p.currentStats.pass || 50;
