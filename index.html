@@ -1997,11 +1997,19 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     
                     timeSpent = Math.max(5, Math.min(24, Math.floor(timeBase) + Math.floor(Math.random() * 6) - 2));
 
-                    // 【戦術AI 2】2-for-1 シチュエーション（残り30〜40秒なら早打ちして攻撃権をもう一度得る）
-                    if (gameState.clock > 30 && gameState.clock < 40 && gameState.shotClock === 24) {
-                        timeSpent = Math.floor(Math.random() * 4) + 5; // 5〜8秒で強引に攻める
+                                    // 🔴【新機能17】Seven Seconds or Less (SSOL)
+                    let isPGAce = (ballHolder.pos === "PG" && (ballHolder.currentStats.speed > 100 && ballHolder.currentStats.playmaking > 100));
+                    if (isPGAce && Math.random() < 0.3) {
+                        timeSpent = Math.floor(Math.random() * 4) + 4; // 4〜7秒の超高速アーリーオフェンス
+                    }
+
+                    // 🔴【新機能16】Advanced 2-for-1 シチュエーション
+                    // 残り28〜35秒なら、7秒以内で確実にシュートを打ち、相手に24秒使わせても自分たちに最後の1秒〜数秒を残す
+                    if (gameState.clock > 28 && gameState.clock <= 36 && gameState.shotClock === 24) {
+                        timeSpent = Math.floor(Math.random() * 3) + 4; // 4〜6秒で確実に攻める
                     }
                     // 【戦術AI 3】クォーターエンドのラストショット狙い（ショットクロック・オフ時）
+
                     else if (gameState.clock <= 24 && gameState.shotClock >= gameState.clock) {
                         // 残り時間が24秒以下なら、相手に時間を残さないよう残り1〜3秒までボールをキープする
                         timeSpent = Math.max(1, gameState.clock - (Math.floor(Math.random() * 3) + 1));
