@@ -2708,7 +2708,10 @@ else {
             ];
             missText = toughMidLogs[Math.floor(rMiss * toughMidLogs.length)];
         }
-        writeLog(currentClock, defData.team.name, missText, false, [shooter.id, defender.id]);
+   
+writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defender.id]);
+
+
     } else {
         // 守備の影響が少ない場合のミス（シュート精度や運による外れ）
         if (shotType === "three") {
