@@ -2390,10 +2390,12 @@ const getSafeStat = (player, key, fallback = 50) => {
     return (typeof val === "number" && isFinite(val)) ? val : fallback;
 };
 
-// 【ファウルゲーム判定】
-const defDiff = currentIsHome ? ((score?.away || 0) - (score?.home || 0)) : ((score?.home || 0) - (score?.away || 0));
+// 【ファウルゲーム判定】（※defDiffは上で計算済みのものを再利用、もしくは更新するなら別名に）
+let currentDefDiff = currentIsHome ? ((score?.away || 0) - (score?.home || 0)) : ((score?.home || 0) - (score?.away || 0));
 // 点差に応じて発動時間をスケール（例：3点差なら30秒前、8点差なら90秒前から）
-const timeThreshold = Math.max(10, Math.abs(defDiff) * 12);
+const timeThreshold = Math.max(10, Math.abs(currentDefDiff) * 12);
+const isFoulGame = (currentQtr >= 4 && currentDefDiff < 0 && currentDefDiff >= -8 && currentClock <= timeThreshold);
+
 const isFoulGame = (currentQtr >= 4 && defDiff < 0 && defDiff >= -8 && currentClock <= timeThreshold);
 
 // 【ファウル実行者の選定（役割分担）】
