@@ -2381,16 +2381,22 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 }
 
 
-                // 【課題4】オープン度に応じた守備ログの出力（ログと内部計算の完全一致）
+                          // 【課題1-5, 1-6, 8-1, 8-3】実況ログと内部判定の完全同期。🎯の削除とWide Open専用化。
                 if (contestLevel === "Smothered") {
-                    writeLog(gameState.clock, defData.team.name, `🛡️【Smothered】${defender.name}が完全に密着！息の詰まるようなパーフェクトディフェンス！`, false, [defender.id]);
+                    writeLog(gameState.clock, defData.team.name, `【Smothered】${actualContester.name}が完全に密着！息の詰まるパーフェクトディフェンス！`, false, [actualContester.id]);
                 } else if (contestLevel === "Heavily Contested") {
-                    writeLog(gameState.clock, defData.team.name, `🛡️【Heavily Contested】${defender.name}が厳しくシュートコースを塞ぐ！タフショットを強いる！`, false, [defender.id]);
+                    writeLog(gameState.clock, defData.team.name, `【Heavily Contested】${actualContester.name}が厳しくシュートコースを塞ぎタフショットを強いる！`, false, [actualContester.id]);
+                } else if (contestLevel === "Lightly Contested") {
+                    writeLog(gameState.clock, defData.team.name, `【Lightly Contested】${actualContester.name}がシュートチェックに飛ぶ！`, false, [actualContester.id]);
+                } else if (contestLevel === "Semi-Open") {
+                    writeLog(gameState.clock, defData.team.name, `【Semi-Open】${actualContester.name}が間合いを詰めるが、明確な妨害には至らない。`, false, [actualContester.id]);
+                } else if (contestLevel === "Open") {
+                    writeLog(gameState.clock, defData.team.name, `【Open】${actualContester.name}は近くにいるがシュートを防ぎきれない！`, false, [actualContester.id]);
                 } else if (contestLevel === "Wide Open") {
-                    writeLog(gameState.clock, offData.team.name, `🎯【Wide Open】ディフェンスがいない！${shooter.name}が完全にフリーな状態を作る！`, false, [shooter.id]);
-                } else if (helpDefender && (contestLevel === "Lightly Contested" || contestLevel === "Semi-Open")) {
-                    writeLog(gameState.clock, defData.team.name, `🛡️${helpDefender.name}が瞬時にヘルプに入り、シュートチェックに飛ぶ！`, false, [helpDefender.id]);
+                    // Wide Open時はディフェンダーのログを出さず、オフェンスが完全にフリーであることのみ描写
+                    writeLog(gameState.clock, offData.team.name, `【Wide Open】ディフェンスが間に合わない！${shooter.name}が完全にフリーな状態を作る！`, false, [shooter.id]);
                 }
+
 
 
 // --- 2. ファウル判定＆終盤ファウルゲーム（最適化・プロ仕様・超絶スペックUP版） ---
