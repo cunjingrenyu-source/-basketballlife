@@ -2098,24 +2098,90 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     continue;
                 }
 
-                // --- 1. パス判断とボール保持者の更新 ---
-                // 【課題6,7 解決】パスとプレイメイキングの区別、及びボール保持者の遷移
+                        // --- 1. パス判断とボール保持者の更新 ---
                 let isAssist = false;
                 let playmakerBuff = 0;
                 let assistText = ""; 
                 let actualPasser = null;
-                let shooter = ballHolder; // デフォルトはハンドラーがそのまま打つ
+                let shooter = ballHolder; 
 
-                // 判断力(Playmaking)ベースで「味方にパスするか」を決める
                 let playmakingStat = bStats.playmaking || bStats.pass || 50;
                 let passDecisionProb = Math.min(0.75, (playmakingStat / 150) + 0.15); 
 
-                // 💡【課題解決】ショットクロック残り5秒以下ならパスを極力出さず自分で打ちに行く
+                // 🔴【新機能6】Clutch Isolation
+                let isClutchIso = (isClutchTime && prevDiff < 0 && (bStats.dribble > 110 && bStats.three > 100));
+                if (isClutchIso) {
+                    passDecisionProb = 0.05; // ほぼ絶対パスしない。エースの意地
+                }
+
+                // 🔴【新機能8, 9】Double Team & Deny
+                // 相手エース（現在のボールホルダー）に対して、終盤ビハインド時に強制ダブルチーム
+                let isDoubleTeamed = false;
+                if (currentDefStrategy.intensity === 'max' && (bStats.three > 110 || bStats.middle > 110)) {
+                    isDoubleTeamed = true;
+                    defensePressure += 0.3; // 守備圧爆上がり
+                    passDecisionProb += 0.2; // パスせざるを得ない状況を作る
+                }
+
                 if (gameState.shotClock <= 5) {
                     passDecisionProb *= 0.15; 
                 }
 
-                if (Math.random() < passDecisionProb) {
+                if (Math.random() < passDecisionProb && !isClutchIso) {
+                    // パスを選択：シューター（レシーバー）を探す
+                    const receiverCandidates = offData.court.filter(p => p.id !== ballHolder.id);
+                    
+                    if (receiverCandidates.length > 0) {
+                        // 🔴【新機能5, 11】Target Hunting & Drive and Kick
+                        // ヘルプを引き付けて外へ（Drive & Kick）または、相手の穴を狙う（Target Hunting）
+                        let courtEvals = receiverCandidates.map(p => {
+                            let matchDef = currentMatchups.get(p.id);
+                            let defHoleBonus = (matchDef && (matchDef.currentStats.defense < 60 || matchDef._box?.pf >= 4)) ? 2.0 : 1.0;
+                            let isKickOut = (isDriveBeaten && (p.pos === "SG" || p.pos === "SF")) ? 1.5 : 1.0;
+                            return Math.max(1, evalPlayer(p)) * defHoleBonus * isKickOut;
+                        });
+                        
+                        let totalEval = courtEvals.reduce((a, b) => a + b, 0);
+                        let r = Math.random(); 
+                        let cum = 0; 
+                        let receiver = receiverCandidates[0];
+                        for (let i = 0; i < receiverCandidates.length; i++) {
+                            cum += (courtEvals[i] / totalEval);
+                            if (r < cum) { receiver = receiverCandidates[i]; break; }
+                        }
+
+                        // 【新機能9】Deny the ball（ディナイ）: レシーバーがエース格の場合、パス成功率を下げる
+                        let denyPenalty = (receiver.currentStats.three > 100) ? 0.05 : 0;
+
+                        let passAbility = bStats.pass || 50;
+                        let passSuccessProb = Math.min(0.985, 0.75 + (passAbility / 150) * 0.235) - denyPenalty;
+                        
+                        if (isDoubleTeamed && Math.random() < 0.2) {
+                            // ダブルチームのプレッシャーでバッドパス
+                            passSuccessProb -= 0.3;
+                        }
+                        
+                        if (Math.random() < passSuccessProb) {
+                            actualPasser = ballHolder;
+                            shooter = receiver; 
+                            isAssist = true; 
+                            if (passAbility >= 80) {
+                                playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
+                            }
+                            if (isDoubleTeamed) {
+                                assistText = `【ダブルチーム回避】${ballHolder.name}が囲まれながらも冷静に空いた味方へパス！ ➔ `;
+                            }
+                        } else {
+                            actualPasser = ballHolder;
+                            if (actualPasser?._box) actualPasser._box.to++;
+                            let toReason = isDoubleTeamed ? `強烈なダブルチームに捕まり、${actualPasser.name}のパスが相手に奪われる！` : `${actualPasser.name}のパスが乱れ、ボールがコート外へ。`;
+                            writeLog(gameState.clock, offData.team.name, `${toReason} ターンオーバー。`, false, [actualPasser.id]);
+                            switchPossession(24, false);
+                            continue;
+                        }
+                    }
+                }
+
                     // パスを選択：シューター（レシーバー）をオフェンス評価値から選ぶ
                     const receiverCandidates = offData.court.filter(p => p.id !== ballHolder.id);
                     
