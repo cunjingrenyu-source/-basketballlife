@@ -2833,10 +2833,15 @@ addScore(2, gameState.currentQ, gameState.isHomeOffense, hData, aData);
 
                 p.box.g++; 
                 if (gb.gs) p.box.gs++;
-                Object.keys(gb).forEach(k => { 
-                    if (k !== 'g' && k !== 'gs') p.box[k] += gb[k]; 
-                });
-                
+              Object.keys(gb).forEach(k => {
+    if (k === 'g' || k === 'gs') return;
+
+    const oldValue = Number(p.box[k]);
+    const addValue = Number(gb[k]);
+
+    p.box[k] = (Number.isFinite(oldValue) ? oldValue : 0)
+              + (Number.isFinite(addValue) ? addValue : 0);
+});
                 if (p.isUser) {
                     const logId = `match_${Date.now()}_${currentRnd}_${p.id}`;
                     
