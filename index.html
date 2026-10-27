@@ -1681,20 +1681,40 @@ window.renderPracticeGrid = function() {
             teamData.bench.forEach(bp => { bp._stamina = Math.min(100, bp._stamina + 2.5); });
         };
 
-                // =========================================================
-        // 【第1章】状態管理 (gameState) の導入
-        // 試合全体の状態を単一のオブジェクトで一元管理し、不整合を防ぐ
+                     // =========================================================
+        // 【第1章】状態管理 (gameState) の導入 ＋ 【AI監督の超絶頭脳】
+        // 試合全体の状態と、AI監督が戦術判断に使うメタデータを一元管理
         // =========================================================
         const gameState = {
             isHomeOffense: Math.random() > 0.5,
             currentQ: 1,
             maxQ: 4,
             isOverTime: false,
-            clock: 720,      // クォーターの残り時間
-            shotClock: 24,   // ショットクロック
+            clock: 720,
+            shotClock: 24,
             isFastBreak: false,
-            phase: 'live'    // 'live', 'dead', 'ft' 等のフェーズ管理用（拡張対応）
+            phase: 'live',
+            // --- AI監督用 モメンタム＆タイムアウト管理 ---
+            homeRun: 0,        // ホームチームの連続得点
+            awayRun: 0,        // アウェイチームの連続得点
+            homeTimeouts: 7,
+            awayTimeouts: 7,
+            // --- AI戦術状態フラグ ---
+            homeStrategy: { focus: 'balanced', intensity: 'normal', defense: 'man' },
+            awayStrategy: { focus: 'balanced', intensity: 'normal', defense: 'man' }
         };
+
+        // 🔴【新機能】モメンタムリセット（攻守交代時ではなく、相手が得点した時にリセット）
+        const updateMomentum = (scoringSide, pts) => {
+            if (scoringSide === 'home') {
+                gameState.homeRun += pts;
+                gameState.awayRun = 0;
+            } else {
+                gameState.awayRun += pts;
+                gameState.homeRun = 0;
+            }
+        };
+
 
         // 試合開始前に全選手へ「実質ステータス(currentStats)」を付与
         if (hTeam && hTeam.roster) hTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
