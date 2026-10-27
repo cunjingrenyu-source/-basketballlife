@@ -2125,14 +2125,18 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     const receiverCandidates = offData.court.filter(p => p.id !== ballHolder.id);
                     
                     if (receiverCandidates.length > 0) {
-                        // 🔴【新機能5, 11】Target Hunting & Drive and Kick
-                        // ヘルプを引き付けて外へ（Drive & Kick）または、相手の穴を狙う（Target Hunting）
+                                            // 🔴【新機能5, 11】Target Hunting & Drive and Kick
                         let courtEvals = receiverCandidates.map(p => {
                             let matchDef = currentMatchups.get(p.id);
                             let defHoleBonus = (matchDef && (matchDef.currentStats.defense < 60 || matchDef._box?.pf >= 4)) ? 2.0 : 1.0;
-                            let isKickOut = (isDriveBeaten && (p.pos === "SG" || p.pos === "SF")) ? 1.5 : 1.0;
+                            
+                            // 🟢 修正：ハンドラーのスピードとドリブル能力から「ペイントアタックからのキックアウト」を想定
+                            let handlerDriveAdv = ((bStats.speed || 50) > 85 && (bStats.dribble || 50) > 85);
+                            let isKickOut = (handlerDriveAdv && (p.pos === "SG" || p.pos === "SF")) ? 1.5 : 1.0;
+                            
                             return Math.max(1, evalPlayer(p)) * defHoleBonus * isKickOut;
                         });
+
                         
                         let totalEval = courtEvals.reduce((a, b) => a + b, 0);
                         let r = Math.random(); 
