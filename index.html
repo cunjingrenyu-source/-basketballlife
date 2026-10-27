@@ -1808,13 +1808,17 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
             }
         };
 
-        const addScore = (pts, qtr, isHomeOffense, hData, aData) => {
+               const addScore = (pts, qtr, isHomeOffense, hData, aData) => {
             const offSide = isHomeOffense ? 'home' : 'away';
             if (typeof score !== 'undefined' && score) score[offSide] = (score[offSide] || 0) + pts;
             const qIdx = qtr - 1;
             if (typeof qScores !== 'undefined' && qScores && qScores[offSide]) {
                 qScores[offSide][qIdx] = (qScores[offSide][qIdx] || 0) + pts;
             }
+            
+            // 🔴【新機能20】モメンタム（ラン）のトラッキング
+            updateMomentum(offSide, pts);
+
             if (Array.isArray(hData?.court) && Array.isArray(aData?.court)) {
                 let offData = isHomeOffense ? hData : aData;
                 let defData = isHomeOffense ? aData : hData;
@@ -1822,6 +1826,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 defData.court.forEach(p => updateBox(p, 'plusMinus', -pts));
             }
         };
+
 
         const getSafeStat = (player, key, fallback = 50) => {
             const val = player?.currentStats?.[key];
