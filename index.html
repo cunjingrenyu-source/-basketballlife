@@ -1223,17 +1223,30 @@ window.renderPracticeGrid = function() {
         let effRaw = (pts + reb + ast + stl + blk) - ((fga - fgm) + (fta - ftm) + to);
         let eff = isSeasonAvg ? (effRaw / g) : effRaw;
 
-        // 3. Usage Rate % (USG%) - 5人分の合計時間を基準に安全算出
-        let minInGame = min > 240 ? min / 60 : min; // 秒なら分に変換
-        let usgDenom = Math.max(1, (minInGame / 5));
-        let usg = ((fga + 0.44 * fta + to) / usgDenom) * 100;
+           // 3. Usage Rate % (USG%) - ガチ仕様（現代NBAペース係数を用いた高精度算出）
+        let minInGame = Number(b.min) || 0;
+        minInGame = minInGame > 240 ? minInGame / 60 : minInGame; // 秒表記なら分に変換
+
+        let pFga = Number(b.fga) || 0;
+        let pFta = Number(b.fta) || 0;
+        let pTo = Number(b.to) || 0;
+
+        let usg = 0;
+        if (minInGame > 0) {
+            // プレイヤーが消費したポゼッション
+            let playerPoss = pFga + 0.44 * pFta + pTo;
+            // コートにいる間のチーム総ポゼッション推計（現代NBAの平均ペース: 1分＝2.1回）
+            let estimatedTeamPoss = minInGame * 2.1; 
+            // チームの攻撃のうち、何％をこの選手が消費したか
+            usg = (playerPoss / estimatedTeamPoss) * 100;
+        }
 
         return {
-            ts: isNaN(ts) || !isFinite(ts) ? "0.0%" : Math.min(100, Math.max(0, ts)).toFixed(1) + "%",
+            ts: isNaN(ts) || !isFinite(ts) ? "0.0%" : Math.min(150, Math.max(0, ts)).toFixed(1) + "%", // TSは稀に100超え(150上限)があり得る
             eff: isNaN(eff) || !isFinite(eff) ? "0.0" : eff.toFixed(1),
-            usg: isNaN(usg) || !isFinite(usg) ? "0.0%" : Math.min(100, Math.max(0, usg)).toFixed(1) + "%"
+            usg: usg === 0 ? "0.0%" : Math.min(100, Math.max(0, usg)).toFixed(1) + "%" // 0〜100の範囲で安全に出力
         };
-    }
+
 
     function generateTableHeaderHtml() {
         return `<tr><th>PLAYER</th><th>MIN</th><th>PTS</th><th>FG</th><th>FG%</th><th>3P</th><th>3P%</th><th>FT</th><th>FT%</th><th>ORB</th><th>DRB</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>PF</th><th>+/-</th><th>USG%</th><th>TS%</th><th>EFF</th></tr>`;
