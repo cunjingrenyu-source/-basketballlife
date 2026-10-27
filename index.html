@@ -1963,9 +1963,11 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 let ballHolder = getBallHandler(offData);
                 let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
 
-                // 【既存維持】クラッチタイムとメンタルバフの計算
-                let prevDiff = isHome ? (score.home - score.away) : (score.away - score.home);
+                             // 【既存維持】クラッチタイムとメンタルバフの計算
+                // 🟢 修正：オプショナルチェーンで安全にスコアを取得
+                let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
                 let isClutchTime = (gameState.currentQ >= 4 && gameState.clock < 120 && Math.abs(prevDiff) <= 5);
+
                 let mentalBuff = 1.0;
                 if (isClutchTime && prevDiff < 0) {
                     mentalBuff = 1.0 + ((ballHolder.currentStats.mental || 50) / 500);
