@@ -2273,23 +2273,35 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 let actualContester = primaryDefender;
 
 
-                if (shotType === "dunk" || shotType === "layup") {
-                    let driveScore = (sStats.speed || 50) + (sStats.dribble || 50);
-                    let defScore = (activeDefStats.speed || 50) + (activeDefStats.defense || 50);
+                          if (shotType === "dunk" || shotType === "layup" || shotType === "floater") {
+                    // 【課題3-4】ドライブ判定の高度化（加速やフィジカルも加味）
+                    let driveScore = (sStats.speed ?? 50) * 0.5 + (sStats.dribble ?? 50) * 0.3 + (sStats.physical ?? 50) * 0.2;
+                    let defScore = (activeDefStats.speed ?? 50) * 0.5 + (activeDefStats.defense ?? 50) * 0.3 + (activeDefStats.physical ?? 50) * 0.2;
                     
-                    if (driveScore > defScore + 10 && Math.random() < 0.6) {
+                    if (driveScore > defScore + 5 && Math.random() < 0.7) {
                         isDriveBeaten = true; 
                     }
                     
-                    // 【改良】filterチェーンを安全にし、自身へのヘルプを防止
-                    let bigmen = (defData.court || [])
-                        .filter(p => (p.pos === "C" || p.pos === "PF") && p.id !== defender.id)
-                        .sort((a, b) => (b.currentStats?.defense || 50) - (a.currentStats?.defense || 50));
+                    // 【課題3-1, 3-2, 10-3】ポジション関係なく、リムプロテクト能力と距離感（模擬）でヘルプを選ぶ
+                    let potentialHelpers = (defData.court ?? [])
+                        .filter(p => p.id !== primaryDefender.id)
+                        .map(p => {
+                            let stats = p.currentStats ?? {};
+                            // ヘルプ適性スコア：守備力とインサイドの強さを評価（C/PFにはポジションボーナス）
+                            let helpScore = (stats.defense ?? 50) * 0.4 + (stats.physical ?? 50) * 0.6;
+                            if (p.pos === "C" || p.pos === "PF") helpScore += 15; 
+                            return { player: p, score: helpScore };
+                        })
+                        .sort((a, b) => b.score - a.score);
                         
-                    if (bigmen.length > 0) {
-                        helpDefender = bigmen[0];
+                    if (potentialHelpers.length > 0) {
+                        // 状況に応じてヘルプが間に合うか判定（確定ではない）
+                        if (isDriveBeaten || Math.random() < 0.4) {
+                            helpDefender = potentialHelpers[0].player;
+                        }
                     }
                 }
+
 
                 // 【課題1】オープン度（Contest Value）の算出。低いほどフリー、高いほど密着。
                 let contestValue = 0;
