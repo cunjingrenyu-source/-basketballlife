@@ -2175,46 +2175,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     }
                 }
 
-                    // パスを選択：シューター（レシーバー）をオフェンス評価値から選ぶ
-                    const receiverCandidates = offData.court.filter(p => p.id !== ballHolder.id);
-                    
-                    // 【改良】退場等でレシーバーがいない場合のエッジケース（エラー回避）を追加
-                    if (receiverCandidates.length > 0) {
-                        let courtEvals = receiverCandidates.map(p => Math.max(1, evalPlayer(p)));
-                        let totalEval = courtEvals.reduce((a, b) => a + b, 0);
-                        let r = Math.random(); 
-                        let cum = 0; 
-                        let receiver = receiverCandidates[0];
-                        for (let i = 0; i < receiverCandidates.length; i++) {
-                            cum += (courtEvals[i] / totalEval);
-                            if (r < cum) { receiver = receiverCandidates[i]; break; }
-                        }
-
-                        // 【修正】パス成功率が最大90%で頭打ちになっていたのを、能力値依存で最大98.5%までスケールさせる
-                        let passAbility = bStats.pass || 50;
-                        // パス能力150なら98.5%、50なら約83%の成功率
-                        let passSuccessProb = Math.min(0.985, 0.75 + (passAbility / 150) * 0.235);
-                        
-                        if (Math.random() < passSuccessProb) {
-                            // パス成功：ボール保持者がレシーバーに移る
-                            actualPasser = ballHolder;
-                            shooter = receiver; 
-                            isAssist = true; // このレシーバーが決めたらアシスト成立
-                            
-                            // キラーパス効果（キャッチ＆シュート等で成功率アップ）
-                            if (passAbility >= 80) {
-                                playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
-                            }
-                        } else {
-                            // 【課題8 解決】パス失敗（ターンオーバー）
-                            actualPasser = ballHolder;
-                            if (actualPasser?._box) actualPasser._box.to++;
-                            writeLog(gameState.clock, offData.team.name, `${actualPasser.name}のパスが乱れ、ボールがコート外へ。ターンオーバー。`, false, [actualPasser.id]);
-                            switchPossession(24, false); // 🔴新関数適用
-                            continue;
-                        }
-                    }
-                }
+              
 
                 // 【改良】シューターのステータス取得を整理し、ネスト深い参照エラーを防止
                 const sStats = shooter?.currentStats || {};
