@@ -2374,34 +2374,29 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
 
 
 // 【ファウルゲーム判定】
-// （※もし上で const defDiff を計算済みなら、以下の1行は消すかコメントアウトしてください）
-// const defDiff = currentIsHome ? ((score?.away || 0) - (score?.home || 0)) : ((score?.home || 0) - (score?.away || 0));
+const defDiff = gameState.isHomeOffense ? ((score?.away || 0) - (score?.home || 0)) : ((score?.home || 0) - (score?.away || 0));
 
 // 点差に応じて発動時間をスケール（例：3点差なら30秒前、8点差なら90秒前から）
 const timeThreshold = Math.max(10, Math.abs(defDiff) * 12);
-let isFoulGame = (currentQtr >= 4 && defDiff < 0 && defDiff >= -8 && currentClock <= timeThreshold);
+let isFoulGame = (gameState.currentQ >= 4 && defDiff < 0 && defDiff >= -8 && gameState.clock <= timeThreshold);
 
 // 🔴【新機能7】Hack-a-Shaq
-// 終盤（残り3分以内）でビハインド時、オフェンス側にフリースロー能力が極端に低い（50未満など）選手がいれば、ボールを持っていなくても故意にファウルする
 let isHackAShaq = false;
 let hackTarget = null;
-if (currentQtr >= 4 && currentClock < 180 && currentClock > timeThreshold && defDiff < 0) {
+if (gameState.currentQ >= 4 && gameState.clock < 180 && gameState.clock > timeThreshold && defDiff < 0) {
     hackTarget = offData.court.find(p => getSafeStat(p, 'freeThrow') < 50 || getSafeStat(p, 'ft') < 50);
     if (hackTarget) {
         isFoulGame = true;
         isHackAShaq = true;
-        shooter = hackTarget; // 強制的にこの選手がFTを打たされる
+        shooter = hackTarget; 
     }
 }
 
 // 【ファウル実行者の選定（役割分担）】
-
 let fouler = defender;
 if (isFoulGame) {
-    // 退場寸前（5PF以上）の選手や、エース級をファウル役から外す
     const availableFoulers = defData.court.filter(p => (p?._box?.pf || 0) < 5);
     if (availableFoulers.length > 0) {
-        // ファウル数が少ない、かつ守備負担の少ない選手を意図的ファウル役に選出
         availableFoulers.sort((a, b) => ((a?._box?.pf || 0) - (b?._box?.pf || 0)));
         fouler = availableFoulers[0]; 
     }
@@ -2419,75 +2414,139 @@ const foulChance = isFoulGame ? 0.95 : baseFoulRisk;
 if (Math.random() < Math.min(0.95, Math.max(0.02, foulChance))) {
     updateBox(fouler, 'pf', 1);
     
-    // フリースロー成功率の算出（クラッチタイムの重圧ペナルティを追加）
+    // ★追加要素2: フレグラントファウル（危険なプレー）の判定
+    let isFlagrant = !isFoulGame && Math.random() < 0.015;
+    
     let ftStat = shooter?.currentStats?.freeThrow || shooter?.currentStats?.ft || ((getSafeStat(shooter, 'middle') + getSafeStat(shooter, 'three')) / 2);
     let ftRate = Math.min(0.95, Math.max(0.50, 0.50 + ((ftStat / 150) * 0.45)));
-    if (isClutchTime && getSafeStat(shooter, 'mental') < 80) ftRate -= 0.05; // メンタルが低いと終盤のFT確率低下
+    if (isClutchTime && getSafeStat(shooter, 'mental') < 80) ftRate -= 0.05; 
 
-    const processFreeThrows = (count, isBonus = false) => {
+    // ★追加要素1: アウェイチームへのブーイングプレッシャー
+    if (isClutchTime && !gameState.isHomeOffense) {
+        ftRate -= 0.04; 
+    }
+
+    const processFreeThrows = (count, isBonus = false, isFlagrantFT = false) => {
         updateBox(shooter, 'fta', count);
+        let consecutiveMakes = 0; // ★追加要素4: FTのリズム（ホットハンド）
         for (let f = 1; f <= count; f++) {
-            if (Math.random() < ftRate) {
+            let currentRate = ftRate + (consecutiveMakes * 0.03); 
+            if (Math.random() < currentRate) {
                 updateBox(shooter, 'ftm', 1);
                 updateBox(shooter, 'pts', 1);
-  
+                addScore(1, gameState.currentQ, gameState.isHomeOffense, hData, aData);
+                consecutiveMakes++;
 
-
-addScore(1, gameState.currentQ, gameState.isHomeOffense, hData, aData);
-
-                // 🏀スウィッシュかどうかの演出を追加
                 const isSwish = Math.random() < (ftStat / 200);
                 const swishText = isSwish ? '美しい弧を描きスウィッシュ！' : '決まった！';
-                writeLog(currentClock, shooter.name, `${isBonus ? 'ボーナススロー' : `フリースロー ${f}本目`}：${swishText} [${score?.home || 0} - ${score?.away || 0}]`, false, [shooter.id]);
+                writeLog(gameState.clock, shooter.name, `${isBonus ? 'ボーナススロー' : `フリースロー ${f}本目`}：${swishText} [${score?.home || 0} - ${score?.away || 0}]`, false, [shooter.id]);
             } else {
-                // 🏀外し方のバリエーションを追加
                 const missText = Math.random() < 0.5 ? 'リングに弾かれる！' : 'プレッシャーか、シュートが短い！';
-                writeLog(currentClock, shooter.name, `${isBonus ? 'ボーナススロー' : `フリースロー ${f}本目`}：${missText}`, false, [shooter.id]);
+                writeLog(gameState.clock, shooter.name, `${isBonus ? 'ボーナススロー' : `フリースロー ${f}本目`}：${missText}`, false, [shooter.id]);
+                consecutiveMakes = 0;
             }
+        }
+        
+        if (isFlagrantFT) {
+            writeLog(gameState.clock, offData.team.name, `🏀 フレグラントファウルのため、${offData.team.name}ボールから再開！`, false);
         }
     };
 
     if (isFoulGame) {
-        writeLog(currentClock, defData.team.name, `⏱️ ${fouler.name}が時計を止める意図的なファウル！${shooter.name}がフリースロー獲得！`, false, [shooter.id, fouler.id]);
+        writeLog(gameState.clock, defData.team.name, `⏱️ ${fouler.name}が時計を止める意図的なファウル！${shooter.name}がフリースロー獲得！`, false, [shooter.id, fouler.id]);
         processFreeThrows(2);
+        switchPossession(24, false);
+    } else if (isFlagrant) {
+        writeLog(gameState.clock, defData.team.name, `<span style="color:#8e44ad; font-weight:bold;">🚨【フレグラントファウル！】</span>${fouler.name}の危険なコンタクト！アンスポーツマンライクファウルがコールされた！`, true, [shooter.id, fouler.id]);
+        processFreeThrows(2, false, true);
+        switchPossession(14, true); 
     } else {
-        // 通常のシュートファウル（AND-1判定）
         const rawSuccessRate = baseRate * (shooter?._cond ?? 1) * mentalBuff - (defensePressure * 0.7) + playmakerBuff;
         const and1Multipliers = { "dunk": 0.6, "layup": 0.6, "middle": 0.3, "three": 0.1 };
         let and1Chance = Math.max(0.01, rawSuccessRate * (and1Multipliers[shotType] || 0.2));
         if (["dunk", "layup"].includes(shotType)) and1Chance += (getSafeStat(shooter, 'physical') / 200) * 0.15;
 
-        if (Math.random() < and1Chance && currentClock > 5) {
+        if (Math.random() < and1Chance && gameState.clock > 5) {
             const pts = shotType === "three" ? 3 : 2;
             updateBox(shooter, 'fga', 1);
             updateBox(shooter, 'fgm', 1);
             updateBox(shooter, 'pts', pts);
             if (shotType === "three") { updateBox(shooter, 'tpa', 1); updateBox(shooter, 'tpm', 1); }
-        
-addScore(pts, gameState.currentQ, gameState.isHomeOffense, hData, aData);
+            
+            addScore(pts, gameState.currentQ, gameState.isHomeOffense, hData, aData);
 
+            // ★追加要素3: AND-1達成時のメンタル/コンディション上昇
+            if (shooter._cond !== undefined) shooter._cond = Math.min(1.2, shooter._cond + 0.05);
 
-            // 🏀AND-1の熱い実況を保持＆強化
             let and1Desc = shotType === "three" ? "4点プレーのチャンスとなる3P" : 
                            shotType === "dunk" ? "豪快なポスタライズダンク" : "タフなシュート";
-            writeLog(currentClock, offData.team.name, `<span style="color:#e74c3c; font-weight:bold; font-size:14px;">🔥【AND-1!!!】🔥</span>${shooter.name}が${fouler.name}のハードなファウルを受けながらも${and1Desc}をねじ込んだ！！！`, true, [shooter.id, fouler.id]);
+            writeLog(gameState.clock, offData.team.name, `<span style="color:#e74c3c; font-weight:bold; font-size:14px;">🔥【AND-1!!!】🔥</span>${shooter.name}が${fouler.name}のハードなファウルを受けながらも${and1Desc}をねじ込んだ！！！`, true, [shooter.id, fouler.id]);
             processFreeThrows(1, true);
+            switchPossession(24, false);
         } else {
             const ftCount = shotType === "three" ? 3 : 2; 
-            writeLog(currentClock, defData.team.name, `💥 ${fouler.name}がシュートモーションに対してファウル！${shooter.name}がフリースロー獲得（${ftCount}投）！`, false, [shooter.id, fouler.id]);
+            writeLog(gameState.clock, defData.team.name, `💥 ${fouler.name}がシュートモーションに対してファウル！${shooter.name}がフリースロー獲得（${ftCount}投）！`, false, [shooter.id, fouler.id]);
             processFreeThrows(ftCount);
+            
+            // ★追加要素5: 際どいファウル判定への過剰抗議によるテクニカルファウル
+            if (Math.random() < 0.02) {
+                writeLog(gameState.clock, defData.team.name, `🤬 ${fouler.name}が判定に対して激しい抗議！テクニカルファウルがコールされた！`, true, [fouler.id]);
+                processFreeThrows(1, true); 
+            }
+            switchPossession(24, false);
         }
     }
 
-    // ファウルアウト判定
     if ((fouler?._box?.pf || 0) >= 6) {
-        writeLog(currentClock, defData.team.name, `<span style="color:red; font-weight:bold;">🚨【ファウルアウト】</span>${fouler.name}がファウル上限に到達し退場となります！`, true, [fouler.id]);
-        if (typeof checkSubstitution === 'function') checkSubstitution(defData, currentClock, !currentIsHome, true); 
+        writeLog(gameState.clock, defData.team.name, `<span style="color:red; font-weight:bold;">🚨【ファウルアウト】</span>${fouler.name}がファウル上限に到達し退場となります！`, true, [fouler.id]);
+        if (typeof checkSubstitution === 'function') checkSubstitution(defData, gameState.clock, !gameState.isHomeOffense, true); 
     }
 
-    switchPossession(24, false);
     continue; 
 }
+
+// --- B. 正規シュート処理（ファウルなし） ---
+updateBox(shooter, 'fga', 1);
+if (shotType === "three") updateBox(shooter, 'tpa', 1);
+
+let toughShotMaker = ((statUsed + getSafeStat(shooter, 'mental')) / 250); 
+let actualPenalty = Math.max(0, contestPenalty - (toughShotMaker * 0.15));
+if (isClutchTime && getSafeStat(shooter, 'mental') > 90) actualPenalty *= 0.5;
+
+let rawRate = (baseRate + ((statUsed - 30) / 120) * 0.30) * (shooter?._cond ?? 1) - actualPenalty + playmakerBuff;
+if (getSafeStat(shooter, '_stamina', 100) < 30) rawRate -= 0.08;
+
+let ankleBreak = (getSafeStat(shooter, 'dribble') > getSafeStat(defender, 'defense') + 20 && Math.random() < 0.15 * (shooter?._cond ?? 1));
+if (ankleBreak) rawRate += 0.20;
+
+let blockChance = ((getSafeStat(defender, 'defense') + getSafeStat(defender, 'physical')) / 300) * 0.08;
+if (contestLevel === "Smothered") blockChance += 0.06;
+else if (contestLevel === "Heavily Contested") blockChance += 0.03;
+if (shotType === "dunk") blockChance -= 0.03; 
+
+if (Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
+    updateBox(defender, 'blk', 1);
+    const isChaseDown = getSafeStat(defender, 'speed') > 100 && Math.random() < 0.3;
+    const isHighBlock = !isChaseDown && getSafeStat(defender, 'physical') > 110 && getSafeStat(defender, 'defense') > 100 && Math.random() < 0.3;
+    const isSnatchBlock = isHighBlock && getSafeStat(defender, 'rebound') > 100 && Math.random() < 0.15; 
+    
+    let blkText = isSnatchBlock ? `<span style="color:#8e44ad; font-weight:bold;">【スナッチブロック！！！】</span>信じられない跳躍力！${defender.name}が空中でシュートを鷲掴みにした！！！` :
+                  isHighBlock ? `<span style="color:#e74c3c; font-weight:bold;">【超絶ブロック！】</span>${shooter.name}のシュートを${defender.name}がバレーボールのスパイクのように叩き落とす！！！` :
+                  isChaseDown ? `<span style="color:#e74c3c; font-weight:bold;">【チェイスダウン！】</span>${defender.name}が背後からボードに叩きつけるチェイスダウンブロック！！！` :
+                  `✋ ${shooter.name}のシュートを${defender.name}が見事にブロック！`;
+    
+    writeLog(gameState.clock, defData.team.name, blkText, (isHighBlock || isChaseDown || isSnatchBlock), [shooter.id, defender.id]);
+    
+    if (isSnatchBlock) {
+        updateBox(defender, 'drb', 1);
+        updateBox(defender, 'reb', 1);
+        switchPossession(24, true);
+    } else {
+        switchPossession(24, false);
+    }
+    continue;
+}
+
 
 // --- B. 正規シュート処理（ファウルなし） ---
 updateBox(shooter, 'fga', 1);
