@@ -2372,36 +2372,6 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
 
 
 
-// --- 2. ファウル判定＆終盤ファウルゲーム（最適化・プロ仕様・超絶スペックUP版） ---
-
-// 【共通ヘルパー】スタッツやスコアの安全な更新処理（バグ完全防止＆可読性向上）
-const currentIsHome = gameState.isHomeOffense;
-const currentClock = gameState.clock;
-const currentQtr = gameState.currentQ;
-const offSide = currentIsHome ? 'home' : 'away';
-const defSide = currentIsHome ? 'away' : 'home';
-
-// 🔴絶対クラッシュしないスタッツ加算器（未定義なら0を作ってから足す）
-const updateBox = (player, key, val = 1) => {
-    if (player && player._box) {
-        player._box[key] = (player._box[key] || 0) + val;
-    }
-};
-
-const addScore = (pts) => {
-    if (typeof score !== 'undefined' && score) score[offSide] = (score[offSide] || 0) + pts;
-    const qIdx = currentQtr - 1;
-    if (typeof qScores !== 'undefined' && qScores && qScores[offSide]) {
-        qScores[offSide][qIdx] = (qScores[offSide][qIdx] || 0) + pts;
-    }
-    if (Array.isArray(offData?.court)) offData.court.forEach(p => updateBox(p, 'plusMinus', pts));
-    if (Array.isArray(defData?.court)) defData.court.forEach(p => updateBox(p, 'plusMinus', -pts));
-};
-
-const getSafeStat = (player, key, fallback = 50) => {
-    const val = player?.currentStats?.[key];
-    return (typeof val === "number" && isFinite(val)) ? val : fallback;
-};
 
 // 【ファウルゲーム判定】
 // （※もし上で const defDiff を計算済みなら、以下の1行は消すかコメントアウトしてください）
