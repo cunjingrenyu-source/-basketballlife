@@ -2740,7 +2740,11 @@ if (Math.random() < Math.min(maxRate, Math.max(minRate, rawRate))) {
                 offReber._box.fgm = (offReber._box.fgm || 0) + 1;
                 offReber._box.fga = (offReber._box.fga || 0) + 1;
             }
-            addScore(2); 
+   
+
+
+addScore(2, gameState.currentQ, gameState.isHomeOffense, hData, aData);
+
             
             let pbText = "";
             if (putbackType === "putback_dunk") {
