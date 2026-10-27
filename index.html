@@ -2463,7 +2463,9 @@ addScore(1, gameState.currentQ, gameState.isHomeOffense, hData, aData);
             updateBox(shooter, 'fgm', 1);
             updateBox(shooter, 'pts', pts);
             if (shotType === "three") { updateBox(shooter, 'tpa', 1); updateBox(shooter, 'tpm', 1); }
-            addScore(pts);
+        
+addScore(pts, gameState.currentQ, gameState.isHomeOffense, hData, aData);
+
 
             // 🏀AND-1の熱い実況を保持＆強化
             let and1Desc = shotType === "three" ? "4点プレーのチャンスとなる3P" : 
