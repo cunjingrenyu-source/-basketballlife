@@ -1926,7 +1926,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 };
                 let currentMatchups = assignMatchups(offData, defData);
 
-                           // 【付加価値UP＋新機能4】ボール運び役の決定。絶好調な選手(Hot Hand)にはボールを集める
+                                         // 【付加価値UP＋新機能4】ボール運び役の決定。絶好調な選手(Hot Hand)にはボールを集める
                 const getBallHandler = (teamData) => {
                     if (gameState.isFastBreak) {
                         return [...teamData.court].sort((a,b) => ((b.currentStats.speed||50)+(b.currentStats.dribble||50)) - ((a.currentStats.speed||50)+(a.currentStats.dribble||50)))[0];
@@ -1946,17 +1946,9 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                         let handlerScore = ((pm * 1.5) + (drb * 1.0) + (pass * 0.5)) * posBonus * staminaFactor * hotHandBonus;
                         return Math.pow(Math.max(1, handlerScore / 50), 2);
                     });
+                    
+                
 
-                        let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
-                        let drb = p.currentStats.dribble || 50;
-                        let pass = p.currentStats.pass || 50;
-                        let posBonus = (p.pos === "PG") ? 1.5 : (p.pos === "SG") ? 1.2 : 1.0;
-                        // 疲労している選手はボール運びを避ける傾向
-                        let staminaFactor = (p._stamina !== undefined) ? Math.max(0.5, p._stamina / 100) : 1.0;
-                        
-                        let handlerScore = ((pm * 1.5) + (drb * 1.0) + (pass * 0.5)) * posBonus * staminaFactor;
-                        return Math.pow(Math.max(1, handlerScore / 50), 2);
-                    });
                     let totalWeight = weights.reduce((a, b) => a + b, 0);
                     let rand = Math.random() * totalWeight;
                     let cum = 0;
@@ -1966,6 +1958,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     }
                     return teamData.court[0];
                 };
+
 
                 let ballHolder = getBallHandler(offData);
                 let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
