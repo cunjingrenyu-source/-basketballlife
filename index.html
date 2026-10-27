@@ -2430,7 +2430,11 @@ if (Math.random() < Math.min(0.95, Math.max(0.02, foulChance))) {
             if (Math.random() < ftRate) {
                 updateBox(shooter, 'ftm', 1);
                 updateBox(shooter, 'pts', 1);
-                addScore(1);
+  
+
+
+addScore(1, gameState.currentQ, gameState.isHomeOffense, hData, aData);
+
                 // 🏀スウィッシュかどうかの演出を追加
                 const isSwish = Math.random() < (ftStat / 200);
                 const swishText = isSwish ? '美しい弧を描きスウィッシュ！' : '決まった！';
