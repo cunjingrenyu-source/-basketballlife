@@ -2374,7 +2374,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
 
 
 // 【ファウルゲーム判定】
-const defDiff = gameState.isHomeOffense ? ((score?.away || 0) - (score?.home || 0)) : ((score?.home || 0) - (score?.away || 0));
+
 
 // 点差に応じて発動時間をスケール（例：3点差なら30秒前、8点差なら90秒前から）
 const timeThreshold = Math.max(10, Math.abs(defDiff) * 12);
