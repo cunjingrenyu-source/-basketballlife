@@ -1984,7 +1984,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
                 
                 let clutchIntensity = 0.0;
-                              // 4Q以降かつ15点差以内でクラッチ判定開始
+                // 4Q以降かつ15点差以内でクラッチ判定開始
                 if (gameState.currentQ >= 4 && Math.abs(prevDiff) <= 15) {
                     // 延長戦(Q5以降)は常に時間要因マックス。4Qは残り5分(300秒)から徐々に上昇し最低0.2を保証
                     let timeFactor = gameState.currentQ >= 5 ? 1.0 : Math.max(0.2, (300 - gameState.clock) / 300);
@@ -2010,11 +2010,39 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 if (isClutchTime) {
                     let mentalValue = ballHolder.currentStats.mental || 50;
                     
-                    // メンタル50を基準にペナルティなし。最大約15%のバフプール
-                    let mentalBonusPool = Math.max(0, (mentalValue - 50) / 333) * clutchIntensity; 
+                    // 【修正点】デバフを完全廃止し、4段階のステータス加算方式を採用
+                    let totalBuffPercent = 0.0;
+                    if (mentalValue > 0) {
+                        let calcMental = Math.min(mentalValue, 150); // 上限150
+                        
+                        // 0〜30の範囲 (1ステータスにつき +0.05%)
+                        let tier1 = Math.min(calcMental, 30);
+                        totalBuffPercent += tier1 * 0.05;
+                        
+                        // 30〜70の範囲 (1ステータスにつき +0.085%) ※インフレ防止のため0.85ではなく0.085で計算
+                        if (calcMental > 30) {
+                            let tier2 = Math.min(calcMental - 30, 40);
+                            totalBuffPercent += tier2 * 0.085;
+                        }
+                        
+                        // 70〜110の範囲 (1ステータスにつき +0.115%)
+                        if (calcMental > 70) {
+                            let tier3 = Math.min(calcMental - 70, 40);
+                            totalBuffPercent += tier3 * 0.115;
+                        }
+                        
+                        // 110〜150の範囲 (1ステータスにつき +0.135%)
+                        if (calcMental > 110) {
+                            let tier4 = calcMental - 110;
+                            totalBuffPercent += tier4 * 0.135;
+                        }
+                    }
+                    
+                    // 算出した%を小数に変換し、試合状況の熱量（clutchIntensity）を掛けて最終バフプールを決定
+                    let mentalBonusPool = (totalBuffPercent / 100) * clutchIntensity;
 
                     if (mentalBonusPool > 0) {
-                        // 攻撃側の尖りを見つけるため、オフェンス関連のステータスのみを走査対象とする
+                        // バフの場合は攻撃側の尖り（最大能力）を見つけてそこに特化させる
                         let statsToScan = ['inside', 'midRange', 'threePoint', 'passing', 'dribble', 'speed', 'physical'];
                         let highestStatValue = 0;
                         let highestStatKey = "";
@@ -2027,7 +2055,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                         }
                         
                         clutchBuffs.maxStatKey = highestStatKey;
-                        // 最大能力に80%（最大12%増）、その他に20%（最大3%増）を配分
+                        // 最大能力に80%（尖りバフ）、その他に20%（微バフ）を配分
                         clutchBuffs.maxMultiplier = 1.0 + (mentalBonusPool * 0.8);
                         clutchBuffs.otherMultiplier = 1.0 + (mentalBonusPool * 0.2);
                         
@@ -2035,6 +2063,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                         mentalBuff = clutchBuffs.otherMultiplier;
                     }
                 }
+
 
 
                 // =========================================================
