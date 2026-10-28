@@ -2744,7 +2744,7 @@ writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defen
             ];
             missText = midLogs[Math.floor(rMiss * midLogs.length)];
         }
-        writeLog(currentClock, offData.team.name, missText, false, [shooter.id]);
+ ⁠writeLog(gameState.clock, offData.team.name, missText, false, [shooter.id]);⁠
     }
 
     // 2. リバウンダー選出ロジック (全ポジション対応・異常時保護)
