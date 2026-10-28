@@ -2547,7 +2547,7 @@ if (Math.random() < Math.max(0.01, blockChance) && !ankleBreak) {
                   `✋ ${shooter.name}のシュートを${defender.name}が見事にブロック！`;
     
     // 変数名エラー防止処理
-    const logClock = typeof currentClock !== 'undefined' ? currentClock : gameState.clock;
+   const logClock = gameState.clock;
     writeLog(logClock, defData.team.name, blkText, (isHighBlock || isChaseDown || isSnatchBlock), [shooter.id, defender.id]);
     
     // 🔴【新機能2】ブロック後のトラッシュトーク（メンタル強者が大ブロックした時のみ）
