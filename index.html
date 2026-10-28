@@ -1984,11 +1984,12 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
                 
                 let clutchIntensity = 0.0;
-                // 4Q以降かつ8点差以内でクラッチ判定開始
-                if (gameState.currentQ >= 4 && Math.abs(prevDiff) <= 8) {
+                              // 4Q以降かつ15点差以内でクラッチ判定開始
+                if (gameState.currentQ >= 4 && Math.abs(prevDiff) <= 15) {
                     // 延長戦(Q5以降)は常に時間要因マックス。4Qは残り5分(300秒)から徐々に上昇し最低0.2を保証
                     let timeFactor = gameState.currentQ >= 5 ? 1.0 : Math.max(0.2, (300 - gameState.clock) / 300);
-                    let scoreFactor = Math.max(0.1, (8 - Math.abs(prevDiff)) / 8); // 同点に近づくほど1.0に近づく
+                    let scoreFactor = Math.max(0.1, (15 - Math.abs(prevDiff)) / 15); // 同点に近づくほど1.0に近づく
+
                     clutchIntensity = timeFactor * scoreFactor;
                 }
                 
