@@ -2857,7 +2857,7 @@ addScore(2, gameState.currentQ, gameState.isHomeOffense, hData, aData);
             orbText = `🏀 ${offReber.name}が良いポジションに入り込み、こぼれ球を確実に確保！`;
         }
         
-        writeLog(currentClock, offData.team.name, orbText, false, [offReber.id]);
+writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);⁠
         keepPossession(14);
         
     } else {
