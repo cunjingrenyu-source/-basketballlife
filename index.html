@@ -2196,7 +2196,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
 
               
 
-                // 【改良】シューターのステータス取得を整理し、ネスト深い参照エラーを防止
+                    // 【改良】シューターのステータス取得を整理し、ネスト深い参照エラーを防止
                 const sStats = shooter?.currentStats || {};
                 let stat3 = sStats.three || sStats["3pt"] || sStats.tpt || 30;
                 let statMid = sStats.middle || sStats.mid || 30;
@@ -2598,7 +2598,7 @@ const homeOffToUse = gameState.isHomeOffense;
 
     const newDiff = homeOffToUse ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
     const safePrevDiff = typeof prevDiff !== 'undefined' ? prevDiff : (newDiff - pts);
-const logClock2 = gameState.clock;⁠
+const logClock2 = gameState.clock;
     
     const isBuzzerBeater = (qtrToUse >= 4 && logClock2 <= 3 && safePrevDiff <= 0 && newDiff > 0);
     const isClutch = (typeof isClutchTime !== 'undefined' && isClutchTime && safePrevDiff <= 3 && safePrevDiff >= -3 && newDiff > 0);
@@ -2745,7 +2745,7 @@ writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defen
             ];
             missText = midLogs[Math.floor(rMiss * midLogs.length)];
         }
- ⁠writeLog(gameState.clock, offData.team.name, missText, false, [shooter.id]);⁠
+ writeLog(gameState.clock, offData.team.name, missText, false, [shooter.id]);
     }
 
     // 2. リバウンダー選出ロジック (全ポジション対応・異常時保護)
@@ -2809,7 +2809,7 @@ writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defen
         const rPutback = Math.random();
         let putbackType = "none";
         
-   if (gameState.clock > 0) {⁠
+   if (gameState.clock > 0) {
             if (dunkStat > 95 && phyStat > 90 && rPutback < 0.10) {
                 putbackType = "putback_dunk";
             } else if (inStat > 85 && phyStat > 80 && rPutback < 0.18) {
@@ -2842,7 +2842,7 @@ addScore(2, gameState.currentQ, gameState.isHomeOffense, hData, aData);
             }
             
             // 8. 得点後の整合性担保: 24秒リセットしてターンエンド
-         writeLog(gameState.clock, offData.team.name, pbText, true, [offReber.id]);⁠
+         writeLog(gameState.clock, offData.team.name, pbText, true, [offReber.id]);
             switchPossession(24, false);
             continue;
         }
@@ -2858,7 +2858,7 @@ addScore(2, gameState.currentQ, gameState.isHomeOffense, hData, aData);
             orbText = `🏀 ${offReber.name}が良いポジションに入り込み、こぼれ球を確実に確保！`;
         }
         
-writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);⁠
+writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);
         keepPossession(14);
         
     } else {
@@ -2902,7 +2902,6 @@ writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);⁠
             gameState.currentQ++;
 
         } // 🚨【修正追加】while (gameState.currentQ <= gameState.maxQ) を閉じる
-
 
         // --- 個人スタッツのグローバル反映＆IndexedDB保存 ---
         const commitToGlobalStats = (teamState, isH) => {
