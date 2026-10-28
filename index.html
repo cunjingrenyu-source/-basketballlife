@@ -1979,15 +1979,62 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 let ballHolder = getBallHandler(offData);
                 let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
 
-                             // 【既存維持】クラッチタイムとメンタルバフの計算
+// 【完全改修】クラッチタイムの段階的評価と特化型メンタルバフの計算
                 // 🟢 修正：オプショナルチェーンで安全にスコアを取得
                 let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
-                let isClutchTime = (gameState.currentQ >= 4 && gameState.clock < 120 && Math.abs(prevDiff) <= 5);
-
-                let mentalBuff = 1.0;
-                if (isClutchTime && prevDiff < 0) {
-                    mentalBuff = 1.0 + ((ballHolder.currentStats.mental || 50) / 500);
+                
+                let clutchIntensity = 0.0;
+                // 4Q以降かつ8点差以内でクラッチ判定開始
+                if (gameState.currentQ >= 4 && Math.abs(prevDiff) <= 8) {
+                    // 延長戦(Q5以降)は常に時間要因マックス。4Qは残り5分(300秒)から徐々に上昇し最低0.2を保証
+                    let timeFactor = gameState.currentQ >= 5 ? 1.0 : Math.max(0.2, (300 - gameState.clock) / 300);
+                    let scoreFactor = Math.max(0.1, (8 - Math.abs(prevDiff)) / 8); // 同点に近づくほど1.0に近づく
+                    clutchIntensity = timeFactor * scoreFactor;
                 }
+                
+                // 既存システムとの互換性維持フラグ
+                let isClutchTime = clutchIntensity > 0; 
+                let mentalBuff = 1.0; 
+                
+                // 後続のシュート・パス・ドライブ処理へ渡すためのバフ管理オブジェクト（新規ローカル変数）
+                let clutchBuffs = { 
+                    intensity: clutchIntensity,
+                    maxStatKey: "", 
+                    maxMultiplier: 1.0, 
+                    otherMultiplier: 1.0,
+                    // 後続処理で能力値が暴走しないための安全装置（ソフトキャップ上限の目安）
+                    softCap: 100 
+                }; 
+                
+                if (isClutchTime) {
+                    let mentalValue = ballHolder.currentStats.mental || 50;
+                    
+                    // メンタル50を基準にペナルティなし。最大約15%のバフプール
+                    let mentalBonusPool = Math.max(0, (mentalValue - 50) / 333) * clutchIntensity; 
+
+                    if (mentalBonusPool > 0) {
+                        // 攻撃側の尖りを見つけるため、オフェンス関連のステータスのみを走査対象とする
+                        let statsToScan = ['inside', 'midRange', 'threePoint', 'passing', 'dribble', 'speed', 'physical'];
+                        let highestStatValue = 0;
+                        let highestStatKey = "";
+                        
+                        for (let key of statsToScan) {
+                            if ((ballHolder.currentStats[key] || 0) > highestStatValue) {
+                                highestStatValue = ballHolder.currentStats[key];
+                                highestStatKey = key;
+                            }
+                        }
+                        
+                        clutchBuffs.maxStatKey = highestStatKey;
+                        // 最大能力に80%（最大12%増）、その他に20%（最大3%増）を配分
+                        clutchBuffs.maxMultiplier = 1.0 + (mentalBonusPool * 0.8);
+                        clutchBuffs.otherMultiplier = 1.0 + (mentalBonusPool * 0.2);
+                        
+                        // 既存のmentalBuffに依存する古いコード向けに、控えめな全体バフを代入しておく
+                        mentalBuff = clutchBuffs.otherMultiplier;
+                    }
+                }
+
 
                 // =========================================================
                 // 🔴【超絶強化】高度なクロックマネジメントと時間消費ロジック
