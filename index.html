@@ -2808,7 +2808,7 @@ writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defen
         const rPutback = Math.random();
         let putbackType = "none";
         
-        if (currentClock > 0) {
+   if (gameState.clock > 0) {⁠
             if (dunkStat > 95 && phyStat > 90 && rPutback < 0.10) {
                 putbackType = "putback_dunk";
             } else if (inStat > 85 && phyStat > 80 && rPutback < 0.18) {
