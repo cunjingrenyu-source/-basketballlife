@@ -2841,7 +2841,7 @@ addScore(2, gameState.currentQ, gameState.isHomeOffense, hData, aData);
             }
             
             // 8. 得点後の整合性担保: 24秒リセットしてターンエンド
-            writeLog(currentClock, offData.team.name, pbText, true, [offReber.id]);
+         writeLog(gameState.clock, offData.team.name, pbText, true, [offReber.id]);⁠
             switchPossession(24, false);
             continue;
         }
