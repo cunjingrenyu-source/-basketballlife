@@ -2597,7 +2597,7 @@ if (isMade) {
 
     const newDiff = homeOffToUse ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
     const safePrevDiff = typeof prevDiff !== 'undefined' ? prevDiff : (newDiff - pts);
-    const logClock2 = typeof currentClock !== 'undefined' ? currentClock : gameState.clock;
+const logClock2 = gameState.clock;⁠
     
     const isBuzzerBeater = (qtrToUse >= 4 && logClock2 <= 3 && safePrevDiff <= 0 && newDiff > 0);
     const isClutch = (typeof isClutchTime !== 'undefined' && isClutchTime && safePrevDiff <= 3 && safePrevDiff >= -3 && newDiff > 0);
