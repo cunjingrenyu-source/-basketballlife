@@ -2591,8 +2591,9 @@ if (isMade) {
     shooter._consecutiveMakes += 1; // 連続成功カウントUP
     
     // 既存維持：スコア追加処理（変数名エラー回避）
-    const qtrToUse = typeof currentQ !== 'undefined' ? currentQ : (typeof currentQtr !== 'undefined' ? currentQtr : gameState.currentQ);
-    const homeOffToUse = typeof isHomeOffense !== 'undefined' ? isHomeOffense : currentIsHome;
+  const qtrToUse = gameState.currentQ;
+const homeOffToUse = gameState.isHomeOffense;
+
     addScore(pts, qtrToUse, homeOffToUse, hData, aData);
 
     const newDiff = homeOffToUse ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
