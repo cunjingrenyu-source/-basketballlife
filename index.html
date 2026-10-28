@@ -1241,11 +1241,14 @@ window.renderPracticeGrid = function() {
             usg = (playerPoss / estimatedTeamPoss) * 100;
         }
 
-        return {
-            ts: isNaN(ts) || !isFinite(ts) ? "0.0%" : Math.min(150, Math.max(0, ts)).toFixed(1) + "%", // TSは稀に100超え(150上限)があり得る
+                return {
+            ts: isNaN(ts) || !isFinite(ts) ? "0.0%" : Math.min(150, Math.max(0, ts)).toFixed(1) + "%", 
             eff: isNaN(eff) || !isFinite(eff) ? "0.0" : eff.toFixed(1),
-            usg: usg === 0 ? "0.0%" : Math.min(100, Math.max(0, usg)).toFixed(1) + "%" // 0〜100の範囲で安全に出力
+            usg: usg === 0 ? "0.0%" : Math.min(100, Math.max(0, usg)).toFixed(1) + "%" 
         };
+    } 
+
+
 
 
     function generateTableHeaderHtml() {
