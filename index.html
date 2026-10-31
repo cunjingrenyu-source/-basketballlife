@@ -3112,12 +3112,24 @@ writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);
                 }
             };
 
-            fillBoxScoreTable('match-box-home', hTeam.roster);
-            fillBoxScoreTable('match-box-away', aTeam.roster);
-            
-            if(typeof renderMiniScoreboard === "function") renderMiniScoreboard(hTeam.name, aTeam.name, qScores, score);
-            if(typeof switchMatchTab === "function") setTimeout(() => { switchMatchTab('full'); }, 50);
+                    // （OT判定や、最終スコアの計算などが少し書かれているかもしれません）
+
+        if (isVisual) {
+            logs.push(`<div class="log-entry"><span class="log-highlight">🏀 試合終了 🏀 ${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}</span></div>`);
+            document.getElementById('match-log').innerHTML = logs.join('');
         }
+        
+        // ▼▼ ここに追加します ▼▼
+        if (score.home > score.away) {
+            hTeam.w = (hTeam.w || 0) + 1;
+            aTeam.l = (aTeam.l || 0) + 1;
+        } else if (score.away > score.home) {
+            aTeam.w = (aTeam.w || 0) + 1;
+            hTeam.l = (hTeam.l || 0) + 1;
+        }
+        // ▲▲ ここまで ▲▲
+
+
     };
 </script>
 
