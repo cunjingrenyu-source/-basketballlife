@@ -474,6 +474,44 @@ function loadFromIDB(logId) {
             }
         }
     }
+function renderPlayerStats() {
+    // ホームチームのスタッツ描画
+    const homeTbody = document.querySelector('#match-box-home tbody');
+    if (homeTbody && gameState.homeTeam && gameState.homeTeam.players) {
+        homeTbody.innerHTML = '';
+        gameState.homeTeam.players.forEach(player => {
+            const tr = document.createElement('tr');
+            // 以下の player.stats 構造は実際のデータ構造に合わせてプロパティ名を調整してください
+            tr.innerHTML = `
+                <td>${player.name}</td>
+                <td>${player.stats.pts || 0}</td>
+                <td>${player.stats.ast || 0}</td>
+                <td>${player.stats.reb || 0}</td>
+                <td>${player.stats.stl || 0}</td>
+                <td>${player.stats.blk || 0}</td>
+            `;
+            homeTbody.appendChild(tr);
+        });
+    }
+
+    // アウェイチームのスタッツ描画
+    const awayTbody = document.querySelector('#match-box-away tbody');
+    if (awayTbody && gameState.awayTeam && gameState.awayTeam.players) {
+        awayTbody.innerHTML = '';
+        gameState.awayTeam.players.forEach(player => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${player.name}</td>
+                <td>${player.stats.pts || 0}</td>
+                <td>${player.stats.ast || 0}</td>
+                <td>${player.stats.reb || 0}</td>
+                <td>${player.stats.stl || 0}</td>
+                <td>${player.stats.blk || 0}</td>
+            `;
+            awayTbody.appendChild(tr);
+        });
+    }
+}
 
  // --- セーブ＆ロード (Firebase対応版) ---
 
