@@ -2288,14 +2288,28 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
 
               
 
-                    // 【改良】シューターのステータス取得を整理し、ネスト深い参照エラーを防止
+                                  // 【改良】シューターのステータス取得を整理し、ネスト深い参照エラーを防止
                 const sStats = shooter?.currentStats || {};
                 let stat3 = sStats.three || sStats["3pt"] || sStats.tpt || 30;
                 let statMid = sStats.middle || sStats.mid || 30;
                 let statIn = sStats.layup || sStats.inside || 30;
                 let statDk = sStats.dunk || 30;
 
+                // 🔴【連携追加】クラッチバフをシューターの能力に適用（ここで後続と完全に繋がる）
+                if (typeof clutchBuffs !== 'undefined' && clutchBuffs.isActive) {
+                    const applyBuff = (val, key) => {
+                        let multi = (clutchBuffs.maxStatKey === key) ? clutchBuffs.maxMultiplier : clutchBuffs.otherMultiplier;
+                        let cap = (clutchBuffs.maxStatKey === key) ? clutchBuffs.maxCap : clutchBuffs.otherCap;
+                        return Math.min(cap, val * multi);
+                    };
+                    stat3 = applyBuff(stat3, 'three');
+                    statMid = applyBuff(statMid, 'middle');
+                    statIn = applyBuff(statIn, 'layup');
+                    statDk = applyBuff(statDk, 'layup'); // ダンクもインサイドの尖り判定に含める
+                }
+
                 let base3 = (shooter.pos === "PG" || shooter.pos === "SG") ? 45 : (shooter.pos === "SF") ? 35 : 20;
+
                 let baseMid = 20; 
                 let baseIn = (shooter.pos === "C" || shooter.pos === "PF") ? 50 : 30;
                 let baseDk = (shooter.pos === "C" || shooter.pos === "PF") ? 20 : 5;
