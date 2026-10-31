@@ -1983,13 +1983,16 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 // 🟢 修正：オプショナルチェーンで安全にスコアを取得
                 let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
                 
-                            let clutchIntensity = 0.0;
-                // 4Qの残り7分(420秒)以下、または延長戦(Q5以降) かつ 15点差以内でクラッチ判定開始
-                if ((gameState.currentQ === 4 && gameState.clock <= 420 || gameState.currentQ >= 5) && Math.abs(prevDiff) <= 15) {
+                let clutchIntensity = 0.0;
+                // 4Qの残り4分(240秒)以下、または延長戦(Q5以降) かつ 10点差以内でクラッチ判定開始
+                if ((gameState.currentQ === 4 && gameState.clock <= 240 || gameState.currentQ >= 5) && Math.abs(prevDiff) <= 10) {
 
-                    // 延長戦(Q5以降)は常に時間要因マックス。4Qは残り5分(300秒)から徐々に上昇し最低0.2を保証
-                    let timeFactor = gameState.currentQ >= 5 ? 1.0 : Math.max(0.2, (300 - gameState.clock) / 300);
-                    let scoreFactor = Math.max(0.1, (15 - Math.abs(prevDiff)) / 15); // 同点に近づくほど1.0に近づく
+                    // 延長戦(Q5以降)は5分(300秒)基準で時間要因を計算。4Qは残り4分(240秒)基準。最低0.2を保証
+                    let baseTime = gameState.currentQ >= 5 ? 300 : 240;
+                    let timeFactor = Math.max(0.2, (baseTime - gameState.clock) / baseTime);
+                    
+                    // 修正(C04): 10点差で0になり、同点(0点差)で1.0に近づく。負の値を防ぐ。
+                    let scoreFactor = Math.max(0.0, (10 - Math.abs(prevDiff)) / 10); 
 
                     clutchIntensity = timeFactor * scoreFactor;
                 }
@@ -1998,44 +2001,46 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 let isClutchTime = clutchIntensity > 0; 
                 let mentalBuff = 1.0; 
                 
-                // 後続のシュート・パス・ドライブ処理へ渡すためのバフ管理オブジェクト（新規ローカル変数）
+                // 後続のシュート・パス・ドライブ処理へ渡すためのバフ管理オブジェクト
                 let clutchBuffs = { 
+                    isActive: isClutchTime,
                     intensity: clutchIntensity,
                     maxStatKey: "", 
                     maxMultiplier: 1.0, 
                     otherMultiplier: 1.0,
-                    // 後続処理で能力値が暴走しないための安全装置（ソフトキャップ上限の目安）
-                    softCap: 100 
+                    // 後続処理で能力値が暴走しないための安全装置（最終計算時に適用するキャップ）
+                    maxCap: 110,
+                    otherCap: 100,
+                    // 二重適用防止用フラグ (後続の処理でこのフラグがtrueなら従来のmentalBuffを無視する)
+                    useNewSystem: true
                 }; 
                 
                 if (isClutchTime) {
-                    let mentalValue = ballHolder.currentStats.mental || 50;
+                    // 修正(M01, M03): メンタル0未満(負数)の対策、未定義時は50
+                    let mentalValue = Math.max(0, ballHolder.currentStats.mental || 50);
                     
-                    // 【修正点】デバフを完全廃止し、4段階のステータス加算方式を採用
+                    // デバフを完全廃止し、4段階のステータス加算方式を採用（最大29.5%）
                     let totalBuffPercent = 0.0;
                     if (mentalValue > 0) {
-                        let calcMental = Math.min(mentalValue, 150); // 上限150
+                        // 修正(M02): 上限150を超過しても150として扱う
+                        let calcMental = Math.min(mentalValue, 150); 
                         
-                        // 0〜30の範囲 (1ステータスにつき +0.05%)
                         let tier1 = Math.min(calcMental, 30);
                         totalBuffPercent += tier1 * 0.05;
                         
-                        // 30〜70の範囲 (1ステータスにつき +0.085%) ※インフレ防止のため0.85ではなく0.085で計算
                         if (calcMental > 30) {
                             let tier2 = Math.min(calcMental - 30, 40);
-                            totalBuffPercent += tier2 * 0.085;
+                            totalBuffPercent += tier2 * 0.10;
                         }
                         
-                        // 70〜110の範囲 (1ステータスにつき +0.115%)
                         if (calcMental > 70) {
                             let tier3 = Math.min(calcMental - 70, 40);
-                            totalBuffPercent += tier3 * 0.115;
+                            totalBuffPercent += tier3 * 0.25;
                         }
                         
-                        // 110〜150の範囲 (1ステータスにつき +0.135%)
                         if (calcMental > 110) {
                             let tier4 = calcMental - 110;
-                            totalBuffPercent += tier4 * 0.135;
+                            totalBuffPercent += tier4 * 0.35;
                         }
                     }
                     
@@ -2043,24 +2048,31 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     let mentalBonusPool = (totalBuffPercent / 100) * clutchIntensity;
 
                     if (mentalBonusPool > 0) {
-                        // バフの場合は攻撃側の尖り（最大能力）を見つけてそこに特化させる
+                        // バフの場合は攻撃側の尖り（最大能力）を見つける
                         let statsToScan = ['inside', 'midRange', 'threePoint', 'passing', 'dribble', 'speed', 'physical'];
                         let highestStatValue = 0;
-                        let highestStatKey = "";
+                        let highestStatKeys = []; 
                         
                         for (let key of statsToScan) {
-                            if ((ballHolder.currentStats[key] || 0) > highestStatValue) {
-                                highestStatValue = ballHolder.currentStats[key];
-                                highestStatKey = key;
+                            let val = ballHolder.currentStats[key] || 0;
+                            if (val > highestStatValue) {
+                                highestStatValue = val;
+                                highestStatKeys = [key];
+                            } else if (val === highestStatValue && highestStatValue > 0) {
+                                highestStatKeys.push(key); // 同値対応
                             }
                         }
                         
-                        clutchBuffs.maxStatKey = highestStatKey;
-                        // 最大能力に80%（尖りバフ）、その他に20%（微バフ）を配分
-                        clutchBuffs.maxMultiplier = 1.0 + (mentalBonusPool * 0.8);
-                        clutchBuffs.otherMultiplier = 1.0 + (mentalBonusPool * 0.2);
+                        // 修正(S01): 同値が複数ある場合はランダムで1つ選ぶ
+                        if (highestStatKeys.length > 0) {
+                            clutchBuffs.maxStatKey = highestStatKeys[Math.floor(Math.random() * highestStatKeys.length)];
+                        }
                         
-                        // 既存のmentalBuffに依存する古いコード向けに、控えめな全体バフを代入しておく
+                        // 最大能力に65%（尖りバフ）、その他に35%（微バフ）を配分
+                        clutchBuffs.maxMultiplier = 1.0 + (mentalBonusPool * 0.65);
+                        clutchBuffs.otherMultiplier = 1.0 + (mentalBonusPool * 0.35);
+                        
+                        // 古い処理向け。後続で新システムを使う場合は二重バフに注意。
                         mentalBuff = clutchBuffs.otherMultiplier;
                     }
                 }
