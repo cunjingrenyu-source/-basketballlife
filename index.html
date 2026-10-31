@@ -2048,9 +2048,10 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     let mentalBonusPool = (totalBuffPercent / 100) * clutchIntensity;
 
                     if (mentalBonusPool > 0) {
-                        // バフの場合は攻撃側の尖り（最大能力）を見つける
-                        let statsToScan = ['inside', 'midRange', 'threePoint', 'passing', 'dribble', 'speed', 'physical'];
+                                        // バフの場合は攻撃側の尖り（最大能力）を見つける
+                        let statsToScan = ['layup', 'middle', 'three', 'pass', 'dribble', 'speed', 'physical']; // 🔴実際のステータス名に修正
                         let highestStatValue = 0;
+
                         let highestStatKeys = []; 
                         
                         for (let key of statsToScan) {
