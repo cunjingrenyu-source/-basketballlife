@@ -3100,7 +3100,7 @@ writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);
             let titleAway = document.getElementById('boxscore-title-away');
             if(titleAway) titleAway.innerText = `🚀 ${aTeam.name} 個人スタッツ`;
 
-            const fillBoxScoreTable = (targetTableId, roster) => {
+                     const fillBoxScoreTable = (targetTableId, roster) => {
                 let t = document.getElementById(targetTableId);
                 if(!t) return;
                 if(typeof generateTableHeaderHtml === "function" && typeof generatePlayerRowHtml === "function"){
@@ -3112,13 +3112,13 @@ writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);
                 }
             };
 
-                    // （OT判定や、最終スコアの計算などが少し書かれているかもしれません）
-
-        if (isVisual) {
-            logs.push(`<div class="log-entry"><span class="log-highlight">🏀 試合終了 🏀 ${hTeam.name} ${score.home} - ${score.away} ${aTeam.name}</span></div>`);
-            document.getElementById('match-log').innerHTML = logs.join('');
+            fillBoxScoreTable('match-box-home', hTeam.roster);
+            fillBoxScoreTable('match-box-away', aTeam.roster);
+            
+            if(typeof renderMiniScoreboard === "function") renderMiniScoreboard(hTeam.name, aTeam.name, qScores, score);
+            if(typeof switchMatchTab === "function") setTimeout(() => { switchMatchTab('full'); }, 50);
         }
-        
+
         // ▼▼ ここに追加します ▼▼
         if (score.home > score.away) {
             hTeam.w = (hTeam.w || 0) + 1;
@@ -3129,8 +3129,8 @@ writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);
         }
         // ▲▲ ここまで ▲▲
 
-
     };
+
 </script>
 
 <!-- ========================================== -->
