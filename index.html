@@ -1802,50 +1802,51 @@ window.simulateGame = function(hTeam, aTeam, isVisual) {
     };
 
         // 🚨【修正追加】ループの外に出して軽量化
-        const updateBox = (player, key, val = 1) => {
-            if (player && player._box) {
-                player._box[key] = (player._box[key] || 0) + val;
+         const updateBox = (player, key, val = 1) => {
+        if (player && player._box) {
+            player._box[key] = (player._box[key] || 0) + val;
+        }
+    };
+
+    const addScore = (pts, qtr, isHomeOffense, hData, aData) => {
+        const offSide = isHomeOffense ? 'home' : 'away';
+        if (typeof score !== 'undefined' && score) score[offSide] = (score[offSide] || 0) + pts;
+        const qIdx = qtr - 1;
+        if (typeof qScores !== 'undefined' && qScores && qScores[offSide]) {
+            qScores[offSide][qIdx] = (qScores[offSide][qIdx] || 0) + pts;
+        }
+        
+        updateMomentum(offSide, pts);
+
+        if (Array.isArray(hData?.court) && Array.isArray(aData?.court)) {
+            let offData = isHomeOffense ? hData : aData;
+            let defData = isHomeOffense ? aData : hData;
+            offData.court.forEach(p => updateBox(p, 'plusMinus', pts));
+            defData.court.forEach(p => updateBox(p, 'plusMinus', -pts));
+        }
+    };
+
+    const getSafeStat = (player, key, fallback = 50) => {
+        if (key === '_stamina') return player._stamina !== undefined ? player._stamina : fallback;
+        const val = player?.currentStats?.[key];
+        return (typeof val === "number" && isFinite(val)) ? val : fallback;
+    };
+
+    while (gameState.currentQ <= gameState.maxQ) {
+        gameState.clock = gameState.isOverTime ? 300 : 720; 
+        let qName = gameState.isOverTime ? `延長第${gameState.currentQ - 4}Q(OT)` : `第${gameState.currentQ}Q`;
+        
+        if(isVisual) {
+            logs.push(`<div class="log-entry"><span class="log-time">残り--:--</span><span class="log-highlight">🏀 ${qName} 開始 🏀</span></div>`);
+            if(gameState.currentQ === 1) {
+                writeLog(gameState.clock, hTeam.name, `【スターティング5】 ${getNames(hData.court)}`);
+                writeLog(gameState.clock, aTeam.name, `【スターティング5】 ${getNames(aData.court)}`);
+                writeLog(gameState.clock, "両チーム", `ティップオフ！試合開始！`);
             }
-        };
+        }
 
-               const addScore = (pts, qtr, isHomeOffense, hData, aData) => {
-            const offSide = isHomeOffense ? 'home' : 'away';
-            if (typeof score !== 'undefined' && score) score[offSide] = (score[offSide] || 0) + pts;
-            const qIdx = qtr - 1;
-            if (typeof qScores !== 'undefined' && qScores && qScores[offSide]) {
-                qScores[offSide][qIdx] = (qScores[offSide][qIdx] || 0) + pts;
-            }
-            
-            // 🔴【新機能20】モメンタム（ラン）のトラッキング
-            updateMomentum(offSide, pts);
+        while(gameState.clock > 0) {
 
-            if (Array.isArray(hData?.court) && Array.isArray(aData?.court)) {
-                let offData = isHomeOffense ? hData : aData;
-                let defData = isHomeOffense ? aData : hData;
-                offData.court.forEach(p => updateBox(p, 'plusMinus', pts));
-                defData.court.forEach(p => updateBox(p, 'plusMinus', -pts));
-            }
-        };
-
-
-        const getSafeStat = (player, key, fallback = 50) => {
-            const val = player?.currentStats?.[key];
-            return (typeof val === "number" && isFinite(val)) ? val : fallback;
-        };
-
-           while (gameState.currentQ <= gameState.maxQ) {
-            // 【第1章】各クォーター開始時の時計とフェーズのリセット
-            gameState.clock = gameState.isOverTime ? 300 : 720; 
-            let qName = gameState.isOverTime ? `延長第${gameState.currentQ - 4}Q(OT)` : `第${gameState.currentQ}Q`;
-            
-            if(isVisual) {
-                logs.push(`<div class="log-entry"><span class="log-time">残り--:--</span><span class="log-highlight">🏀 ${qName} 開始 🏀</span></div>`);
-                if(gameState.currentQ === 1) {
-                    writeLog(gameState.clock, hTeam.name, `【スターティング5】 ${getNames(hData.court)}`);
-                    writeLog(gameState.clock, aTeam.name, `【スターティング5】 ${getNames(aData.court)}`);
-                    writeLog(gameState.clock, "両チーム", `ティップオフ！試合開始！`);
-                }
-            }
 
                         while(gameState.clock > 0) {
                 let offData = gameState.isHomeOffense ? hData : aData;
