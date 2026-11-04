@@ -1593,109 +1593,109 @@ window.renderPracticeGrid = function() {
         if (roundEl) roundEl.innerText = currentRound <= totalRounds ? currentRound : "終了";
     };
 
-    window.simulateGame = function(hTeam, aTeam, isVisual) {
-        let logs = []; 
-        let score = { home: 0, away: 0 };
-        let qScores = { home: [0,0,0,0], away: [0,0,0,0] };
-    
-        let gamePlayers = [...hTeam.roster, ...aTeam.roster];
-        gamePlayers.forEach(p => {
-            p._box = { pts:0, reb:0, ast:0, stl:0, blk:0, to:0, pf:0, fta:0, ftm:0, fgm:0, fga:0, tpm:0, tpa:0, drb:0, orb:0, plusMinus:0, min:0, gs:0 };
-            if(!p.stats) p.stats = { speed:50, stamina:50, defense:50, dribble:50, pass:50, physical:50, layup:50, dunk:50, middle:50, three:50, mental:50 };
-        });
+window.simulateGame = function(hTeam, aTeam, isVisual) {
+    let logs = []; 
+    let score = { home: 0, away: 0 };
+    let qScores = { home: [0,0,0,0], away: [0,0,0,0] };
 
-        gamePlayers.forEach(p => { 
-            let r = Math.random();
-            if(r < 0.05) { p._cond = 1.20; p._condStr = "絶好調"; }
-            else if(r < 0.15) { p._cond = 0.90; p._condStr = "不調"; }
-            else if(r < 0.40) { p._cond = 1.05; p._condStr = "好調"; }
-            else { p._cond = 1.00; p._condStr = "普通"; }
-        });
+    let gamePlayers = [...hTeam.roster, ...aTeam.roster];
+    gamePlayers.forEach(p => {
+        p._box = { pts:0, reb:0, ast:0, stl:0, blk:0, to:0, pf:0, fta:0, ftm:0, fgm:0, fga:0, tpm:0, tpa:0, drb:0, orb:0, plusMinus:0, min:0, gs:0 };
+        if(!p.stats) p.stats = { speed:50, stamina:50, defense:50, dribble:50, pass:50, physical:50, layup:50, dunk:50, middle:50, three:50, mental:50 };
+    });
 
-        const evalPlayer = (p) => {
-            let s = p.stats; let c = p._cond;
-            if(p.pos==="PG") return (s.pass*1.5 + s.dribble*1.5 + s.speed) * c;
-            if(p.pos==="SG") return (s.three*1.5 + s.middle*1.5 + s.speed) * c;
-            if(p.pos==="SF") return (s.layup + s.middle + s.defense + s.physical) * c;
-            if(p.pos==="PF") return (s.rebound*1.5 + s.physical*1.5 + s.dunk) * c;
-            if(p.pos==="C")  return (s.rebound*1.5 + s.defense*1.5 + s.physical + s.dunk) * c;
-            return 50 * c;
-        };
+    gamePlayers.forEach(p => { 
+        let r = Math.random();
+        if(r < 0.05) { p._cond = 1.20; p._condStr = "絶好調"; }
+        else if(r < 0.15) { p._cond = 0.90; p._condStr = "不調"; }
+        else if(r < 0.40) { p._cond = 1.05; p._condStr = "好調"; }
+        else { p._cond = 1.00; p._condStr = "普通"; }
+    });
 
-        const setupTeamState = (team) => {
-            let court = []; let bench = [];
-            const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
-            POSITIONS.forEach(pos => {
-                let sorted = team.roster.filter(p=>p.pos===pos).sort((a,b) => {
-                    if (a.isUser) return -1;
-                    if (b.isUser) return 1;
-                    return evalPlayer(b) - evalPlayer(a);
-                });
-                
-                if (sorted.length > 0) {
-                    court.push(sorted[0]); 
-                    bench.push(...sorted.slice(1)); 
-                    sorted[0]._box.gs = 1; sorted[0]._stamina = 100;
-                    sorted.slice(1).forEach(bp => { bp._stamina = 100; });
-                }
+    const evalPlayer = (p) => {
+        let s = p.stats; let c = p._cond;
+        if(p.pos==="PG") return (s.pass*1.5 + s.dribble*1.5 + s.speed) * c;
+        if(p.pos==="SG") return (s.three*1.5 + s.middle*1.5 + s.speed) * c;
+        if(p.pos==="SF") return (s.layup + s.middle + s.defense + s.physical) * c;
+        if(p.pos==="PF") return (s.rebound*1.5 + s.physical*1.5 + s.dunk) * c;
+        if(p.pos==="C")  return (s.rebound*1.5 + s.defense*1.5 + s.physical + s.dunk) * c;
+        return 50 * c;
+    };
+
+    const setupTeamState = (team) => {
+        let court = []; let bench = [];
+        const POSITIONS = ["PG", "SG", "SF", "PF", "C"];
+        POSITIONS.forEach(pos => {
+            let sorted = team.roster.filter(p=>p.pos===pos).sort((a,b) => {
+                if (a.isUser) return -1;
+                if (b.isUser) return 1;
+                return evalPlayer(b) - evalPlayer(a);
             });
-            return { team, court, bench };
-        };
-
-        let hData = setupTeamState(hTeam); let aData = setupTeamState(aTeam);
-        
-        const formatClock = (sec) => {
-            let m = Math.floor(sec/60); let s = sec%60;
-            return `残り${m}:${s.toString().padStart(2,'0')}`;
-        };
-        const getNames = (arr) => arr.map(p=>`#${p.num} ${p.name}`).join(", ");
-        
-        const writeLog = (timeSec, teamName, html, isHighlight = false, involvedIds = []) => {
-            if(!isVisual) return;
-            let extraClass = "";
-            if (isHighlight) extraClass += " log-type-highlight";
-            if (typeof currentUser !== 'undefined' && currentUser && involvedIds.includes(currentUser.id)) extraClass += " log-type-myplay";
             
-            logs.push(`<div class="log-entry ${extraClass}"><span class="log-time">${formatClock(timeSec)}</span><span class="log-team">${teamName}</span><span class="log-action">${html}</span></div>`);
-        };
+            if (sorted.length > 0) {
+                court.push(sorted[0]); 
+                bench.push(...sorted.slice(1)); 
+                sorted[0]._box.gs = 1; sorted[0]._stamina = 100;
+                sorted.slice(1).forEach(bp => { bp._stamina = 100; });
+            }
+        });
+        return { team, court, bench };
+    };
 
-        const checkSubstitution = (teamData, clockSec, isHomeTeam) => {
-            let tName = teamData.team.name;
-            teamData.court.forEach((p, idx) => {
-                let stamLoss = 3 - (p.stats.stamina / 150) * 1.5;
-                if(p._condStr === "不調") stamLoss *= 1.2;
-                p._stamina = Math.max(0, p._stamina - (stamLoss * 0.08));
+    let hData = setupTeamState(hTeam); let aData = setupTeamState(aTeam);
+    
+    const formatClock = (sec) => {
+        let m = Math.floor(sec/60); let s = sec%60;
+        return `残り${m}:${s.toString().padStart(2,'0')}`;
+    };
+    const getNames = (arr) => arr.map(p=>`#${p.num} ${p.name}`).join(", ");
+    
+    const writeLog = (timeSec, teamName, html, isHighlight = false, involvedIds = []) => {
+        if(!isVisual) return;
+        let extraClass = "";
+        if (isHighlight) extraClass += " log-type-highlight";
+        if (typeof currentUser !== 'undefined' && currentUser && involvedIds.includes(currentUser.id)) extraClass += " log-type-myplay";
+        
+        logs.push(`<div class="log-entry ${extraClass}"><span class="log-time">${formatClock(timeSec)}</span><span class="log-team">${teamName}</span><span class="log-action">${html}</span></div>`);
+    };
 
-                if (p._stamina < 30 && p._condStr !== "不調") {
-                    p._condStr = "不調";
-                    p._cond = 0.90;
-                }
+    const checkSubstitution = (teamData, clockSec, isHomeTeam) => {
+        let tName = teamData.team.name;
+        teamData.court.forEach((p, idx) => {
+            let stamLoss = 3 - (p.stats.stamina / 150) * 1.5;
+            if(p._condStr === "不調") stamLoss *= 1.2;
+            p._stamina = Math.max(0, p._stamina - (stamLoss * 0.08));
 
-                if(p._stamina < 65 && !p.isUser) { 
-                    let subCandidates = teamData.bench.filter(bp => bp.pos === p.pos && bp._stamina > 75);
-                    if(subCandidates.length > 0) {
-                        subCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
-                        let subIn = subCandidates[0];
+            if (p._stamina < 30 && p._condStr !== "不調") {
+                p._condStr = "不調";
+                p._cond = 0.90;
+            }
+
+            if(p._stamina < 65 && !p.isUser) { 
+                let subCandidates = teamData.bench.filter(bp => bp.pos === p.pos && bp._stamina > 75);
+                if(subCandidates.length > 0) {
+                    subCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
+                    let subIn = subCandidates[0];
+                    teamData.court[idx] = subIn;
+                    teamData.bench = teamData.bench.filter(bp => bp.id !== subIn.id);
+                    teamData.bench.push(p);
+                    writeLog(clockSec, tName, `<span class="log-sub">[交代] #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN (${p.pos})</span>`);
+                } else {
+                    let fallbackCandidates = teamData.bench.filter(bp => bp._stamina > 70);
+                    if(fallbackCandidates.length > 0) {
+                        fallbackCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
+                        let subIn = fallbackCandidates[0];
                         teamData.court[idx] = subIn;
                         teamData.bench = teamData.bench.filter(bp => bp.id !== subIn.id);
                         teamData.bench.push(p);
-                        writeLog(clockSec, tName, `<span class="log-sub">[交代] #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN (${p.pos})</span>`);
-                    } else {
-                        let fallbackCandidates = teamData.bench.filter(bp => bp._stamina > 70);
-                        if(fallbackCandidates.length > 0) {
-                            fallbackCandidates.sort((a,b) => evalPlayer(b) - evalPlayer(a));
-                            let subIn = fallbackCandidates[0];
-                            teamData.court[idx] = subIn;
-                            teamData.bench = teamData.bench.filter(bp => bp.id !== subIn.id);
-                            teamData.bench.push(p);
-                            writeLog(clockSec, tName, `<span class="log-sub">[変則交代] ロールプレイヤー起用！ #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN</span>`);
-                        }
+                        writeLog(clockSec, tName, `<span class="log-sub">[変則交代] ロールプレイヤー起用！ #${p.num} ${p.name} OUT ⇄ #${subIn.num} ${subIn.name} IN</span>`);
                     }
                 }
-            });
+            }
+        });
 
-            teamData.bench.forEach(bp => { bp._stamina = Math.min(100, bp._stamina + 2.5); });
-        };
+        teamData.bench.forEach(bp => { bp._stamina = Math.min(100, bp._stamina + 2.5); });
+    };
 
                      // =========================================================
         // 【第1章】状態管理 (gameState) の導入 ＋ 【AI監督の超絶頭脳】
