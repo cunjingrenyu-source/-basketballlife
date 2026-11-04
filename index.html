@@ -1849,121 +1849,95 @@ window.simulateGame = function(hTeam, aTeam, isVisual) {
 
 
                         while(gameState.clock > 0) {
-                let offData = gameState.isHomeOffense ? hData : aData;
-                let defData = gameState.isHomeOffense ? aData : hData;
-                let isHome = gameState.isHomeOffense;
+                          let offData = gameState.isHomeOffense ? hData : aData;
+            let defData = gameState.isHomeOffense ? aData : hData;
+            let isHome = gameState.isHomeOffense;
+            
+            const offSideStr = isHome ? 'home' : 'away';
+            const defSideStr = isHome ? 'away' : 'home';
+            const offDiff = isHome ? (score.home - score.away) : (score.away - score.home);
+            const defDiff = -offDiff;
+
+            let defRun = isHome ? gameState.awayRun : gameState.homeRun;
+            let defTimeouts = isHome ? gameState.awayTimeouts : gameState.homeTimeouts;
+            
+            if (defRun >= 9 && defTimeouts > 0 && !gameState.isFastBreak) {
+                if (isHome) gameState.awayTimeouts--; else gameState.homeTimeouts--;
+                if (isHome) gameState.awayRun = 0; else gameState.homeRun = 0;
                 
-                const offSideStr = isHome ? 'home' : 'away';
-                const defSideStr = isHome ? 'away' : 'home';
-                const offDiff = isHome ? (score.home - score.away) : (score.away - score.home);
-                const defDiff = -offDiff;
-
-                // =========================================================
-                // 🔴【AI監督 超絶采配システム】タイムアウト＆戦術切り替え
-                // =========================================================
-                let defRun = isHome ? gameState.awayRun : gameState.homeRun;
-                let defTimeouts = isHome ? gameState.awayTimeouts : gameState.homeTimeouts;
+                defData.court.forEach(p => { if (p._stamina !== undefined) p._stamina = Math.min(100, p._stamina + 15); });
+                offData.court.forEach(p => { if (p._stamina !== undefined) p._stamina = Math.min(100, p._stamina + 5); });
                 
-                // 【新機能1】Smart Timeouts: 相手が9-0以上のラン、または終盤で急激に点差を詰められたらタイムアウト
-                if (defRun >= 9 && defTimeouts > 0 && !gameState.isFastBreak) {
-                    if (isHome) gameState.awayTimeouts--; else gameState.homeTimeouts--;
-                    // モメンタムを切る
-                    if (isHome) gameState.awayRun = 0; else gameState.homeRun = 0;
-                    
-                    // スタミナ回復
-                    defData.court.forEach(p => { if (p._stamina !== undefined) p._stamina = Math.min(100, p._stamina + 15); });
-                    offData.court.forEach(p => { if (p._stamina !== undefined) p._stamina = Math.min(100, p._stamina + 5); });
-                    
-                    writeLog(gameState.clock, defData.team.name, `📣 【タイムアウト要求】相手の連続得点（${defRun}-0）を止めるため、名将がたまらずタイムアウト！流れを断ち切る！ (残りTO: ${defTimeouts - 1})`, true);
-                    
-                    // タイムアウト明けはハーフコートから
-                    gameState.shotClock = 24;
-                    gameState.isFastBreak = false;
-                }
-
-                // 【新機能2, 3】Foul Trouble & Load Management
-                if (Math.random() < 0.25) {
-                    // 第1〜3Qはファウルトラブル（Q数+1回のファウルでベンチへ）、第4Qは大差（20点差以上）でガベージタイム
-                    const isGarbage = (gameState.currentQ === 4 && Math.abs(offDiff) >= 20 && gameState.clock < 180);
-                    
-                    // ※checkSubstitution側で isGarbage や foulLimit を受け取れるようにする拡張を想定
-                    // 既存関数を壊さないよう引数を追加するか、内部で判定させます。ここでは安全のため既存呼び出しを維持しつつ、概念のみ適用。
-                    if (typeof checkSubstitution === 'function') {
-                        checkSubstitution(hData, gameState.clock, true);
-                        checkSubstitution(aData, gameState.clock, false);
-                    }
-                }
-
-                // 【新機能10, 19】AI戦術状態の動的更新
-                let currentDefStrategy = defSideStr === 'home' ? gameState.homeStrategy : gameState.awayStrategy;
-                let currentOffStrategy = offSideStr === 'home' ? gameState.homeStrategy : gameState.awayStrategy;
+                writeLog(gameState.clock, defData.team.name, `📣 【タイムアウト要求】相手の連続得点（${defRun}-0）を止めるため、名将がたまらずタイムアウト！流れを断ち切る！ (残りTO: ${defTimeouts - 1})`, true);
                 
-                // 守備戦術：インサイドをやられすぎたらゾーン、終盤ビハインドならプレス
-                if (defDiff < -5 && gameState.currentQ >= 4 && gameState.clock < 180) {
-                    currentDefStrategy.intensity = 'max'; // フルコートプレス / インテンシティMAX
-                } else {
-                    currentDefStrategy.intensity = 'normal';
-                }
-                // ゾーンディフェンスへの切り替え（ランダム要素で戦術変更）
-                if (Math.random() < 0.05) currentDefStrategy.defense = currentDefStrategy.defense === 'man' ? 'zone' : 'man';
+                gameState.shotClock = 24;
+                gameState.isFastBreak = false;
+            }
 
-                // 【既存維持】毎ポゼッション、ポジションベースの完全なマッチアップを構築
-
-                if(Math.random() < 0.15) {
+            if (Math.random() < 0.25) {
+                if (typeof checkSubstitution === 'function') {
                     checkSubstitution(hData, gameState.clock, true);
                     checkSubstitution(aData, gameState.clock, false);
                 }
+            }
 
-                // 【既存維持】毎ポゼッション、ポジションベースの完全なマッチアップを構築
-                const assignMatchups = (off, def) => {
-                    let matchups = new Map();
-                    const posRank = {"PG":1, "SG":2, "SF":3, "PF":4, "C":5};
-                    let sortedOff = [...off.court].sort((a,b) => (posRank[a.pos]||3) - (posRank[b.pos]||3));
-                    let sortedDef = [...def.court].sort((a,b) => (posRank[a.pos]||3) - (posRank[b.pos]||3));
-                    for(let i = 0; i < 5; i++) {
-                        matchups.set(sortedOff[i].id, sortedDef[i]);
-                    }
-                    return matchups;
-                };
-                let currentMatchups = assignMatchups(offData, defData);
+            let currentDefStrategy = defSideStr === 'home' ? gameState.homeStrategy : gameState.awayStrategy;
+            let currentOffStrategy = offSideStr === 'home' ? gameState.homeStrategy : gameState.awayStrategy;
+            
+            if (defDiff < -5 && gameState.currentQ >= 4 && gameState.clock < 180) {
+                currentDefStrategy.intensity = 'max'; 
+            } else {
+                currentDefStrategy.intensity = 'normal';
+            }
+            if (Math.random() < 0.05) currentDefStrategy.defense = currentDefStrategy.defense === 'man' ? 'zone' : 'man';
 
-                                         // 【付加価値UP＋新機能4】ボール運び役の決定。絶好調な選手(Hot Hand)にはボールを集める
-                const getBallHandler = (teamData) => {
-                    if (gameState.isFastBreak) {
-                        return [...teamData.court].sort((a,b) => ((b.currentStats.speed||50)+(b.currentStats.dribble||50)) - ((a.currentStats.speed||50)+(a.currentStats.dribble||50)))[0];
-                    }
-                    let weights = teamData.court.map(p => {
-                        let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
-                        let drb = p.currentStats.dribble || 50;
-                        let pass = p.currentStats.pass || 50;
-                        let posBonus = (p.pos === "PG") ? 1.5 : (p.pos === "SG") ? 1.2 : 1.0;
-                        
-                        // 【新機能4】Ride the Hot Hand: 直近のプレイで連続得点している（内部的に好調）選手に重み
-                        let hotHandBonus = (p._condStr === "絶好調") ? 2.0 : (p._condStr === "好調") ? 1.5 : 1.0;
-                        
-                        // 疲労している選手はボール運びを避ける傾向
-                        let staminaFactor = (p._stamina !== undefined) ? Math.max(0.5, p._stamina / 100) : 1.0;
-                        
-                        let handlerScore = ((pm * 1.5) + (drb * 1.0) + (pass * 0.5)) * posBonus * staminaFactor * hotHandBonus;
-                        return Math.pow(Math.max(1, handlerScore / 50), 2);
-                    });
+            if(Math.random() < 0.15) {
+                checkSubstitution(hData, gameState.clock, true);
+                checkSubstitution(aData, gameState.clock, false);
+            }
+
+            const assignMatchups = (off, def) => {
+                let matchups = new Map();
+                const posRank = {"PG":1, "SG":2, "SF":3, "PF":4, "C":5};
+                let sortedOff = [...off.court].sort((a,b) => (posRank[a.pos]||3) - (posRank[b.pos]||3));
+                let sortedDef = [...def.court].sort((a,b) => (posRank[a.pos]||3) - (posRank[b.pos]||3));
+                for(let i = 0; i < 5; i++) {
+                    matchups.set(sortedOff[i].id, sortedDef[i]);
+                }
+                return matchups;
+            };
+            let currentMatchups = assignMatchups(offData, defData);
+
+            const getBallHandler = (teamData) => {
+                if (gameState.isFastBreak) {
+                    return [...teamData.court].sort((a,b) => ((b.currentStats.speed||50)+(b.currentStats.dribble||50)) - ((a.currentStats.speed||50)+(a.currentStats.dribble||50)))[0];
+                }
+                let weights = teamData.court.map(p => {
+                    let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
+                    let drb = p.currentStats.dribble || 50;
+                    let pass = p.currentStats.pass || 50;
+                    let posBonus = (p.pos === "PG") ? 1.5 : (p.pos === "SG") ? 1.2 : 1.0;
+                    let hotHandBonus = (p._condStr === "絶好調") ? 2.0 : (p._condStr === "好調") ? 1.5 : 1.0;
+                    let staminaFactor = (p._stamina !== undefined) ? Math.max(0.5, p._stamina / 100) : 1.0;
                     
+                    let handlerScore = ((pm * 1.5) + (drb * 1.0) + (pass * 0.5)) * posBonus * staminaFactor * hotHandBonus;
+                    return Math.pow(Math.max(1, handlerScore / 50), 2);
+                });
                 
+                let totalWeight = weights.reduce((a, b) => a + b, 0);
+                let rand = Math.random() * totalWeight;
+                let cum = 0;
+                for (let i = 0; i < teamData.court.length; i++) {
+                    cum += weights[i];
+                    if (rand < cum) return teamData.court[i];
+                }
+                return teamData.court[0];
+            };
 
-                    let totalWeight = weights.reduce((a, b) => a + b, 0);
-                    let rand = Math.random() * totalWeight;
-                    let cum = 0;
-                    for (let i = 0; i < teamData.court.length; i++) {
-                        cum += weights[i];
-                        if (rand < cum) return teamData.court[i];
-                    }
-                    return teamData.court[0];
-                };
+            let ballHolder = getBallHandler(offData);
+            let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
 
-
-                let ballHolder = getBallHandler(offData);
-                let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
-
+        
 // 【完全改修】クラッチタイムの段階的評価と特化型メンタルバフの計算
                 // 🟢 修正：オプショナルチェーンで安全にスコアを取得
                 let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
