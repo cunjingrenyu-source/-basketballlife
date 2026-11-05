@@ -2019,11 +2019,10 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
 
 
-// 【完全改修】クラッチタイムの段階的評価と特化型メンタルバフの計算
-                // 🟢 修正：オプショナルチェーンで安全にスコアを取得
-                let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
-                
+                // 【完全改修】クラッチタイムの段階的評価と特化型メンタルバフの計算
+                // ※ prevDiff は上で宣言済みのため再宣言しません
                 let clutchIntensity = 0.0;
+
                 // 4Qの残り4分(240秒)以下、または延長戦(Q5以降) かつ 10点差以内でクラッチ判定開始
                 if ((gameState.currentQ === 4 && gameState.clock <= 240 || gameState.currentQ >= 5) && Math.abs(prevDiff) <= 10) {
 
