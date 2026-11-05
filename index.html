@@ -2298,7 +2298,8 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     passDecisionProb *= 0.15; 
                 }
 
-                if (Math.random() < passDecisionProb && !isClutchIso) {
+               if (Math.random() < passDecisionProb && !isClutchTimeBase) {
+
                     // パスを選択：シューター（レシーバー）を探す
                     const receiverCandidates = offData.court.filter(p => p.id !== ballHolder.id);
                     
