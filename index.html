@@ -2962,12 +2962,8 @@ const logClock2 = gameState.clock;
     
     const hName = typeof hTeam !== 'undefined' ? hTeam.name : 'HOME';
     const aName = typeof aTeam !== 'undefined' ? aTeam.name : 'AWAY';
-         // 🔴【修正】フィート（距離）のみを大々的に強調表示
-    let distBadge = `<span style="font-weight:bold; font-size:14px; color:#e67e22; margin-right:4px;">【${shotDistance}ft】</span>`;
-    
-    // 既存維持：ログ出力とポゼッション切り替え
-    writeLog(logClock2, offData.team.name, `${distBadge}${assistText}${playText}${crowdReact} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]`, isHigh, involved);
-
+        // 🔴【新機能】2段構成のシュート詳細ログ
+    let detailLog = `<br><span style="font-size:11px; color:#7f8c8d;">(距離: ${shotDistance}ft | 能力: ${Math.floor(statUsed)} | 基準: ${logBaseProb}% | 補正: ${logBonus > 0 ? '+' : ''}${logBonus}% | 最終: ${logFinalProb}%)</span>`;
     
     // 既存維持：ログ出力とポゼッション切り替え
     writeLog(logClock2, offData.team.name, `${assistText}${shotDistance}ftから ${playText}${crowdReact} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]${detailLog}`, isHigh, involved);
@@ -3010,9 +3006,7 @@ else {
             missText = toughMidLogs[Math.floor(rMiss * toughMidLogs.length)];
         }
    
-let distBadgeDef = `<span style="font-weight:bold; font-size:14px; color:#e67e22; margin-right:4px;">【${shotDistance}ft】</span>`;
-writeLog(gameState.clock, defData.team.name, `${distBadgeDef}${missText}`, false, [shooter.id, defender.id]);
-
+writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defender.id]);
 
 
     } else {
@@ -3048,9 +3042,9 @@ writeLog(gameState.clock, defData.team.name, `${distBadgeDef}${missText}`, false
             missText = midLogs[Math.floor(rMiss * midLogs.length)];
         }
 
-             let distBadgeOff = `<span style="font-weight:bold; font-size:14px; color:#e67e22; margin-right:4px;">【${shotDistance}ft】</span>`;
-        writeLog(gameState.clock, offData.team.name, `${distBadgeOff}${missText}`, false, [shooter.id]);
-
+        // 🔴ここから下の2行だけ変更！
+        let detailLog = `<br><span style="font-size:11px; color:#7f8c8d;">(距離: ${shotDistance}ft | 能力: ${Math.floor(statUsed)} | 基準: ${logBaseProb}% | 補正: ${logBonus > 0 ? '+' : ''}${logBonus}% | 最終: ${logFinalProb}%)</span>`;
+        writeLog(gameState.clock, offData.team.name, `${shotDistance}ftからのシュート。${missText}${detailLog}`, false, [shooter.id]);
     }
 
     // 2. リバウンダー選出ロジック (全ポジション対応・異常時保護)
