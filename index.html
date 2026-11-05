@@ -2804,8 +2804,13 @@ let toughShotMaker = ((statUsed + getSafeStat(shooter, 'mental')) / 250);
 let actualPenalty = Math.max(0, contestPenalty - (toughShotMaker * 0.15));
 if (typeof isClutchTime !== 'undefined' && isClutchTime && getSafeStat(shooter, 'mental') > 90) actualPenalty *= 0.5;
 
-let rawRate = (baseRate + ((statUsed - 30) / 120) * 0.30) * (shooter?._cond ?? 1) - actualPenalty + (typeof playmakerBuff !== 'undefined' ? playmakerBuff : 0);
+// 新仕様：baseRate には既に距離と能力の相補的計算が含まれているため、過剰な能力加算を削除しコンディションとペナルティのみ適用
+let rawRate = baseRate * (shooter?._cond ?? 1) - actualPenalty + (typeof playmakerBuff !== 'undefined' ? playmakerBuff : 0);
 if (getSafeStat(shooter, '_stamina', 100) < 30) rawRate -= 0.08;
+
+// ログ表示用の最終確率
+let logFinalProb = (Math.min(0.95, Math.max(0.05, rawRate)) * 100).toFixed(1);
+
 
 // 🔴【新機能1】ホットハンド・バフ（連続成功で確率が微増する隠し要素）
 shooter._consecutiveMakes = shooter._consecutiveMakes || 0;
