@@ -2456,13 +2456,28 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 }
 
 
-                          // 【課題1-1, 1-2, 1-7】ディフェンダーとの「距離」の概念をシミュレート（0.0:密着 〜 1.0:完全に離れている）
+                                              // 【課題1-1, 1-2, 1-7】ディフェンダーとの「距離」の概念をシミュレート（0.0:密着 〜 1.0:完全に離れている）
                 let defDistance = 0.5; // 基準値
                 
-                // 【課題2-5】速攻時の距離判定（確定でフリーにしない。戻りの速さを考慮）
+                // 【課題2-5】速攻時の距離判定
                 if (gameState.isFastBreak) {
                     let transitionDefense = (activeDefStats.speed ?? 50) * 0.7 + (activeDefStats.defense ?? 50) * 0.3;
-                    defDistance = transitionDefense > 75 ? 0.4 : 0.8; // 守備が速ければ距離を詰める
+                    defDistance = transitionDefense > 75 ? 0.4 : 0.8; 
+                }
+
+                // 🔴【課題2】アイソレーション突破結果の反映
+                if (isIsolation) {
+                    if (isIsoBreakdown) {
+                        defDistance = 0.9; // 突破成功：ディフェンダーを振り切り、ほぼフリーな状態（オープン度上昇）
+                        if (shotType === "three" || shotType === "middle") {
+                            writeLog(gameState.clock, offData.team.name, `${shooter.name}が鋭いステップバックで${actualContester.name}との距離を広げた！`, true, [shooter.id]);
+                        } else {
+                            writeLog(gameState.clock, offData.team.name, `${shooter.name}が鋭いドライブで${actualContester.name}を完全に抜き去った！`, true, [shooter.id]);
+                        }
+                    } else {
+                        defDistance = 0.1; // 突破失敗：守備に阻まれタフショットを強いられる
+                        writeLog(gameState.clock, defData.team.name, `${actualContester.name}がしつこく食らいつき、${shooter.name}を振り切らせない！`, false, [actualContester.id]);
+                    }
                 }
 
                 let contestValue = 0;
