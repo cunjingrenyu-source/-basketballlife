@@ -3033,7 +3033,7 @@ writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defen
                 `${shooter.name}がレイアップを放つも、ボールはリングをぐるぐると回って外れた！`
             ];
             missText = layupLogs[Math.floor(rMiss * layupLogs.length)];
-        } else {
+         } else {
             const midLogs = [
                 `${shooter.name}のジャンプシュートはリングに嫌われる！`,
                 `${shooter.name}がフリーで放ったミドルシュートだったが、惜しくも外れる。`,
@@ -3041,10 +3041,14 @@ writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defen
             ];
             missText = midLogs[Math.floor(rMiss * midLogs.length)];
         }
- writeLog(gameState.clock, offData.team.name, missText, false, [shooter.id]);
+
+        // 🔴ここから下の2行だけ変更！
+        let detailLog = `<br><span style="font-size:11px; color:#7f8c8d;">(距離: ${shotDistance}ft | 能力: ${Math.floor(statUsed)} | 基準: ${logBaseProb}% | 補正: ${logBonus > 0 ? '+' : ''}${logBonus}% | 最終: ${logFinalProb}%)</span>`;
+        writeLog(gameState.clock, offData.team.name, `${shotDistance}ftからのシュート。${missText}${detailLog}`, false, [shooter.id]);
     }
 
     // 2. リバウンダー選出ロジック (全ポジション対応・異常時保護)
+
     const getRebounder = (teamData, isDefense) => {
         if (!teamData || !Array.isArray(teamData.court) || teamData.court.length === 0) {
             return { id: "dummy", name: "不明な選手", _box: {}, currentStats: {} };
