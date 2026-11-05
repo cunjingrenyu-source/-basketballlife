@@ -1940,114 +1940,312 @@ window.simulateGame = function(hTeam, aTeam, isVisual) {
         
 // 【完全改修】クラッチタイムの段階的評価と特化型メンタルバフの計算
                 // 🟢 修正：オプショナルチェーンで安全にスコアを取得
-                           let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
-            
-            let clutchIntensity = 0.0;
-            if ((gameState.currentQ === 4 && gameState.clock <= 240 || gameState.currentQ >= 5) && Math.abs(prevDiff) <= 10) {
-                let baseTime = gameState.currentQ >= 5 ? 300 : 240;
-                let timeFactor = Math.max(0.2, (baseTime - gameState.clock) / baseTime);
-                let scoreFactor = Math.max(0.0, (10 - Math.abs(prevDiff)) / 10); 
-                clutchIntensity = timeFactor * scoreFactor;
-            }
-            
-            let isClutchTime = clutchIntensity > 0; 
-            let mentalBuff = 1.0; 
-            
-            let clutchBuffs = { 
-                isActive: isClutchTime, intensity: clutchIntensity,
-                maxStatKey: "", maxMultiplier: 1.0, otherMultiplier: 1.0,
-                maxCap: 110, otherCap: 100, useNewSystem: true
-            }; 
-            
-            if (isClutchTime) {
-                let mentalValue = Math.max(0, ballHolder.currentStats.mental || 50);
-                let totalBuffPercent = 0.0;
-                if (mentalValue > 0) {
-                    let calcMental = Math.min(mentalValue, 150); 
-                    let tier1 = Math.min(calcMental, 30); totalBuffPercent += tier1 * 0.05;
-                    if (calcMental > 30) { let tier2 = Math.min(calcMental - 30, 40); totalBuffPercent += tier2 * 0.10; }
-                    if (calcMental > 70) { let tier3 = Math.min(calcMental - 70, 40); totalBuffPercent += tier3 * 0.25; }
-                    if (calcMental > 110) { let tier4 = calcMental - 110; totalBuffPercent += tier4 * 0.35; }
+                let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
+                
+                let clutchIntensity = 0.0;
+                // 4Qの残り4分(240秒)以下、または延長戦(Q5以降) かつ 10点差以内でクラッチ判定開始
+                if ((gameState.currentQ === 4 && gameState.clock <= 240 || gameState.currentQ >= 5) && Math.abs(prevDiff) <= 10) {
+
+                    // 延長戦(Q5以降)は5分(300秒)基準で時間要因を計算。4Qは残り4分(240秒)基準。最低0.2を保証
+                    let baseTime = gameState.currentQ >= 5 ? 300 : 240;
+                    let timeFactor = Math.max(0.2, (baseTime - gameState.clock) / baseTime);
+                    
+                    // 修正(C04): 10点差で0になり、同点(0点差)で1.0に近づく。負の値を防ぐ。
+                    let scoreFactor = Math.max(0.0, (10 - Math.abs(prevDiff)) / 10); 
+
+                    clutchIntensity = timeFactor * scoreFactor;
                 }
                 
-                let mentalBonusPool = (totalBuffPercent / 100) * clutchIntensity;
-
-                if (mentalBonusPool > 0) {
-                    let statsToScan = ['layup', 'middle', 'three', 'pass', 'dribble', 'speed', 'physical'];
-                    let highestStatValue = 0;
-                    let highestStatKeys = []; 
+                // 既存システムとの互換性維持フラグ
+                let isClutchTime = clutchIntensity > 0; 
+                let mentalBuff = 1.0; 
+                
+                // 後続のシュート・パス・ドライブ処理へ渡すためのバフ管理オブジェクト
+                let clutchBuffs = { 
+                    isActive: isClutchTime,
+                    intensity: clutchIntensity,
+                    maxStatKey: "", 
+                    maxMultiplier: 1.0, 
+                    otherMultiplier: 1.0,
+                    // 後続処理で能力値が暴走しないための安全装置（最終計算時に適用するキャップ）
+                    maxCap: 110,
+                    otherCap: 100,
+                    // 二重適用防止用フラグ (後続の処理でこのフラグがtrueなら従来のmentalBuffを無視する)
+                    useNewSystem: true
+                }; 
+                
+                if (isClutchTime) {
+                    // 修正(M01, M03): メンタル0未満(負数)の対策、未定義時は50
+                    let mentalValue = Math.max(0, ballHolder.currentStats.mental || 50);
                     
-                    for (let key of statsToScan) {
-                        let val = ballHolder.currentStats[key] || 0;
-                        if (val > highestStatValue) {
-                            highestStatValue = val;
-                            highestStatKeys = [key];
-                        } else if (val === highestStatValue && highestStatValue > 0) {
-                            highestStatKeys.push(key); 
+                    // デバフを完全廃止し、4段階のステータス加算方式を採用（最大29.5%）
+                    let totalBuffPercent = 0.0;
+                    if (mentalValue > 0) {
+                        // 修正(M02): 上限150を超過しても150として扱う
+                        let calcMental = Math.min(mentalValue, 150); 
+                        
+                        let tier1 = Math.min(calcMental, 30);
+                        totalBuffPercent += tier1 * 0.05;
+                        
+                        if (calcMental > 30) {
+                            let tier2 = Math.min(calcMental - 30, 40);
+                            totalBuffPercent += tier2 * 0.10;
+                        }
+                        
+                        if (calcMental > 70) {
+                            let tier3 = Math.min(calcMental - 70, 40);
+                            totalBuffPercent += tier3 * 0.25;
+                        }
+                        
+                        if (calcMental > 110) {
+                            let tier4 = calcMental - 110;
+                            totalBuffPercent += tier4 * 0.35;
                         }
                     }
                     
-                    if (highestStatKeys.length > 0) {
-                        clutchBuffs.maxStatKey = highestStatKeys[Math.floor(Math.random() * highestStatKeys.length)];
+                    // 算出した%を小数に変換し、試合状況の熱量（clutchIntensity）を掛けて最終バフプールを決定
+                    let mentalBonusPool = (totalBuffPercent / 100) * clutchIntensity;
+
+                    if (mentalBonusPool > 0) {
+                                        // バフの場合は攻撃側の尖り（最大能力）を見つける
+                        let statsToScan = ['layup', 'middle', 'three', 'pass', 'dribble', 'speed', 'physical']; // 🔴実際のステータス名に修正
+                        let highestStatValue = 0;
+
+                        let highestStatKeys = []; 
+                        
+                        for (let key of statsToScan) {
+                            let val = ballHolder.currentStats[key] || 0;
+                            if (val > highestStatValue) {
+                                highestStatValue = val;
+                                highestStatKeys = [key];
+                            } else if (val === highestStatValue && highestStatValue > 0) {
+                                highestStatKeys.push(key); // 同値対応
+                            }
+                        }
+                        
+                        // 修正(S01): 同値が複数ある場合はランダムで1つ選ぶ
+                        if (highestStatKeys.length > 0) {
+                            clutchBuffs.maxStatKey = highestStatKeys[Math.floor(Math.random() * highestStatKeys.length)];
+                        }
+                        
+                        // 最大能力に65%（尖りバフ）、その他に35%（微バフ）を配分
+                        clutchBuffs.maxMultiplier = 1.0 + (mentalBonusPool * 0.65);
+                        clutchBuffs.otherMultiplier = 1.0 + (mentalBonusPool * 0.35);
+                        
+                        // 古い処理向け。後続で新システムを使う場合は二重バフに注意。
+                        mentalBuff = clutchBuffs.otherMultiplier;
+                    }
+                }
+
+                // =========================================================
+                // 🔴【超絶強化】高度なクロックマネジメントと時間消費ロジック
+                // 単なるランダムではなく、実際の戦術（2-for-1、ラストショット狙い）を再現
+                // =========================================================
+                let timeSpent = 0;
+                if (gameState.isFastBreak) {
+                    timeSpent = Math.floor(Math.random() * 4) + 2; // 速攻は2〜5秒
+                } else {
+                    let offIQ = (ballHolder.currentStats.playmaking || 50) + (ballHolder.currentStats.pass || 50);
+                    let defPres = (defender.currentStats.defense || 50) + (defender.currentStats.speed || 50);
+                    let timeBase = 12 + ((defPres - offIQ) / 40); 
+                    
+                    // 【戦術AI 1】ビハインド時の急ぎ
+                    if (gameState.currentQ >= 4 && gameState.clock < 180 && prevDiff < 0) {
+                        timeBase *= 0.6;
                     }
                     
-                    clutchBuffs.maxMultiplier = 1.0 + (mentalBonusPool * 0.65);
-                    clutchBuffs.otherMultiplier = 1.0 + (mentalBonusPool * 0.35);
-                    mentalBuff = clutchBuffs.otherMultiplier;
-                }
-            }
+                    timeSpent = Math.max(5, Math.min(24, Math.floor(timeBase) + Math.floor(Math.random() * 6) - 2));
 
-            let timeSpent = 0;
-            if (gameState.isFastBreak) {
-                timeSpent = Math.floor(Math.random() * 4) + 2; 
-            } else {
-                let offIQ = (ballHolder.currentStats.playmaking || 50) + (ballHolder.currentStats.pass || 50);
-                let defPres = (defender.currentStats.defense || 50) + (defender.currentStats.speed || 50);
-                let timeBase = 12 + ((defPres - offIQ) / 40); 
-                
-                if (gameState.currentQ >= 4 && gameState.clock < 180 && prevDiff < 0) {
-                    timeBase *= 0.6;
-                }
-                timeSpent = Math.max(5, Math.min(24, Math.floor(timeBase) + Math.floor(Math.random() * 6) - 2));
+                                    // 🔴【新機能17】Seven Seconds or Less (SSOL)
+                    let isPGAce = (ballHolder.pos === "PG" && (ballHolder.currentStats.speed > 100 && ballHolder.currentStats.playmaking > 100));
+                    if (isPGAce && Math.random() < 0.3) {
+                        timeSpent = Math.floor(Math.random() * 4) + 4; // 4〜7秒の超高速アーリーオフェンス
+                    }
 
-                let isPGAce = (ballHolder.pos === "PG" && (ballHolder.currentStats.speed > 100 && (ballHolder.currentStats.playmaking||ballHolder.currentStats.pass) > 100));
-                if (isPGAce && Math.random() < 0.3) {
-                    timeSpent = Math.floor(Math.random() * 4) + 4; 
-                }
-                if (gameState.clock > 28 && gameState.clock <= 36 && gameState.shotClock === 24) {
-                    timeSpent = Math.floor(Math.random() * 3) + 4; 
-                }
-                else if (gameState.clock <= 24 && gameState.shotClock >= gameState.clock) {
-                    timeSpent = Math.max(1, gameState.clock - (Math.floor(Math.random() * 3) + 1));
-                }
-                else if (gameState.shotClock > 0 && gameState.shotClock <= timeSpent && Math.random() < 0.85) {
-                    timeSpent = Math.max(1, gameState.shotClock - 1); 
-                }
-            }
+                    // 🔴【新機能16】Advanced 2-for-1 シチュエーション
+                    // 残り28〜35秒なら、7秒以内で確実にシュートを打ち、相手に24秒使わせても自分たちに最後の1秒〜数秒を残す
+                    if (gameState.clock > 28 && gameState.clock <= 36 && gameState.shotClock === 24) {
+                        timeSpent = Math.floor(Math.random() * 3) + 4; // 4〜6秒で確実に攻める
+                    }
+                    // 【戦術AI 3】クォーターエンドのラストショット狙い（ショットクロック・オフ時）
 
-            let actualSpent = consumeTime(timeSpent);
-            offData.court.forEach(p => { if(p._box) p._box.min += (actualSpent / 60); });
-            defData.court.forEach(p => { if(p._box) p._box.min += (actualSpent / 60); });
+                    else if (gameState.clock <= 24 && gameState.shotClock >= gameState.clock) {
+                        // 残り時間が24秒以下なら、相手に時間を残さないよう残り1〜3秒までボールをキープする
+                        timeSpent = Math.max(1, gameState.clock - (Math.floor(Math.random() * 3) + 1));
+                    }
+                    // 残りショットクロックが少ない場合の自滅防止（既存ロジック維持）
+                    else if (gameState.shotClock > 0 && gameState.shotClock <= timeSpent && Math.random() < 0.85) {
+                        timeSpent = Math.max(1, gameState.shotClock - 1); 
+                    }
+                }
 
-            let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
-            let defensePressure = (((defender.currentStats.defense || 50) * 0.35) / 150) + defPressureBonus; 
+                // 共通関数を用いて安全に時計を進める（gameStateの同期）
+                let actualSpent = consumeTime(timeSpent);
 
-            if (gameState.shotClock <= 0 && gameState.clock > 0 && !gameState.isFastBreak) {
-                writeLog(gameState.clock, defData.team.name, `⏰ショットクロックバイオレーション！${defender.name}ら守備陣の息詰まるプレッシャーが24秒を守り切った！`, false, [defender.id]);
-                switchPossession(24, false);
-                continue;
-            }
+                // 【既存維持】出場時間の加算
+                offData.court.forEach(p => { if(p._box) p._box.min += (actualSpent / 60); });
+                defData.court.forEach(p => { if(p._box) p._box.min += (actualSpent / 60); });
 
-            if (!gameState.isFastBreak && actualSpent >= 8 && gameState.shotClock <= 16) {
-                let dribbleSkill = ballHolder.currentStats.dribble || 50;
-                if (Math.random() < (0.02 + defensePressure) - (dribbleSkill / 2500)) {
-                    writeLog(gameState.clock, defData.team.name, `🛡️【8秒バイオレーション】${defender.name}の激しいフルコートプレス！相手は8秒以内にハーフコートを越えられなかった！`, false, [ballHolder.id, defender.id]);
-                    if(ballHolder._box) ballHolder._box.to++;
+                let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
+                let defensePressure = (((defender.currentStats.defense || 50) * 0.35) / 150) + defPressureBonus; 
+
+                // =========================================================
+                // 🔴【修正・強化】バイオレーション判定の厳密化
+                // =========================================================
+                // 1. 24秒バイオレーション（ショットクロックが0以下に到達した場合）
+                if (gameState.shotClock <= 0 && gameState.clock > 0 && !gameState.isFastBreak) {
+                    writeLog(gameState.clock, defData.team.name, `⏰ショットクロックバイオレーション！${defender.name}ら守備陣の息詰まるプレッシャーが24秒を守り切った！`, false, [defender.id]);
                     switchPossession(24, false);
                     continue;
                 }
-            }
 
+                // 2. 8秒ルール（バックコートバイオレーション）の論理的判定
+                // 単なるランダムではなく「8秒以上経過(ショットクロック16以下) ＋ ディフェンス圧力がハンドラーの能力を凌駕」した場合に発生
+                if (!gameState.isFastBreak && actualSpent >= 8 && gameState.shotClock <= 16) {
+                    let dribbleSkill = ballHolder.currentStats.dribble || 50;
+                    // 守備圧力が高い、かつランダム要素（プレッシャーによるミス）
+                    if (Math.random() < (0.02 + defensePressure) - (dribbleSkill / 2500)) {
+                        writeLog(gameState.clock, defData.team.name, `🛡️【8秒バイオレーション】${defender.name}の激しいフルコートプレス！相手は8秒以内にハーフコートを越えられなかった！`, false, [ballHolder.id, defender.id]);
+                        if(ballHolder._box) ballHolder._box.to++;
+                        switchPossession(24, false);
+                        continue;
+                    }
+                }
+
+
+
+                            // --- A. ハンドラーのターンオーバー & スティール判定 ---
+                // 【改良】オプショナルチェーン(?. )を用いてオブジェクト未定義によるクラッシュを完全防止
+                const bStats = ballHolder?.currentStats || {};
+                const dStats = defender?.currentStats || {};
+                
+                let handlerStat = ((bStats.dribble || 50) * 1.2) + ((bStats.pass || 50) * 0.8) + ((bStats.speed || 50) * 0.5);
+                
+                // 【ターンオーバー適正化】基礎リスクを引き上げ、ディフェンス圧力(defensePressure)を直接リスクに加算
+                let baseToRisk = gameState.isFastBreak ? 0.12 : (0.22 - ((handlerStat * mentalBuff) / 1000));
+                let toRisk = baseToRisk + (defensePressure * 0.25); // 守備が強いとTO確率が跳ね上がる
+                
+                // スタミナ低下による疲労ミス
+                if ((ballHolder?._stamina ?? 100) < 40) toRisk += 0.05;
+                if (ballHolder?._condStr === "不調") toRisk += 0.05;
+
+                // 🔴【修正】TO判定のif文 と stlChanceの計算 を復元・堅牢化
+                if (Math.random() < toRisk) {
+                    if (ballHolder?._box) ballHolder._box.to++;
+                    let stlChance = ((dStats.defense || 50) / 150) + (defensePressure * 0.2);
+                    let willFastBreak = false;
+
+                    if (Math.random() < Math.max(0.02, stlChance)) {
+                        if (defender?._box) defender._box.stl++;
+                        let stlText = gameState.isFastBreak 
+                            ? `${ballHolder.name}の速攻のパスを${defender.name}が見事にパスカット！` 
+                            : `${ballHolder.name}の隙を突き、${defender.name}が鋭いスティール！`;
+                        writeLog(gameState.clock, defData.team.name, stlText, true, [ballHolder.id, defender.id]);
+                        
+                        if ((dStats.speed || 50) > 80 && Math.random() < 0.6) {
+                            willFastBreak = true;
+                            writeLog(gameState.clock, defData.team.name, `⚡スティールからそのまま速攻へ走る！！！`, true, [defender.id]);
+                        }
+                    } else {
+                        let toText = gameState.isFastBreak 
+                            ? `${ballHolder.name}が速攻で急ぎすぎてボールをこぼしターンオーバー！` 
+                            : `激しいマークに遭い、${ballHolder.name}がボールを失ってターンオーバー。`;
+                        writeLog(gameState.clock, offData.team.name, toText, false, [ballHolder.id]);
+                    }
+                    
+                    switchPossession(24, willFastBreak); // 🔴新関数適用
+                    continue;
+                }
+
+                        // --- 1. パス判断とボール保持者の更新 ---
+                let isAssist = false;
+                let playmakerBuff = 0;
+                let assistText = ""; 
+                let actualPasser = null;
+                let shooter = ballHolder; 
+
+                let playmakingStat = bStats.playmaking || bStats.pass || 50;
+                let passDecisionProb = Math.min(0.75, (playmakingStat / 150) + 0.15); 
+
+                // 🔴【新機能6】Clutch Isolation
+                let isClutchIso = (isClutchTime && prevDiff < 0 && (bStats.dribble > 110 && bStats.three > 100));
+                if (isClutchIso) {
+                    passDecisionProb = 0.05; // ほぼ絶対パスしない。エースの意地
+                }
+
+                // 🔴【新機能8, 9】Double Team & Deny
+                // 相手エース（現在のボールホルダー）に対して、終盤ビハインド時に強制ダブルチーム
+                let isDoubleTeamed = false;
+                if (currentDefStrategy.intensity === 'max' && (bStats.three > 110 || bStats.middle > 110)) {
+                    isDoubleTeamed = true;
+                    defensePressure += 0.3; // 守備圧爆上がり
+                    passDecisionProb += 0.2; // パスせざるを得ない状況を作る
+                }
+
+                if (gameState.shotClock <= 5) {
+                    passDecisionProb *= 0.15; 
+                }
+
+                if (Math.random() < passDecisionProb && !isClutchIso) {
+                    // パスを選択：シューター（レシーバー）を探す
+                    const receiverCandidates = offData.court.filter(p => p.id !== ballHolder.id);
+                    
+                    if (receiverCandidates.length > 0) {
+                                            // 🔴【新機能5, 11】Target Hunting & Drive and Kick
+                        let courtEvals = receiverCandidates.map(p => {
+                            let matchDef = currentMatchups.get(p.id);
+                            let defHoleBonus = (matchDef && (matchDef.currentStats.defense < 60 || matchDef._box?.pf >= 4)) ? 2.0 : 1.0;
+                            
+                            // 🟢 修正：ハンドラーのスピードとドリブル能力から「ペイントアタックからのキックアウト」を想定
+                            let handlerDriveAdv = ((bStats.speed || 50) > 85 && (bStats.dribble || 50) > 85);
+                            let isKickOut = (handlerDriveAdv && (p.pos === "SG" || p.pos === "SF")) ? 1.5 : 1.0;
+                            
+                            return Math.max(1, evalPlayer(p)) * defHoleBonus * isKickOut;
+                        });
+
+                        
+                        let totalEval = courtEvals.reduce((a, b) => a + b, 0);
+                        let r = Math.random(); 
+                        let cum = 0; 
+                        let receiver = receiverCandidates[0];
+                        for (let i = 0; i < receiverCandidates.length; i++) {
+                            cum += (courtEvals[i] / totalEval);
+                            if (r < cum) { receiver = receiverCandidates[i]; break; }
+                        }
+
+                        // 【新機能9】Deny the ball（ディナイ）: レシーバーがエース格の場合、パス成功率を下げる
+                        let denyPenalty = (receiver.currentStats.three > 100) ? 0.05 : 0;
+
+                        let passAbility = bStats.pass || 50;
+                        let passSuccessProb = Math.min(0.985, 0.75 + (passAbility / 150) * 0.235) - denyPenalty;
+                        
+                        if (isDoubleTeamed && Math.random() < 0.2) {
+                            // ダブルチームのプレッシャーでバッドパス
+                            passSuccessProb -= 0.3;
+                        }
+                        
+                        if (Math.random() < passSuccessProb) {
+                            actualPasser = ballHolder;
+                            shooter = receiver; 
+                            isAssist = true; 
+                            if (passAbility >= 80) {
+                                playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
+                            }
+                            if (isDoubleTeamed) {
+                                assistText = `【ダブルチーム回避】${ballHolder.name}が囲まれながらも冷静に空いた味方へパス！ ➔ `;
+                            }
+                        } else {
+                            actualPasser = ballHolder;
+                            if (actualPasser?._box) actualPasser._box.to++;
+                            let toReason = isDoubleTeamed ? `強烈なダブルチームに捕まり、${actualPasser.name}のパスが相手に奪われる！` : `${actualPasser.name}のパスが乱れ、ボールがコート外へ。`;
+                            writeLog(gameState.clock, offData.team.name, `${toReason} ターンオーバー。`, false, [actualPasser.id]);
+                            switchPossession(24, false);
+                            continue;
+                        }
+                    }
+                }
+
+              
 
                                   // 【改良】シューターのステータス取得を整理し、ネスト深い参照エラーを防止
                 const sStats = shooter?.currentStats || {};
