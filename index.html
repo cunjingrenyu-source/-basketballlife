@@ -1942,29 +1942,50 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                 };
                 let currentMatchups = assignMatchups(offData, defData);
 
-                                         // 【付加価値UP＋新機能4】ボール運び役の決定。絶好調な選手(Hot Hand)にはボールを集める
-                const getBallHandler = (teamData) => {
+                                                  // 【課題1】エース度の計算とボール運び役の決定（USG%の調整）
+                const calculateAceScore = (p) => {
+                    let s = p.currentStats;
+                    // S:得点能力(3P,ミドル,レイアップ,ダンクの総合), I:自力で攻撃(ドリブル+スピード), P:フィジカル, Q:パス, G:メンタル
+                    let scoreAbility = ((s.three||50) + (s.middle||50) + (s.layup||50) + (s.dunk||50)) / 4;
+                    let selfCreate = ((s.dribble||50) * 0.6 + (s.speed||50) * 0.4);
+                    let physical = s.physical || 50;
+                    let pass = s.pass || 50;
+                    let mental = s.mental || 50;
+                    
+                    // A = 0.35S + 0.25I + 0.10P + 0.05Q + 0.25G
+                    return (0.35 * scoreAbility) + (0.25 * selfCreate) + (0.10 * physical) + (0.05 * pass) + (0.25 * mental);
+                };
+
+                const getBallHandler = (teamData, isClutch) => {
                     if (gameState.isFastBreak) {
                         return [...teamData.court].sort((a,b) => ((b.currentStats.speed||50)+(b.currentStats.dribble||50)) - ((a.currentStats.speed||50)+(a.currentStats.dribble||50)))[0];
                     }
+                    
+                    // 出場中の5人のエース度を計算
+                    teamData.court.forEach(p => p._aceScore = calculateAceScore(p));
+                    // チーム内の最大エース度を持つ選手（エース）を特定
+                    let acePlayer = [...teamData.court].sort((a,b) => b._aceScore - a._aceScore)[0];
+                    // セカンドオプション
+                    let secondOption = [...teamData.court].sort((a,b) => b._aceScore - a._aceScore)[1];
+
                     let weights = teamData.court.map(p => {
                         let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
                         let drb = p.currentStats.dribble || 50;
                         let pass = p.currentStats.pass || 50;
                         let posBonus = (p.pos === "PG") ? 1.5 : (p.pos === "SG") ? 1.2 : 1.0;
                         
-                        // 【新機能4】Ride the Hot Hand: 直近のプレイで連続得点している（内部的に好調）選手に重み
                         let hotHandBonus = (p._condStr === "絶好調") ? 2.0 : (p._condStr === "好調") ? 1.5 : 1.0;
-                        
-                        // 疲労している選手はボール運びを避ける傾向
                         let staminaFactor = (p._stamina !== undefined) ? Math.max(0.5, p._stamina / 100) : 1.0;
                         
-                        let handlerScore = ((pm * 1.5) + (drb * 1.0) + (pass * 0.5)) * posBonus * staminaFactor * hotHandBonus;
+                        // エース補正（クラッチ時はエースへの集中度を劇的に高める）
+                        let aceBonus = 1.0;
+                        if (p.id === acePlayer.id) aceBonus = isClutch ? 3.0 : 1.3;
+                        else if (p.id === secondOption.id) aceBonus = isClutch ? 1.5 : 1.1;
+                        
+                        let handlerScore = ((pm * 1.5) + (drb * 1.0) + (pass * 0.5)) * posBonus * staminaFactor * hotHandBonus * aceBonus;
                         return Math.pow(Math.max(1, handlerScore / 50), 2);
                     });
                     
-                
-
                     let totalWeight = weights.reduce((a, b) => a + b, 0);
                     let rand = Math.random() * totalWeight;
                     let cum = 0;
@@ -1974,6 +1995,13 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     }
                     return teamData.court[0];
                 };
+
+                // ※注意：引数にクラッチ状態を渡すため、ここでは後で宣言されるクラッチ変数を仮計算するか、デフォルトで呼び出します。
+                // 既存の ballHolder 定義部分は一旦そのまま置き換えます。
+                let isClutchTimeBase = (gameState.currentQ >= 4 && gameState.clock <= 240 && Math.abs(prevDiff) <= 10);
+                let ballHolder = getBallHandler(offData, isClutchTimeBase);
+                let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
+
 
 
                 let ballHolder = getBallHandler(offData);
