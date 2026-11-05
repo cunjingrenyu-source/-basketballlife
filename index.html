@@ -2226,20 +2226,66 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     continue;
                 }
 
-                        // --- 1. パス判断とボール保持者の更新 ---
+                                        // --- 1. パス判断、および【課題2】アイソレーション判定 ---
                 let isAssist = false;
                 let playmakerBuff = 0;
                 let assistText = ""; 
                 let actualPasser = null;
                 let shooter = ballHolder; 
 
+                // ▼ アイソレーションのローカル変数
+                let isIsolation = false;
+                let isIsoBreakdown = false;
+                let isoText = "";
+
+                // 第1段階：アイソレーション適性（ISO）の計算
+                // ISO = 0.40*D + 0.25*V + 0.20*P + 0.15*S
+                let scoreForIso = ((bStats.three||50) + (bStats.middle||50) + (bStats.layup||50) + (bStats.dunk||50)) / 4;
+                let isoScore = (0.40 * (bStats.dribble||50)) + (0.25 * (bStats.speed||50)) + (0.20 * (bStats.physical||50)) + (0.15 * scoreForIso);
+
+                // 第2段階：実行すべき状況かの判定
+                // 条件：適性が高く、エース級であり、ショットクロックに余裕があるか、クラッチ状況
+                let isAce = ballHolder._aceScore >= [...offData.court].sort((a,b)=>b._aceScore - a._aceScore)[0]._aceScore;
+                let defStamina = defender._stamina !== undefined ? defender._stamina : 100;
+                let matchUpAdvantage = isoScore - ((dStats.defense||50)*0.6 + (dStats.speed||50)*0.4);
+
+                if (isoScore > 85 && isAce && !gameState.isFastBreak) {
+                    let isoProb = 0.15; // 基礎確率
+                    if (isClutchTime) isoProb += 0.3; // クラッチ時は増加
+                    if (matchUpAdvantage > 15) isoProb += 0.2; // マッチアップで有利
+                    if (gameState.shotClock <= 8) isoProb += 0.2; // 時間がない
+                    if (defStamina < 40) isoProb += 0.15; // 相手がバテている
+
+                    if (Math.random() < isoProb) {
+                        isIsolation = true;
+                    }
+                }
+
                 let playmakingStat = bStats.playmaking || bStats.pass || 50;
                 let passDecisionProb = Math.min(0.75, (playmakingStat / 150) + 0.15); 
 
-                // 🔴【新機能6】Clutch Isolation
-                let isClutchIso = (isClutchTime && prevDiff < 0 && (bStats.dribble > 110 && bStats.three > 100));
-                if (isClutchIso) {
-                    passDecisionProb = 0.05; // ほぼ絶対パスしない。エースの意地
+                // 🔴【既存維持＋拡張】Clutch Isolation または 今回の判定によるアイソレーション
+                if (isIsolation || (isClutchTime && prevDiff < 0 && (bStats.dribble > 110 && bStats.three > 100))) {
+                    isIsolation = true;
+                    passDecisionProb = 0.0; // アイソレーション時はパスしない
+                    
+                    // アイソレーション内部処理：突破判定（シュート判定とは完全に分離）
+                    let breakdownRoll = Math.random() * 100;
+                    let breakdownThreshold = 40 + matchUpAdvantage; 
+                    if (breakdownRoll < breakdownThreshold) {
+                        isIsoBreakdown = true;
+                    }
+
+                    // アイソレーションのログ生成
+                    const rLog = Math.random();
+                    if (isClutchTime) {
+                        isoText = `🔥残り時間わずか！${ballHolder.name}がアイソレーションで勝負を仕掛ける！`;
+                    } else {
+                        if (rLog < 0.33) isoText = `${ballHolder.name}が味方を退け、アイソレーションを仕掛ける！`;
+                        else if (rLog < 0.66) isoText = `${ballHolder.name}、細かいドリブルでディフェンスを揺さぶる！`;
+                        else isoText = `1on1！${ballHolder.name}が${defender.name}に勝負を挑む！`;
+                    }
+                    writeLog(gameState.clock, offData.team.name, `<span style="color:#e67e22; font-weight:bold;">【ISO】</span>${isoText}`, false, [ballHolder.id, defender.id]);
                 }
 
                 // 🔴【新機能8, 9】Double Team & Deny
