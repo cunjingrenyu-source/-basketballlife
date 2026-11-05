@@ -3010,7 +3010,9 @@ else {
             missText = toughMidLogs[Math.floor(rMiss * toughMidLogs.length)];
         }
    
-writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defender.id]);
+let distBadgeDef = `<span style="font-weight:bold; font-size:14px; color:#e67e22; margin-right:4px;">【${shotDistance}ft】</span>`;
+writeLog(gameState.clock, defData.team.name, `${distBadgeDef}${missText}`, false, [shooter.id, defender.id]);
+
 
 
     } else {
@@ -3046,9 +3048,9 @@ writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defen
             missText = midLogs[Math.floor(rMiss * midLogs.length)];
         }
 
-        // 🔴ここから下の2行だけ変更！
-        let detailLog = `<br><span style="font-size:11px; color:#7f8c8d;">(距離: ${shotDistance}ft | 能力: ${Math.floor(statUsed)} | 基準: ${logBaseProb}% | 補正: ${logBonus > 0 ? '+' : ''}${logBonus}% | 最終: ${logFinalProb}%)</span>`;
-        writeLog(gameState.clock, offData.team.name, `${shotDistance}ftからのシュート。${missText}${detailLog}`, false, [shooter.id]);
+             let distBadgeOff = `<span style="font-weight:bold; font-size:14px; color:#e67e22; margin-right:4px;">【${shotDistance}ft】</span>`;
+        writeLog(gameState.clock, offData.team.name, `${distBadgeOff}${missText}`, false, [shooter.id]);
+
     }
 
     // 2. リバウンダー選出ロジック (全ポジション対応・異常時保護)
