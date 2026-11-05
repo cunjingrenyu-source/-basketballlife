@@ -2004,9 +2004,6 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
 
 
 
-                let ballHolder = getBallHandler(offData);
-                let defender = currentMatchups.get(ballHolder.id) || defData.court[0];
-
 // 【完全改修】クラッチタイムの段階的評価と特化型メンタルバフの計算
                 // 🟢 修正：オプショナルチェーンで安全にスコアを取得
                 let prevDiff = isHome ? ((score?.home || 0) - (score?.away || 0)) : ((score?.away || 0) - (score?.home || 0));
