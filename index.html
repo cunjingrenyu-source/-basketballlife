@@ -1719,6 +1719,19 @@ window.renderPracticeGrid = function() {
             homeStrategy: { focus: 'balanced', intensity: 'normal', defense: 'man' },
             awayStrategy: { focus: 'balanced', intensity: 'normal', defense: 'man' }
         };
+        // --- ここから追加（課題7・課題11対応のための必須状態変数） ---
+gameState.shotClock = 24;        // 24秒バイオレーション管理用
+gameState.eightSecCount = 0;     // 8秒バイオレーション管理用（バックコートでの経過時間）
+gameState.isFrontCourt = false;  // フロントコート進入フラグ（バックコートバイオレーション判定用）
+gameState.teamControl = null;    // 現在ボールをコントロールしているチーム（"home" または "away"）
+
+// 開発者用内部統計（課題11）
+gameState.devStats = {
+    home: { attacks: 0, fastBreaks: 0, potentialAssists: 0, violations8s: 0, violations24s: 0, backcourtViolations: 0 },
+    away: { attacks: 0, fastBreaks: 0, potentialAssists: 0, violations8s: 0, violations24s: 0, backcourtViolations: 0 }
+};
+
+
 
         // 🔴【新機能】モメンタムリセット（攻守交代時ではなく、相手が得点した時にリセット）
         const updateMomentum = (scoringSide, pts) => {
