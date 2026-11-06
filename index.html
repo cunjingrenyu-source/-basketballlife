@@ -3032,7 +3032,7 @@ else {
                 `${shooter.name}がレイアップを放つも、ボールはリングをぐるぐると回って外れた！`
             ];
             missText = layupLogs[Math.floor(rMiss * layupLogs.length)];
-         } else {
+                 } else {
             const midLogs = [
                 `${shooter.name}のジャンプシュートはリングに嫌われる！`,
                 `${shooter.name}がフリーで放ったミドルシュートだったが、惜しくも外れる。`,
@@ -3041,10 +3041,10 @@ else {
             missText = midLogs[Math.floor(rMiss * midLogs.length)];
         }
 
-        // 🔴ここから下の2行だけ変更！
-        let detailLog = `<br><span style="font-size:11px; color:#7f8c8d;">(距離: ${shotDistance}ft | 能力: ${Math.floor(statUsed)} | 基準: ${logBaseProb}% | 補正: ${logBonus > 0 ? '+' : ''}${logBonus}% | 最終: ${logFinalProb}%)</span>`;
-        writeLog(gameState.clock, offData.team.name, `${shotDistance}ftからのシュート。${missText}${detailLog}`, false, [shooter.id]);
+        let distBadge = `<span style="font-size:14px; font-weight:bold; color:#2c3e50;">【${shotDistance}ft】</span>`;
+        writeLog(gameState.clock, offData.team.name, `${distBadge} ${missText}`, false, [shooter.id]);
     }
+
 
     // 2. リバウンダー選出ロジック (全ポジション対応・異常時保護)
 
