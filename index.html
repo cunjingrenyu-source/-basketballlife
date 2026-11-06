@@ -1772,11 +1772,9 @@ const consumeTime = (seconds) => {
     return actualSpent;
 };
 
-        // =========================================================
+    // =========================================================
 // 【演出データベース＆選択システム】（課題3-1〜3-11完全対応）
-// 乱数の使い回しを廃止し、能力・状況・乱数の独立抽選で演出を決定する
 // =========================================================
-
 const playDb = {
     three: [
         { type: "god", condition: (s, d, cl, clk, diff) => s.three > 120 && clk < 10, prob: 0.05, text: "{shooter}がロゴ付近から放つディープスリー！！美しい弧を描きネットを揺らした！！！", high: true },
@@ -1817,49 +1815,46 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
     
     for (let opt of options) {
         if (opt.condition(sStats, dStats, contestLevel, clock, diff)) {
-            // 条件を満たしても確率で通常技にフォールバックさせる（超絶プレイの乱発防止）
             if (Math.random() < opt.prob) {
                 let text = opt.text.replace(/{shooter}/g, shooter.name).replace(/{defender}/g, defender.name);
                 return { text, high: opt.high };
             }
         }
     }
-    // フェイルセーフ
     return { text: `${shooter.name}がシュートを決めた！`, high: false };
 };
 
+// 🚨【修正追加】ループの外に出して軽量化
+const updateBox = (player, key, val = 1) => {
+    if (player && player._box) {
+        player._box[key] = (player._box[key] || 0) + val;
+    }
+};
 
-        // 🚨【修正追加】ループの外に出して軽量化
-        const updateBox = (player, key, val = 1) => {
-            if (player && player._box) {
-                player._box[key] = (player._box[key] || 0) + val;
-            }
-        };
+const addScore = (pts, qtr, isHomeOffense, hData, aData) => {
+    const offSide = isHomeOffense ? 'home' : 'away';
+    if (typeof score !== 'undefined' && score) score[offSide] = (score[offSide] || 0) + pts;
+    const qIdx = qtr - 1;
+    if (typeof qScores !== 'undefined' && qScores && qScores[offSide]) {
+        qScores[offSide][qIdx] = (qScores[offSide][qIdx] || 0) + pts;
+    }
+    
+    // 🔴【新機能20】モメンタム（ラン）のトラッキング
+    updateMomentum(offSide, pts);
 
-               const addScore = (pts, qtr, isHomeOffense, hData, aData) => {
-            const offSide = isHomeOffense ? 'home' : 'away';
-            if (typeof score !== 'undefined' && score) score[offSide] = (score[offSide] || 0) + pts;
-            const qIdx = qtr - 1;
-            if (typeof qScores !== 'undefined' && qScores && qScores[offSide]) {
-                qScores[offSide][qIdx] = (qScores[offSide][qIdx] || 0) + pts;
-            }
-            
-            // 🔴【新機能20】モメンタム（ラン）のトラッキング
-            updateMomentum(offSide, pts);
+    if (Array.isArray(hData?.court) && Array.isArray(aData?.court)) {
+        let offData = isHomeOffense ? hData : aData;
+        let defData = isHomeOffense ? aData : hData;
+        offData.court.forEach(p => updateBox(p, 'plusMinus', pts));
+        defData.court.forEach(p => updateBox(p, 'plusMinus', -pts));
+    }
+};
 
-            if (Array.isArray(hData?.court) && Array.isArray(aData?.court)) {
-                let offData = isHomeOffense ? hData : aData;
-                let defData = isHomeOffense ? aData : hData;
-                offData.court.forEach(p => updateBox(p, 'plusMinus', pts));
-                defData.court.forEach(p => updateBox(p, 'plusMinus', -pts));
-            }
-        };
+const getSafeStat = (player, key, fallback = 50) => {
+    const val = player?.currentStats?.[key];
+    return (typeof val === "number" && isFinite(val)) ? val : fallback;
+};
 
-
-        const getSafeStat = (player, key, fallback = 50) => {
-            const val = player?.currentStats?.[key];
-            return (typeof val === "number" && isFinite(val)) ? val : fallback;
-        };
 
            while (gameState.currentQ <= gameState.maxQ) {
             // 【第1章】各クォーター開始時の時計とフェーズのリセット
