@@ -2962,12 +2962,10 @@ const logClock2 = gameState.clock;
     
     const hName = typeof hTeam !== 'undefined' ? hTeam.name : 'HOME';
     const aName = typeof aTeam !== 'undefined' ? aTeam.name : 'AWAY';
-        // 🔴【新機能】2段構成のシュート詳細ログ
-    let detailLog = `<br><span style="font-size:11px; color:#7f8c8d;">(距離: ${shotDistance}ft | 能力: ${Math.floor(statUsed)} | 基準: ${logBaseProb}% | 補正: ${logBonus > 0 ? '+' : ''}${logBonus}% | 最終: ${logFinalProb}%)</span>`;
-    
-    // 既存維持：ログ出力とポゼッション切り替え
-    writeLog(logClock2, offData.team.name, `${assistText}${shotDistance}ftから ${playText}${crowdReact} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]${detailLog}`, isHigh, involved);
-    
+        // 既存維持：ログ出力とポゼッション切り替え（不要な数字を消し、フィートを大々的に表示）
+    let distBadge = `<span style="font-size:14px; font-weight:bold; color:#2c3e50;">【${shotDistance}ft】</span>`;
+    writeLog(logClock2, offData.team.name, `${distBadge} ${assistText}${playText}${crowdReact} [${hName} ${score?.home || 0} - ${score?.away || 0} ${aName}]`, isHigh, involved);
+
     switchPossession(24, false);
     continue;
 
