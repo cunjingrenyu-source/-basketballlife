@@ -2996,18 +2996,19 @@ else {
             ];
             missText = toughInsideLogs[Math.floor(rMiss * toughInsideLogs.length)];
         } else {
-            const toughMidLogs = [
+                   const toughMidLogs = [
                 `🛡️${defender.name}の完璧なシュートチェック！${shooter.name}はタフショットを強いられ外れる！`,
                 `🛡️${defender.name}がシュートコースを完全に塞いだ！${shooter.name}のミドルは不発！`,
                 `🛡️息の詰まるディフェンス！焦った${shooter.name}がバランスを崩してミス！`
             ];
             missText = toughMidLogs[Math.floor(rMiss * toughMidLogs.length)];
         }
-   
-writeLog(gameState.clock, defData.team.name, missText, false, [shooter.id, defender.id]);
 
+        let distBadge = `<span style="font-size:14px; font-weight:bold; color:#2c3e50;">【${shotDistance}ft】</span>`;
+        writeLog(gameState.clock, defData.team.name, `${distBadge} ${missText}`, false, [shooter.id, defender.id]);
 
     } else {
+
         // 守備の影響が少ない場合のミス（シュート精度や運による外れ）
         if (shotType === "three") {
             const threeLogs = [
