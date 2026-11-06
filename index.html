@@ -3308,6 +3308,21 @@ writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);
                 }
             } // 🚨【修正追加】while(gameState.clock > 0) を閉じる
             
+                        // 🔴【課題12完全対応】クォーター終了時の延長戦（OT）判定
+            // 第4Q以降の終了時点で同点の場合、試合を終わらせず maxQ を延長する
+            if (gameState.currentQ >= 4 && gameState.clock <= 0) {
+                let currentHomeScore = score?.home || 0;
+                let currentAwayScore = score?.away || 0;
+                
+                if (currentHomeScore === currentAwayScore) {
+                    gameState.maxQ++;
+                    gameState.isOverTime = true;
+                    if(typeof isVisual !== 'undefined' && isVisual) {
+                        logs.push(`<div class="log-entry"><span class="log-highlight" style="color:red; font-size:16px;">🚨 同点により延長戦（オーバータイム）へ突入します！ 🚨</span></div>`);
+                    }
+                }
+            }
+
             // クォーター終了時の処理（次のクォーターへ）
             gameState.currentQ++;
 
