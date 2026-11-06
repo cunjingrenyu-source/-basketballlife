@@ -1880,7 +1880,7 @@ while (gameState.currentQ <= gameState.maxQ) {
         const defDiff = -offDiff;
 
 
-                // =========================================================
+                               // =========================================================
                 // 🔴【AI監督 超絶采配システム】タイムアウト＆戦術切り替え
                 // =========================================================
                 let defRun = isHome ? gameState.awayRun : gameState.homeRun;
@@ -2094,7 +2094,7 @@ while (gameState.currentQ <= gameState.maxQ) {
                     let mentalBonusPool = (totalBuffPercent / 100) * clutchIntensity;
 
                     if (mentalBonusPool > 0) {
-                                        // バフの場合は攻撃側の尖り（最大能力）を見つける
+                        // バフの場合は攻撃側の尖り（最大能力）を見つける
                         let statsToScan = ['layup', 'middle', 'three', 'pass', 'dribble', 'speed', 'physical']; // 🔴実際のステータス名に修正
                         let highestStatValue = 0;
 
@@ -2123,6 +2123,7 @@ while (gameState.currentQ <= gameState.maxQ) {
                         mentalBuff = clutchBuffs.otherMultiplier;
                     }
                 }
+
                 // =========================================================
                 // 🔴【課題5-1〜5-3, 5-7完全対応】攻撃テンポの判断と時間消費の可変化
                 // =========================================================
