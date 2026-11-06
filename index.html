@@ -2116,48 +2116,75 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                         mentalBuff = clutchBuffs.otherMultiplier;
                     }
                 }
-
                 // =========================================================
-                // 🔴【超絶強化】高度なクロックマネジメントと時間消費ロジック
-                // 単なるランダムではなく、実際の戦術（2-for-1、ラストショット狙い）を再現
+                // 🔴【課題5-1〜5-3, 5-7完全対応】攻撃テンポの判断と時間消費の可変化
                 // =========================================================
                 let timeSpent = 0;
+                let attackPhase = "halfcourt"; // 【許可取得済】攻撃の種類を判定するローカル変数
+                let staminaFactor = ballHolder._stamina !== undefined ? (ballHolder._stamina / 100) : 1.0;
+                
+                // 1. トランジション＆守備陣形の完成度判定
                 if (gameState.isFastBreak) {
-                    timeSpent = Math.floor(Math.random() * 4) + 2; // 速攻は2〜5秒
+                    let transitionDef = (defender.currentStats.speed || 50) * 0.7 + (defender.currentStats.defense || 50) * 0.3;
+                    let fastBreakSpeed = (ballHolder.currentStats.speed || 50) * 0.8 + (ballHolder.currentStats.dribble || 50) * 0.2;
+                    
+                    if (fastBreakSpeed * staminaFactor > transitionDef - 10) {
+                        attackPhase = "fastbreak"; // 成功して速攻継続
+                    } else {
+                        attackPhase = "early"; // 相手が戻り始めたため、速攻から通常攻撃(アーリー)へ移行
+                    }
                 } else {
+                    // 速攻が成立しなくても、守備が完全に整う前ならアーリーオフェンス
+                    if (gameState.shotClock >= 20 && Math.random() < 0.3 * staminaFactor) {
+                        attackPhase = "early";
+                    } else {
+                        attackPhase = "halfcourt"; // それ以外は通常のセットオフェンスへ移行
+                    }
+                }
+
+                let isRushing = (gameState.currentQ >= 4 && gameState.clock < 180 && prevDiff < 0);
+
+                // 2. 攻撃開始からシュートまでの時間をフェーズごとに可変化
+                if (attackPhase === "fastbreak") {
+                    timeSpent = Math.floor(Math.random() * 3) + 2; // 速攻は2〜4秒
+                    if (ballHolder._stamina !== undefined) ballHolder._stamina = Math.max(0, ballHolder._stamina - 3); // 速攻時のスタミナ消費増
+                } else if (attackPhase === "early") {
+                    timeSpent = Math.floor(Math.random() * 4) + 4; // アーリーは4〜7秒
+                    if (ballHolder._stamina !== undefined) ballHolder._stamina = Math.max(0, ballHolder._stamina - 2);
+                } else {
+                    // ハーフコート攻撃（パス回数、ドリブル時間などを模擬）
                     let offIQ = (ballHolder.currentStats.playmaking || 50) + (ballHolder.currentStats.pass || 50);
                     let defPres = (defender.currentStats.defense || 50) + (defender.currentStats.speed || 50);
-                    let timeBase = 12 + ((defPres - offIQ) / 40); 
+                    let setupTime = Math.floor(Math.random() * 5) + 3; // セットアップ時間
+                    let timeBase = setupTime + 10 + ((defPres - offIQ) / 40); 
                     
-                    // 【戦術AI 1】ビハインド時の急ぎ
-                    if (gameState.currentQ >= 4 && gameState.clock < 180 && prevDiff < 0) {
-                        timeBase *= 0.6;
-                    }
+                    if (isRushing) timeBase *= 0.6; // 試合状況連動テンポ（ビハインド時は急ぐ）
+                    if (staminaFactor < 0.5) timeBase += 2; // 疲労時は攻撃テンポ低下
                     
-                    timeSpent = Math.max(5, Math.min(24, Math.floor(timeBase) + Math.floor(Math.random() * 6) - 2));
+                    timeSpent = Math.max(8, Math.min(24, Math.floor(timeBase) + Math.floor(Math.random() * 4) - 2));
 
-                                    // 🔴【新機能17】Seven Seconds or Less (SSOL)
-                    let isPGAce = (ballHolder.pos === "PG" && (ballHolder.currentStats.speed > 100 && ballHolder.currentStats.playmaking > 100));
-                    if (isPGAce && Math.random() < 0.3) {
-                        timeSpent = Math.floor(Math.random() * 4) + 4; // 4〜7秒の超高速アーリーオフェンス
-                    }
-
-                    // 🔴【新機能16】Advanced 2-for-1 シチュエーション
-                    // 残り28〜35秒なら、7秒以内で確実にシュートを打ち、相手に24秒使わせても自分たちに最後の1秒〜数秒を残す
+                    // Advanced 2-for-1 シチュエーション
                     if (gameState.clock > 28 && gameState.clock <= 36 && gameState.shotClock === 24) {
-                        timeSpent = Math.floor(Math.random() * 3) + 4; // 4〜6秒で確実に攻める
+                        timeSpent = Math.floor(Math.random() * 3) + 4;
                     }
-                    // 【戦術AI 3】クォーターエンドのラストショット狙い（ショットクロック・オフ時）
-
+                    // クォーターエンドのラストショット狙い
                     else if (gameState.clock <= 24 && gameState.shotClock >= gameState.clock) {
-                        // 残り時間が24秒以下なら、相手に時間を残さないよう残り1〜3秒までボールをキープする
                         timeSpent = Math.max(1, gameState.clock - (Math.floor(Math.random() * 3) + 1));
                     }
-                    // 残りショットクロックが少ない場合の自滅防止（既存ロジック維持）
                     else if (gameState.shotClock > 0 && gameState.shotClock <= timeSpent && Math.random() < 0.85) {
                         timeSpent = Math.max(1, gameState.shotClock - 1); 
                     }
+                    
+                    // 長時間のボール保持による疲労
+                    if (timeSpent > 15 && ballHolder._stamina !== undefined) {
+                        ballHolder._stamina = Math.max(0, ballHolder._stamina - 1);
+                    }
                 }
+                
+                // 攻撃フェーズ情報を後続処理に渡すため状態を更新
+                gameState.isFastBreak = (attackPhase === "fastbreak");
+                let isEarlyOffense = (attackPhase === "early"); // 【許可取得済】後続ロジック用のローカル変数
+
 
                 // 共通関数を用いて安全に時計を進める（gameStateの同期）
                 let actualSpent = consumeTime(timeSpent);
