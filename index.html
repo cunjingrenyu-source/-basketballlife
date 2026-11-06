@@ -1753,15 +1753,21 @@ const switchPossession = (resetClockTo = 24, nextFastBreak = false) => {
     gameState.isHomeOffense = !gameState.isHomeOffense;
     gameState.shotClock = resetClockTo;
     gameState.isFastBreak = nextFastBreak;
-    gameState.phase = 'live'; // 攻守交代で必ずライブ状態に戻る
+    gameState.phase = 'live'; 
+    // ↓ 以下2行を追加
+    gameState.isFrontCourt = false;
+    gameState.eightSecCount = 0;
 };
 
-// 🔴【第1章】攻撃権を維持したまま時計だけリセットする関数（ORB用）
 const keepPossession = (resetClockTo = 14) => {
     gameState.shotClock = resetClockTo;
-    gameState.isFastBreak = false; // ORB後は必ずハーフコートオフェンス
+    gameState.isFastBreak = false; 
     gameState.phase = 'live';
+    // ↓ 以下2行を追加
+    gameState.isFrontCourt = true; // ORB後は既にフロントコート
+    gameState.eightSecCount = 0;
 };
+
 
 // 🔴【第1章】タイマーの共通減算処理
 // 試合時計とショットクロックを同時に減算し、0未満にならないように保護する
