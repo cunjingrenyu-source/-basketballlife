@@ -2339,25 +2339,22 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                     passDecisionProb *= 0.15; 
                 }
 
-               if (Math.random() < passDecisionProb && !isClutchTimeBase) {
-
-                    // パスを選択：シューター（レシーバー）を探す
+                          if (Math.random() < passDecisionProb && !isClutchTimeBase) {
                     const receiverCandidates = offData.court.filter(p => p.id !== ballHolder.id);
                     
                     if (receiverCandidates.length > 0) {
-                                            // 🔴【新機能5, 11】Target Hunting & Drive and Kick
+                        // 【課題5-4】攻撃パターンの追加 (キックアウト、オフボールカット等)
                         let courtEvals = receiverCandidates.map(p => {
                             let matchDef = currentMatchups.get(p.id);
                             let defHoleBonus = (matchDef && (matchDef.currentStats.defense < 60 || matchDef._box?.pf >= 4)) ? 2.0 : 1.0;
                             
-                            // 🟢 修正：ハンドラーのスピードとドリブル能力から「ペイントアタックからのキックアウト」を想定
                             let handlerDriveAdv = ((bStats.speed || 50) > 85 && (bStats.dribble || 50) > 85);
-                            let isKickOut = (handlerDriveAdv && (p.pos === "SG" || p.pos === "SF")) ? 1.5 : 1.0;
+                            let isKickOut = (handlerDriveAdv && (p.currentStats.three > 85)) ? 1.5 : 1.0; 
+                            let isCut = (!handlerDriveAdv && p.currentStats.speed > 85 && p.currentStats.layup > 80) ? 1.3 : 1.0; // オフボールカット
                             
-                            return Math.max(1, evalPlayer(p)) * defHoleBonus * isKickOut;
+                            return Math.max(1, evalPlayer(p)) * defHoleBonus * isKickOut * isCut;
                         });
 
-                        
                         let totalEval = courtEvals.reduce((a, b) => a + b, 0);
                         let r = Math.random(); 
                         let cum = 0; 
@@ -2367,26 +2364,37 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                             if (r < cum) { receiver = receiverCandidates[i]; break; }
                         }
 
-                        // 【新機能9】Deny the ball（ディナイ）: レシーバーがエース格の場合、パス成功率を下げる
                         let denyPenalty = (receiver.currentStats.three > 100) ? 0.05 : 0;
+                        let passFatigue = (ballHolder._stamina !== undefined && ballHolder._stamina < 30) ? 0.05 : 0; // 【課題5-7】疲労によるパス精度低下
 
                         let passAbility = bStats.pass || 50;
-                        let passSuccessProb = Math.min(0.985, 0.75 + (passAbility / 150) * 0.235) - denyPenalty;
+                        let passSuccessProb = Math.min(0.985, 0.75 + (passAbility / 150) * 0.235) - denyPenalty - passFatigue;
                         
-                        if (isDoubleTeamed && Math.random() < 0.2) {
-                            // ダブルチームのプレッシャーでバッドパス
-                            passSuccessProb -= 0.3;
-                        }
+                        if (isDoubleTeamed && Math.random() < 0.2) passSuccessProb -= 0.3;
                         
                         if (Math.random() < passSuccessProb) {
                             actualPasser = ballHolder;
                             shooter = receiver; 
                             isAssist = true; 
-                            if (passAbility >= 80) {
-                                playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
-                            }
-                            if (isDoubleTeamed) {
-                                assistText = `【ダブルチーム回避】${ballHolder.name}が囲まれながらも冷静に空いた味方へパス！ ➔ `;
+                            if (passAbility >= 80) playmakerBuff = Math.min(0.08, ((passAbility - 80) / 70) * 0.08); 
+                            
+                            // 【課題5-4】エクストラパスの判定
+                            let extraPassProb = (shooter.currentStats.pass || 50) / 300;
+                            if (Math.random() < extraPassProb && timeSpent < 20) {
+                                let extraCandidates = receiverCandidates.filter(p => p.id !== shooter.id);
+                                if (extraCandidates.length > 0) {
+                                    shooter = extraCandidates[Math.floor(Math.random() * extraCandidates.length)];
+                                    timeSpent += 1; // 攻撃時間追加
+                                    actualSpent = consumeTime(1); 
+                                    playmakerBuff += 0.05; // さらにオープンになる
+                                    assistText = `【エクストラパス！】${actualPasser.name}から${receiver.name}、そしてさらにパスを回す！美しい展開！ ➔ `;
+                                }
+                            } else {
+                                if (isDoubleTeamed) {
+                                    assistText = `【ダブルチーム回避】${ballHolder.name}が囲まれながらも冷静に空いた味方へパス！ ➔ `;
+                                } else if (((bStats.speed || 50) > 85 && (bStats.dribble || 50) > 85) && shooter.currentStats.three > 85) {
+                                    assistText = `【ドライブ＆キック】${ballHolder.name}がドライブで守備を引きつけ、外へキックアウト！ ➔ `;
+                                }
                             }
                         } else {
                             actualPasser = ballHolder;
@@ -2398,6 +2406,7 @@ const getPlayText = (type, shooter, defender, contestLevel, clock, diff) => {
                         }
                     }
                 }
+
 
               
                 // 【改良】シューターのステータス取得を整理し、ネスト深い参照エラーを防止
