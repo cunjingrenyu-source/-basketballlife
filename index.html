@@ -1855,30 +1855,30 @@ const getSafeStat = (player, key, fallback = 50) => {
     return (typeof val === "number" && isFinite(val)) ? val : fallback;
 };
 
+while (gameState.currentQ <= gameState.maxQ) {
+    // 【第1章】各クォーター開始時の時計とフェーズのリセット
+    gameState.clock = gameState.isOverTime ? 300 : 720; 
+    let qName = gameState.isOverTime ? `延長第${gameState.currentQ - 4}Q(OT)` : `第${gameState.currentQ}Q`;
+    
+    if(isVisual) {
+        logs.push(`<div class="log-entry"><span class="log-time">残り--:--</span><span class="log-highlight">🏀 ${qName} 開始 🏀</span></div>`);
+        if(gameState.currentQ === 1) {
+            writeLog(gameState.clock, hTeam.name, `【スターティング5】 ${getNames(hData.court)}`);
+            writeLog(gameState.clock, aTeam.name, `【スターティング5】 ${getNames(aData.court)}`);
+            writeLog(gameState.clock, "両チーム", `ティップオフ！試合開始！`);
+        }
+    }
 
-           while (gameState.currentQ <= gameState.maxQ) {
-            // 【第1章】各クォーター開始時の時計とフェーズのリセット
-            gameState.clock = gameState.isOverTime ? 300 : 720; 
-            let qName = gameState.isOverTime ? `延長第${gameState.currentQ - 4}Q(OT)` : `第${gameState.currentQ}Q`;
-            
-            if(isVisual) {
-                logs.push(`<div class="log-entry"><span class="log-time">残り--:--</span><span class="log-highlight">🏀 ${qName} 開始 🏀</span></div>`);
-                if(gameState.currentQ === 1) {
-                    writeLog(gameState.clock, hTeam.name, `【スターティング5】 ${getNames(hData.court)}`);
-                    writeLog(gameState.clock, aTeam.name, `【スターティング5】 ${getNames(aData.court)}`);
-                    writeLog(gameState.clock, "両チーム", `ティップオフ！試合開始！`);
-                }
-            }
+    while(gameState.clock > 0) {
+        let offData = gameState.isHomeOffense ? hData : aData;
+        let defData = gameState.isHomeOffense ? aData : hData;
+        let isHome = gameState.isHomeOffense;
+        
+        const offSideStr = isHome ? 'home' : 'away';
+        const defSideStr = isHome ? 'away' : 'home';
+        const offDiff = isHome ? (score.home - score.away) : (score.away - score.home);
+        const defDiff = -offDiff;
 
-                        while(gameState.clock > 0) {
-                let offData = gameState.isHomeOffense ? hData : aData;
-                let defData = gameState.isHomeOffense ? aData : hData;
-                let isHome = gameState.isHomeOffense;
-                
-                const offSideStr = isHome ? 'home' : 'away';
-                const defSideStr = isHome ? 'away' : 'home';
-                const offDiff = isHome ? (score.home - score.away) : (score.away - score.home);
-                const defDiff = -offDiff;
 
                 // =========================================================
                 // 🔴【AI監督 超絶采配システム】タイムアウト＆戦術切り替え
