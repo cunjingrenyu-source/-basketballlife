@@ -2229,7 +2229,63 @@ while (gameState.currentQ <= gameState.maxQ) {
 
 
 
-                            // --- A. ハンドラーのターンオーバー & スティール判定 ---
+                                   // =========================================================
+        // 【第2章】攻撃テンポとバイオレーション判定
+        // =========================================================
+        let attackTempo = 0;
+        let isTransition = false;
+        
+        // 速攻（ファストブレイク）の処理
+        if (gameState.isFastBreak) {
+            attackTempo = 3 + Math.floor(Math.random() * 4); // 3〜6秒
+            isTransition = true;
+            if(isVisual) logs.push(`<div class="log-entry transition"><span class="log-time">残り${formatTime(gameState.clock)}</span>🏀 <b>ファストブレイク発生！</b> ${ballHolder.name}が猛スピードでフロントコートへ駆け上がる！</div>`);
+            gameState.devStats[offSideStr].fastBreaks++;
+        } else {
+            // ハーフコートオフェンスの消費時間（セットオフェンス）
+            let baseTempo = 10 + Math.floor(Math.random() * 10);
+            
+            // クラッチタイムは時間をじっくり使う
+            if (isClutchTime && (score[offSideStr] >= score[defSideStr])) {
+                baseTempo = Math.min(22, baseTempo + 6);
+            }
+            
+            // AI戦術によるテンポ調整
+            if (currentOffStrategy.focus === 'pace_and_space') {
+                baseTempo = Math.max(5, baseTempo - 4);
+            } else if (currentOffStrategy.focus === 'post_up') {
+                baseTempo = Math.min(24, baseTempo + 3);
+            }
+            
+            attackTempo = Math.min(gameState.shotClock, baseTempo);
+        }
+
+        // 🔴【新機能】時間の消費とバイオレーション判定
+        let timeSpent = consumeTime(attackTempo);
+        gameState.eightSecCount += timeSpent;
+        
+        // 8秒バイオレーション判定
+        if (!gameState.isFrontCourt && gameState.eightSecCount >= 8 && !gameState.isFastBreak) {
+            writeLog(gameState.clock, offData.team.name, `❌ 【8秒バイオレーション】 ${ballHolder.name}がフロントコートに運べず、ターンオーバー！`);
+            gameState.devStats[offSideStr].violations8s++;
+            switchPossession(24, false);
+            continue; // 次のポゼッションへ
+        }
+        
+        // フロントコート到達
+        gameState.isFrontCourt = true; 
+
+        // 24秒バイオレーション判定（シュート前に時計が切れた場合）
+        if (gameState.shotClock <= 0) {
+            writeLog(gameState.clock, offData.team.name, `⏰ 【24秒バイオレーション】 シュートを打ちきれずターンオーバー！`);
+            gameState.devStats[offSideStr].violations24s++;
+            switchPossession(24, false);
+            continue; // 次のポゼッションへ
+        }
+        
+        gameState.devStats[offSideStr].attacks++;
+
+        　　　　　　　　　// --- A. ハンドラーのターンオーバー & スティール判定 ---
                 // 【改良】オプショナルチェーン(?. )を用いてオブジェクト未定義によるクラッシュを完全防止
                 const bStats = ballHolder?.currentStats || {};
                 const dStats = defender?.currentStats || {};
