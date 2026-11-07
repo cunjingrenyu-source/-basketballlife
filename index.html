@@ -2489,34 +2489,17 @@ while (gameState.currentQ <= gameState.maxQ) {
                                             continue;
                                         }
                                     }
-                                                             } else {
-                                    // --- 修正箇所: ここで受け手(shooter)を元に状況を再判定し、エラーを回避 ---
-                                    let handlerDriveAdvFinal = ((bStats.speed || 50) > 80 && (bStats.dribble || 50) > 80);
-                                    let oppCenterDefFinal = defData.court.find(dp => dp.pos === "C")?.currentStats.blocks || 50;
-                                    
-                                    let isKickOutSituation = handlerDriveAdvFinal && (shooter.currentStats.three > 80);
-                                    let isCutSituation = !handlerDriveAdvFinal && (shooter.currentStats.speed > 80) && (shooter.currentStats.layup > 80) && (oppCenterDefFinal < 70);
-                                    
-                                    // 提案いただいたログ拡充案を反映（ランダムでバリエーションを持たせる）
-                                    const rLog = Math.random();
-                                    
+                                } else {
+                                    // 通常パス成功テキスト
                                     if (isDoubleTeamed) {
-                                        if (rLog < 0.5) assistText = `【ダブルチーム回避】${ballHolder.name}が囲まれながらも冷静に空いた${shooter.name}へパス！ ➔ `;
-                                        else assistText = `【プレッシャー回避】${ballHolder.name}が厳しいマークを潜り抜け、${shooter.name}へパスを展開！ ➔ `;
-                                    } else if (isKickOutSituation) {
-                                        if (rLog < 0.5) assistText = `【ドライブ＆キック】${ballHolder.name}がドライブで守備を収縮させ、外の${shooter.name}へキックアウト！ ➔ `;
-                                        else assistText = `【的確な状況判断】${ballHolder.name}が中に切り込み、フリーの${shooter.name}を見逃さずパス！ ➔ `;
-                                    } else if (isCutSituation) {
-                                        if (rLog < 0.5) assistText = `【鮮やかなカット】${shooter.name}がリング下へ飛び込む！${ballHolder.name}からドンピシャのパス！ ➔ `;
-                                        else assistText = `【ハイロー連携】インサイドに切れ込んだ${shooter.name}へ、${ballHolder.name}が合わせる！ ➔ `;
-                                    } else {
-                                        // 通常のパス展開にもバリエーションを追加
-                                        if (rLog < 0.3) assistText = `【視野の広さ】${ballHolder.name}がコート全体を見渡し、フリーの${shooter.name}へ展開！ ➔ `;
-                                        else if (rLog < 0.6) assistText = `【ボールムーブメント】素早いパス回し！${ballHolder.name}から${shooter.name}へ！ ➔ `;
-                                        else assistText = `${ballHolder.name}から${shooter.name}へのパスが通る！ ➔ `;
+                                        assistText = `【ダブルチーム回避】${ballHolder.name}が囲まれながらも冷静に空いた${shooter.name}へパス！ ➔ `;
+                                    } else if (isKickOut > 1.2) {
+                                        assistText = `【ドライブ＆キック】${ballHolder.name}がドライブで守備を収縮させ、外の${shooter.name}へキックアウト！ ➔ `;
+                                    } else if (isCut > 1.2) {
+                                        assistText = `【鮮やかなカット】${shooter.name}がリング下へ飛び込む！${ballHolder.name}からドンピシャのパス！ ➔ `;
                                     }
                                 }
-
+                            } else {
                                 // ---------------- パス失敗(TO)処理 ----------------
                                 actualPasser = ballHolder;
                                 if (actualPasser?._box) actualPasser._box.to++; // 既存の加算ロジックを踏襲
