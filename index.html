@@ -2994,6 +2994,48 @@ const foulChance = isFoulGame ? 0.95 : baseFoulRisk;
 if (Math.random() < Math.min(0.95, Math.max(0.02, foulChance))) {
     updateBox(fouler, 'pf', 1);
     
+    // =========================================================
+    // 🔴【課題1-①】退場（ファウルアウト）バグの根本治療
+    // =========================================================
+    if (fouler._box && fouler._box.pf >= 6 && !fouler.is_fouled_out) {
+        fouler.is_fouled_out = true;
+        
+        // ベンチから同ポジションの最優先選手を探す
+        let benchCandidates = defData.bench.filter(p => !p.is_fouled_out && p.pos === fouler.pos);
+        if (benchCandidates.length === 0) {
+            // 同ポジションがいなければ誰でもいいから探す
+            benchCandidates = defData.bench.filter(p => !p.is_fouled_out);
+        }
+        
+        if (benchCandidates.length > 0) {
+            // スタミナ・能力上位でソート
+            benchCandidates.sort((a, b) => {
+                let aScore = (a._stamina || 100) + (a.currentStats?.defense || 50);
+                let bScore = (b._stamina || 100) + (b.currentStats?.defense || 50);
+                return bScore - aScore;
+            });
+            
+            let subInPlayer = benchCandidates[0];
+            
+            // オンコートとベンチの入れ替え実行
+            const outIndex = defData.court.findIndex(p => p.id === fouler.id);
+            if (outIndex !== -1) {
+                defData.court.splice(outIndex, 1, subInPlayer);
+            }
+            const inIndex = defData.bench.findIndex(p => p.id === subInPlayer.id);
+            if (inIndex !== -1) {
+                defData.bench.splice(inIndex, 1, fouler);
+            }
+            
+            // 確定ログの発行
+            writeLog(gameState.clock, defData.team.name, `<span style="color:#c0392b; font-weight:bold;">[退場・交代] 🚨 #${fouler.number || ''} ${fouler.name} が退場 ➔ #${subInPlayer.number || ''} ${subInPlayer.name} がコートイン</span>`, true, [fouler.id, subInPlayer.id]);
+        } else {
+            writeLog(gameState.clock, defData.team.name, `<span style="color:#c0392b; font-weight:bold;">🚨 #${fouler.number || ''} ${fouler.name} がファウルアウト！しかしベンチに交代可能な選手がいません！</span>`, true, [fouler.id]);
+        }
+    }
+    
+
+    
     // ★追加要素2: フレグラントファウル（危険なプレー）の判定
     let isFlagrant = !isFoulGame && Math.random() < 0.015;
     
