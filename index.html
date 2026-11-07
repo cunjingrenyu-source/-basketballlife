@@ -2214,13 +2214,15 @@ while (gameState.currentQ <= gameState.maxQ) {
 
                 let isRushing = (gameState.currentQ >= 4 && gameState.clock < 180 && prevDiff < 0);
 
-                // 2. 攻撃開始からシュートまでの時間をフェーズごとに可変化
+                          // 2. 攻撃開始からシュートまでの時間をフェーズごとに可変化
                 if (attackPhase === "fastbreak") {
                     timeSpent = Math.floor(Math.random() * 3) + 2; // 速攻は2〜4秒
-                    if (ballHolder._stamina !== undefined) ballHolder._stamina = Math.max(0, ballHolder._stamina - 3); // 速攻時のスタミナ消費増
+                    // 🔴【課題1-②】速攻スタミナ消費を仕様書通り -0.8 に修正（既存の-3から適正化）
+                    if (ballHolder._stamina !== undefined) ballHolder._stamina = Math.max(0, ballHolder._stamina - 0.8);
                 } else if (attackPhase === "early") {
                     timeSpent = Math.floor(Math.random() * 4) + 4; // アーリーは4〜7秒
-                    if (ballHolder._stamina !== undefined) ballHolder._stamina = Math.max(0, ballHolder._stamina - 2);
+                    // 🔴【課題1-②】通常ハーフコート(アーリー含む): スタミナ -0.3
+                    if (ballHolder._stamina !== undefined) ballHolder._stamina = Math.max(0, ballHolder._stamina - 0.3);
                 } else {
                     // ハーフコート攻撃（パス回数、ドリブル時間などを模擬）
                     let offIQ = (ballHolder.currentStats.playmaking || 50) + (ballHolder.currentStats.pass || 50);
@@ -2245,11 +2247,15 @@ while (gameState.currentQ <= gameState.maxQ) {
                         timeSpent = Math.max(1, gameState.shotClock - 1); 
                     }
                     
-                    // 長時間のボール保持による疲労
+                    // 🔴【課題1-②】通常ハーフコートベース消費: スタミナ -0.3
+                    if (ballHolder._stamina !== undefined) ballHolder._stamina = Math.max(0, ballHolder._stamina - 0.3);
+
+                    // 既存維持：長時間のボール保持による追加疲労ペナルティ
                     if (timeSpent > 15 && ballHolder._stamina !== undefined) {
                         ballHolder._stamina = Math.max(0, ballHolder._stamina - 1);
                     }
                 }
+
                 
                 // 攻撃フェーズ情報を後続処理に渡すため状態を更新
                 gameState.isFastBreak = (attackPhase === "fastbreak");
