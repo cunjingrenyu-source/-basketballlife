@@ -3344,7 +3344,7 @@ addScore(2, gameState.currentQ, gameState.isHomeOffense, hData, aData);
             continue;
         }
         
-        // 6. プットバックしなかった場合のORB実況バリエーション
+            // 6. プットバックしなかった場合のORB実況バリエーション
         const rOrb = Math.random();
         let orbText = "";
         if (phyStat > 100 && rOrb < 0.4) {
@@ -3355,8 +3355,10 @@ addScore(2, gameState.currentQ, gameState.isHomeOffense, hData, aData);
             orbText = `🏀 ${offReber.name}が良いポジションに入り込み、こぼれ球を確実に確保！`;
         }
         
-writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);
+        writeLog(gameState.clock, offData.team.name, orbText, false, [offReber.id]);
         keepPossession(14);
+        continue;  // 🚨【修正】ここを追加！これがないと次ターンの処理がバグります
+
         
     } else {
         // 7. ディフェンスリバウンド獲得
