@@ -2981,7 +2981,7 @@ if (Math.random() < Math.min(0.95, Math.max(0.02, foulChance))) {
             }
             switchPossession(24, false);
         }
-    
+    }
 
     if ((fouler?._box?.pf || 0) >= 6) {
         writeLog(gameState.clock, defData.team.name, `<span style="color:red; font-weight:bold;">🚨【ファウルアウト】</span>${fouler.name}がファウル上限に到達し退場となります！`, true, [fouler.id]);
