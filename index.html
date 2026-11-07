@@ -2243,13 +2243,15 @@ while (gameState.currentQ <= gameState.maxQ) {
                 
                 let handlerStat = ((bStats.dribble || 50) * 1.2) + ((bStats.pass || 50) * 0.8) + ((bStats.speed || 50) * 0.5);
                 
-                // 【ターンオーバー適正化】基礎リスクを引き上げ、ディフェンス圧力(defensePressure)を直接リスクに加算
-                let baseToRisk = gameState.isFastBreak ? 0.12 : (0.22 - ((handlerStat * mentalBuff) / 1000));
-                let toRisk = baseToRisk + (defensePressure * 0.25); // 守備が強いとTO確率が跳ね上がる
+                
+                              // 【改良】基礎リスクを大幅に下げ、能力値によるTO回避を強化（無駄なTOを激減）
+                let baseToRisk = gameState.isFastBreak ? 0.08 : (0.15 - ((handlerStat * mentalBuff) / 1500));
+                let toRisk = Math.max(0.01, baseToRisk + (defensePressure * 0.15)); // 守備圧力の影響も緩和し、最低1%を保証
                 
                 // スタミナ低下による疲労ミス
                 if ((ballHolder?._stamina ?? 100) < 40) toRisk += 0.05;
                 if (ballHolder?._condStr === "不調") toRisk += 0.05;
+
 
                 // 🔴【修正】TO判定のif文 と stlChanceの計算 を復元・堅牢化
                 if (Math.random() < toRisk) {
