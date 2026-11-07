@@ -1743,13 +1743,69 @@ const updateMomentum = (scoringSide, pts) => {
     }
 };
 
+// =========================================================
+// 🔴【課題3-①】試合前チームアシスト相殺補正（8段階テーブル）
+// 安全性を高め、対象が存在しない場合のエラーを完全に防ぐようアプデ
+// =========================================================
+const calculateTeamAssistLevel = (team) => {
+    if (!team || !team.roster || team.roster.length === 0) return 5; // デフォルトはLv5
+    let totalAssist = team.roster.reduce((sum, p) => sum + ((p.pass || 50) + (p.playmaking || 50)) / 2, 0);
+    let avgAssist = totalAssist / team.roster.length;
+    
+    if (avgAssist < 40) return 1;
+    if (avgAssist < 50) return 2;
+    if (avgAssist < 60) return 3;
+    if (avgAssist < 65) return 4;
+    if (avgAssist < 75) return 5;
+    if (avgAssist < 85) return 6;
+    if (avgAssist < 95) return 7;
+    return 8;
+};
+
+// チームが存在するかどうかを安全に確認してレベルを算出
+const homeAssistLevel = (typeof hTeam !== 'undefined' && hTeam) ? calculateTeamAssistLevel(hTeam) : 5;
+const awayAssistLevel = (typeof aTeam !== 'undefined' && aTeam) ? calculateTeamAssistLevel(aTeam) : 5;
+
+// =========================================================
+// 🔴【課題1-②】疲労ペナルティ補正付きステータス取得関数
+// =========================================================
+const getEffectiveStatsWithFatigue = (player) => {
+    if (!player) return {};
+    
+    // 初期のcurrentStatsが存在しない場合は生成（既存ロジック互換）
+    let baseStats = player.currentStats || (typeof getEffectiveStats === 'function' ? getEffectiveStats(player) : player);
+    let stamina = player._stamina !== undefined ? player._stamina : 100;
+    
+    let fatigueMulti = 1.0;
+    if (stamina <= 30) {
+        fatigueMulti = 0.75; // スタミナ30%以下 ➔ 全能力値 × 0.75（パス精度大幅低下・TO率急増）
+    } else if (stamina <= 50) {
+        fatigueMulti = 0.90; // スタミナ50%以下 ➔ 全能力値 × 0.9（シュート精度・反応速度ダウン）
+    }
+    
+    let currentFatigueStats = {};
+    for (let key in baseStats) {
+        if (typeof baseStats[key] === 'number') {
+            currentFatigueStats[key] = baseStats[key] * fatigueMulti;
+        } else {
+            currentFatigueStats[key] = baseStats[key];
+        }
+    }
+    return currentFatigueStats;
+};
+
 // 試合開始前に全選手へ「実質ステータス(currentStats)」を付与
-if (hTeam && hTeam.roster) hTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
-if (aTeam && aTeam.roster) aTeam.roster.forEach(p => p.currentStats = getEffectiveStats(p));
+if (typeof hTeam !== 'undefined' && hTeam && hTeam.roster) {
+    hTeam.roster.forEach(p => p.currentStats = typeof getEffectiveStats === 'function' ? getEffectiveStats(p) : p);
+}
+if (typeof aTeam !== 'undefined' && aTeam && aTeam.roster) {
+    aTeam.roster.forEach(p => p.currentStats = typeof getEffectiveStats === 'function' ? getEffectiveStats(p) : p);
+}
 
 // 🔴【第1章】攻守交代・時計・速攻フラグを一元管理する絶対関数（gameState連動）
 // この関数を通さない限り攻守は交代しない。これにより不整合を100%防ぐ。
 const switchPossession = (resetClockTo = 24, nextFastBreak = false) => {
+
     gameState.isHomeOffense = !gameState.isHomeOffense;
     gameState.shotClock = resetClockTo;
     gameState.isFastBreak = nextFastBreak;
