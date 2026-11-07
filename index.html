@@ -2832,116 +2832,125 @@ while (gameState.currentQ <= gameState.maxQ) {
                 }
 
 
-                                              // 【課題1-1, 1-2, 1-7】ディフェンダーとの「距離」の概念をシミュレート（0.0:密着 〜 1.0:完全に離れている）
-                let defDistance = 0.5; // 基準値
+                                                           // =========================================================
+                // 🔴【課題2-①】オープン度（距離）とディフェンス能力（阻止力）の分離計算
+                // =========================================================
+                let opennessFactor = 0.5; // 初期値（0.0=密着、1.0=フリー）
+                let contestFactor = 0.5;  // 阻止力（高いほどシュート成功率を下げる）
                 
-                // 【課題2-5】速攻時の距離判定
                 if (gameState.isFastBreak) {
                     let transitionDefense = (activeDefStats.speed ?? 50) * 0.7 + (activeDefStats.defense ?? 50) * 0.3;
-                    defDistance = transitionDefense > 75 ? 0.4 : 0.8; 
+                    opennessFactor = transitionDefense > 75 ? 0.4 : 0.8; 
                 }
 
-                // 🔴【課題2】アイソレーション突破結果の反映
                 if (isIsolation) {
                     if (isIsoBreakdown) {
-                        defDistance = 0.9; // 突破成功：ディフェンダーを振り切り、ほぼフリーな状態（オープン度上昇）
+                        opennessFactor = 0.9; 
                         if (shotType === "three" || shotType === "middle") {
                             writeLog(gameState.clock, offData.team.name, `${shooter.name}が鋭いステップバックで${actualContester.name}との距離を広げた！`, true, [shooter.id]);
                         } else {
                             writeLog(gameState.clock, offData.team.name, `${shooter.name}が鋭いドライブで${actualContester.name}を完全に抜き去った！`, true, [shooter.id]);
                         }
                     } else {
-                        defDistance = 0.1; // 突破失敗：守備に阻まれタフショットを強いられる
+                        opennessFactor = 0.1; 
                         writeLog(gameState.clock, defData.team.name, `${actualContester.name}がしつこく食らいつき、${shooter.name}を振り切らせない！`, false, [actualContester.id]);
                     }
                 }
 
                 let contestValue = 0;
+                
                 if (shotType === "three" || shotType === "middle") {
-                    // アウトサイド：距離とクローズアウト（接近）の能力で計算
-                    let closeOutAbility = ((activeDefStats.defense ?? 50) * 0.6 + (activeDefStats.speed ?? 50) * 0.4) / 100;
-                    // 距離が遠い(1.0に近い)ほどコンテストは下がる
-                    contestValue = closeOutAbility * (1.0 - defDistance);
+                    // 🔴【課題2-①】3P・ミドル判定（距離とシュートチェック）
+                    // opennessFactor: ディフェンダーとの距離を表現
+                    let closeOutAbility = ((activeDefStats.defense ?? 50) * 0.7 + (activeDefStats.speed ?? 50) * 0.3) / 100;
+                    contestFactor = closeOutAbility; // チェイス・チェック能力
+                    contestValue = contestFactor * (1.0 - opennessFactor); 
                 } else {
-                    // インサイド：ブロックとヘルプの計算
-                    let primaryDef = isDriveBeaten ? 0 : ((activeDefStats.defense ?? 50) * 0.5 + (activeDefStats.physical ?? 50) * 0.5) / 100;
+                    // 🔴【課題2-①】レイアップ・ダンク判定（インサイド・フィジカル）
+                    // opennessFactor: ペイント内のヘルプ位置などを表現
+                    let offPhysical = sStats.physical ?? 50;
+                    let primaryDef = isDriveBeaten ? 0 : ((activeDefStats.blocks ?? activeDefStats.defense ?? 50) * 0.5 + (activeDefStats.physical ?? 50) * 0.5) / 100;
                     let helpDef = 0;
+                    let defPhysical = activeDefStats.physical ?? 50;
                     
                     if (helpDefender) {
                         let hStats = helpDefender.currentStats ?? {};
-                        helpDef = ((hStats.defense ?? 50) * 0.6 + (hStats.physical ?? 50) * 0.4) / 100;
-                        actualContester = helpDefender; // 【課題10-4】元の primaryDefender は維持し、コンテスターだけ更新
+                        helpDef = ((hStats.blocks ?? hStats.defense ?? 50) * 0.6 + (hStats.physical ?? 50) * 0.4) / 100;
+                        defPhysical = hStats.physical ?? 50;
+                        actualContester = helpDefender; 
                     }
-                    contestValue = primaryDef + helpDef;
+                    
+                    contestFactor = primaryDef + helpDef;
+                    
+                    // フィジカル差によるコンテスト無効化（ポスタライズの伏線）
+                    if (offPhysical > defPhysical + 20) {
+                        contestFactor *= 0.5; // 攻撃側がフィジカルで圧倒
+                    }
+                    contestValue = contestFactor; 
                 }
 
-                // 【課題2-6】乱数依存の軽減。ベース値に少し揺らぎを入れる程度（0.85 〜 1.15）
                 contestValue *= (0.85 + Math.random() * 0.3);
 
-                // 【課題2-4】ショットクロックのプレッシャー（コンテスト値とは切り離すため、タフショット係数として別管理）
                 let shotClockPressure = (gameState.shotClock <= 3 && !gameState.isFastBreak) ? 0.15 : 0.0;
-
-                // 【課題1-3, 1-4, 2-1】6段階のオープン度確定と、成功率補正（乗算・加算のベースとして扱いやすい数値）
-                let contestLevel = "Wide Open";
-                let contestPenalty = 0.0; 
-                let defStaminaDrain = 0; // 守備側の追加スタミナ消費
-                
-                // プレッシャーを加味した最終判定用スコア
                 let finalContestScore = contestValue + shotClockPressure;
 
+                let contestLevel = "Wide Open";
+                let contestPenalty = 0.0; 
+                let defStaminaDrain = 0; 
+                
+                // 🔴【課題2-②】「コンテスト死」の修正
+                // 能力低い選手が近くにいるだけ ➔ Lightly Contested
+                // 高能力ディフェンダーが密着 ➔ Smothered で成功率を極端に落とす
                 if (finalContestScore <= 0.15) {
                     contestLevel = "Wide Open";
-                    contestPenalty = -0.10; // 成功率上昇ボーナス
-                    defStaminaDrain = 0; // 守備は間に合っていない
+                    contestPenalty = -0.10; 
+                    defStaminaDrain = 0; 
                 } else if (finalContestScore <= 0.35) {
                     contestLevel = "Open";
-                    contestPenalty = 0.05; // わずかな影響
+                    contestPenalty = 0.05; 
                     defStaminaDrain = 1;
-                } else if (finalContestScore <= 0.60) {
+                } else if (finalContestScore <= 0.55) {
                     contestLevel = "Semi-Open";
                     contestPenalty = 0.15;
                     defStaminaDrain = 2;
-                } else if (finalContestScore <= 0.85) {
-                    contestLevel = "Lightly Contested";
+                } else if (finalContestScore <= 0.80) {
+                    contestLevel = "Lightly Contested"; // チェックが甘い
                     contestPenalty = 0.25;
                     defStaminaDrain = 3;
-                } else if (finalContestScore <= 1.15) {
+                } else if (finalContestScore <= 1.10) {
                     contestLevel = "Heavily Contested";
                     contestPenalty = 0.40;
                     defStaminaDrain = 5;
                 } else {
-                    contestLevel = "Smothered";
-                    contestPenalty = 0.60; // 絶望的なチェック
+                    contestLevel = "Smothered"; // 密着・高能力
+                    contestPenalty = 0.80; // 成功率を極端に落とす（後続で乗算補正として扱うためペナルティ値を跳ね上げる）
                     defStaminaDrain = 7;
                 }
 
-                // 【課題6-2, 6-3】スタミナ消費の再設計。シュート自体の基本消費(1) ＋ 接触による追加消費
+                // 🔴【課題1-②】スタミナ消費の再設計
                 if (shooter?._stamina !== undefined) {
-                    let offStaminaDrain = 1 + (contestLevel === "Heavily Contested" || contestLevel === "Smothered" ? 2 : 0);
+                    let offStaminaDrain = 0.3 + (contestLevel === "Heavily Contested" || contestLevel === "Smothered" ? 0.5 : 0);
                     shooter._stamina = Math.max(0, shooter._stamina - offStaminaDrain);
                 }
                 if (actualContester?._stamina !== undefined) {
-                    actualContester._stamina = Math.max(0, actualContester._stamina - defStaminaDrain);
+                    // 🔴【課題1-②】フルコートプレス / 密着ディフェンス: スタミナ -0.6
+                    let extraDefDrain = (contestLevel === "Smothered") ? 0.6 : (defStaminaDrain * 0.1); 
+                    actualContester._stamina = Math.max(0, actualContester._stamina - extraDefDrain);
                 }
 
-
-                          // 【課題1-5, 1-6, 8-1, 8-3】実況ログと内部判定の完全同期。🎯の削除とWide Open専用化。
                 if (contestLevel === "Smothered") {
                     writeLog(gameState.clock, defData.team.name, `【Smothered】${actualContester.name}が完全に密着！息の詰まるパーフェクトディフェンス！`, false, [actualContester.id]);
                 } else if (contestLevel === "Heavily Contested") {
                     writeLog(gameState.clock, defData.team.name, `【Heavily Contested】${actualContester.name}が厳しくシュートコースを塞ぎタフショットを強いる！`, false, [actualContester.id]);
                 } else if (contestLevel === "Lightly Contested") {
-                    writeLog(gameState.clock, defData.team.name, `【Lightly Contested】${actualContester.name}がシュートチェックに飛ぶ！`, false, [actualContester.id]);
+                    writeLog(gameState.clock, defData.team.name, `【Lightly Contested】${actualContester.name}がシュートチェックに飛ぶが、チェックが甘い！`, false, [actualContester.id]);
                 } else if (contestLevel === "Semi-Open") {
                     writeLog(gameState.clock, defData.team.name, `【Semi-Open】${actualContester.name}が間合いを詰めるが、明確な妨害には至らない。`, false, [actualContester.id]);
                 } else if (contestLevel === "Open") {
                     writeLog(gameState.clock, defData.team.name, `【Open】${actualContester.name}は近くにいるがシュートを防ぎきれない！`, false, [actualContester.id]);
                 } else if (contestLevel === "Wide Open") {
-                    // Wide Open時はディフェンダーのログを出さず、オフェンスが完全にフリーであることのみ描写
                     writeLog(gameState.clock, offData.team.name, `【Wide Open】ディフェンスが間に合わない！${shooter.name}が完全にフリーな状態を作る！`, false, [shooter.id]);
                 }
-
-
 
 
 // 【ファウルゲーム判定】
