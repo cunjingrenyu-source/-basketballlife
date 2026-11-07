@@ -2298,27 +2298,31 @@ while (gameState.currentQ <= gameState.maxQ) {
 
 
                                   
-        　　　　　　　　　// --- A. ハンドラーのターンオーバー & スティール判定 ---
-                // 【改良】オプショナルチェーン(?. )を用いてオブジェクト未定義によるクラッシュを完全防止
-                const bStats = ballHolder?.currentStats || {};
-                const dStats = defender?.currentStats || {};
+        　　　　                // --- A. ハンドラーのターンオーバー & スティール判定 ---
+                // 🔴【課題1-②】ここで疲労ペナルティ付きのステータスを取得し直す（既存のオプショナルチェーンも維持）
+                const bStats = typeof getEffectiveStatsWithFatigue === 'function' && ballHolder ? getEffectiveStatsWithFatigue(ballHolder) : (ballHolder?.currentStats || {});
+                const dStats = typeof getEffectiveStatsWithFatigue === 'function' && defender ? getEffectiveStatsWithFatigue(defender) : (defender?.currentStats || {});
                 
                 let handlerStat = ((bStats.dribble || 50) * 1.2) + ((bStats.pass || 50) * 0.8) + ((bStats.speed || 50) * 0.5);
                 
+                // 🔴【課題3-②】無駄なTOを激減させるため、TO判定をフラグ管理化（既存の計算式はベースとして残す）
+                let stlChance = ((dStats.defense || 50) / 150) + (defensePressure * 0.2);
+                let isStaminaEmpty = ((ballHolder?._stamina ?? 100) < 30);
+                let isDoubleTeamFlag = (typeof currentDefStrategy !== 'undefined' && currentDefStrategy.intensity === 'max' && (bStats.three > 110 || bStats.middle > 110));
                 
-                              // 【改良】基礎リスクを大幅に下げ、能力値によるTO回避を強化（無駄なTOを激減）
-                let baseToRisk = gameState.isFastBreak ? 0.08 : (0.15 - ((handlerStat * mentalBuff) / 1500));
-                let toRisk = Math.max(0.01, baseToRisk + (defensePressure * 0.15)); // 守備圧力の影響も緩和し、最低1%を保証
-                
-                // スタミナ低下による疲労ミス
-                if ((ballHolder?._stamina ?? 100) < 40) toRisk += 0.05;
-                if (ballHolder?._condStr === "不調") toRisk += 0.05;
+                let toRisk = 0;
+                // 明確なTO発生フラグ：スティール能力が高い、ダブルチーム、スタミナ切れの場合のみリスクを加算
+                if (stlChance > 0.4 || isDoubleTeamFlag || isStaminaEmpty || gameState.isFastBreak) {
+                    let baseToRisk = gameState.isFastBreak ? 0.08 : (0.15 - ((handlerStat * (typeof mentalBuff !== 'undefined' ? mentalBuff : 1)) / 1500));
+                    toRisk = Math.max(0.01, baseToRisk + (defensePressure * 0.15));
+                    
+                    // 既存維持：スタミナ低下・不調によるペナルティ
+                    if ((ballHolder?._stamina ?? 100) < 40) toRisk += 0.05;
+                    if (ballHolder?._condStr === "不調") toRisk += 0.05;
+                }
 
-
-                // 🔴【修正】TO判定のif文 と stlChanceの計算 を復元・堅牢化
-                if (Math.random() < toRisk) {
+                if (toRisk > 0 && Math.random() < toRisk) {
                     if (ballHolder?._box) ballHolder._box.to++;
-                    let stlChance = ((dStats.defense || 50) / 150) + (defensePressure * 0.2);
                     let willFastBreak = false;
 
                     if (Math.random() < Math.max(0.02, stlChance)) {
@@ -2339,9 +2343,10 @@ while (gameState.currentQ <= gameState.maxQ) {
                         writeLog(gameState.clock, offData.team.name, toText, false, [ballHolder.id]);
                     }
                     
-                    switchPossession(24, willFastBreak); // 🔴新関数適用
+                    switchPossession(24, willFastBreak); 
                     continue;
                 }
+
 
                                         // --- 1. パス判断、および【課題2】アイソレーション判定 ---
                 let isAssist = false;
