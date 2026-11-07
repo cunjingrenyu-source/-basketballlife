@@ -3397,13 +3397,13 @@ addScore(2, gameState.currentQ, gameState.isHomeOffense, hData, aData);
                 }
             } // 🚨【修正追加】while(gameState.clock > 0) を閉じる
             
-                        // 🔴【課題12完全対応】クォーター終了時の延長戦（OT）判定
-            // 第4Q以降の終了時点で同点の場合、試合を終わらせず maxQ を延長する
+            // 🔴【課題12完全対応】クォーター終了時の延長戦（OT）判定
             if (gameState.currentQ >= 4 && gameState.clock <= 0) {
-                let currentHomeScore = score?.home || 0;
-                let currentAwayScore = score?.away || 0;
+                // 🚨【修正】ここも安全なスコア取得に変更
+                let finalHomeScore = (typeof score !== 'undefined' && score) ? (score.home || 0) : (hData.score || 0);
+                let finalAwayScore = (typeof score !== 'undefined' && score) ? (score.away || 0) : (aData.score || 0);
                 
-                if (currentHomeScore === currentAwayScore) {
+                if (finalHomeScore === finalAwayScore) {
                     gameState.maxQ++;
                     gameState.isOverTime = true;
                     if(typeof isVisual !== 'undefined' && isVisual) {
