@@ -2380,15 +2380,15 @@ while (gameState.currentQ <= gameState.maxQ) {
                             cum += (courtEvals[i] / totalEval);
                             if (r < cum) { receiver = receiverCandidates[i]; break; }
                         }
-
                         let denyPenalty = (receiver.currentStats.three > 100) ? 0.05 : 0;
                         let passFatigue = (ballHolder._stamina !== undefined && ballHolder._stamina < 30) ? 0.05 : 0; // 【課題5-7】疲労によるパス精度低下
 
                         let passAbility = bStats.pass || 50;
-                        let passSuccessProb = Math.min(0.985, 0.75 + (passAbility / 150) * 0.235) - denyPenalty - passFatigue;
+                        // 【改良】基礎成功率を85%に底上げし、能力が高い選手は最大99.5%成功するように修正
+                        let passSuccessProb = Math.min(0.995, 0.85 + (passAbility / 150) * 0.145) - denyPenalty - passFatigue;
                         
                         if (isDoubleTeamed && Math.random() < 0.2) passSuccessProb -= 0.3;
-                        
+
                         if (Math.random() < passSuccessProb) {
                             actualPasser = ballHolder;
                             shooter = receiver; 
