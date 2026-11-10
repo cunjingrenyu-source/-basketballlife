@@ -2298,27 +2298,31 @@ while (gameState.currentQ <= gameState.maxQ) {
 
 
                                   
-        　　　　                // --- A. ハンドラーのターンオーバー & スティール判定 ---
-                // 🔴【課題1-②】ここで疲労ペナルティ付きのステータスを取得し直す（既存のオプショナルチェーンも維持）
+        　　　　                      // --- A. ハンドラーのターンオーバー & スティール判定 ---
+                // 【課題1-②】疲労ペナルティ付きのステータスを取得（既存の安全確認を維持）
                 const bStats = typeof getEffectiveStatsWithFatigue === 'function' && ballHolder ? getEffectiveStatsWithFatigue(ballHolder) : (ballHolder?.currentStats || {});
                 const dStats = typeof getEffectiveStatsWithFatigue === 'function' && defender ? getEffectiveStatsWithFatigue(defender) : (defender?.currentStats || {});
                 
                 let handlerStat = ((bStats.dribble || 50) * 1.2) + ((bStats.pass || 50) * 0.8) + ((bStats.speed || 50) * 0.5);
                 
-                // 🔴【課題3-②】無駄なTOを激減させるため、TO判定をフラグ管理化（既存の計算式はベースとして残す）
-                let stlChance = ((dStats.defense || 50) / 150) + (defensePressure * 0.2);
+                // 【課題6】stlChanceの上限を95%に設定
+                let stlChance = Math.min(0.95, ((dStats.defense || 50) / 150) + (defensePressure * 0.2));
                 let isStaminaEmpty = ((ballHolder?._stamina ?? 100) < 30);
-                let isDoubleTeamFlag = (typeof currentDefStrategy !== 'undefined' && currentDefStrategy.intensity === 'max' && (bStats.three > 110 || bStats.middle > 110));
+                let isDoubleTeamFlag = (typeof currentDefStrategy !== 'undefined' && currentDefStrategy.intensity === 'max' && ((bStats.three || 50) > 110 || (bStats.middle || 50) > 110));
                 
                 let toRisk = 0;
-                // 明確なTO発生フラグ：スティール能力が高い、ダブルチーム、スタミナ切れの場合のみリスクを加算
+                // 明確なTO発生フラグ：スティール能力が高い、ダブルチーム、スタミナ切れ、速攻の場合のみリスクを加算
                 if (stlChance > 0.4 || isDoubleTeamFlag || isStaminaEmpty || gameState.isFastBreak) {
-                    let baseToRisk = gameState.isFastBreak ? 0.08 : (0.15 - ((handlerStat * (typeof mentalBuff !== 'undefined' ? mentalBuff : 1)) / 1500));
-                    toRisk = Math.max(0.01, baseToRisk + (defensePressure * 0.15));
+                    // 【課題13, 21】ファストブレイクのTOリスクもハンドラー能力と守備力で変動させる
+                    let fastBreakRisk = Math.max(0.02, 0.10 - ((bStats.dribble || 50) / 2000) + (stlChance * 0.1));
+                    let baseToRisk = gameState.isFastBreak ? fastBreakRisk : (0.15 - ((handlerStat * (typeof mentalBuff !== 'undefined' ? mentalBuff : 1)) / 1500));
                     
-                    // 既存維持：スタミナ低下・不調によるペナルティ
-                    if ((ballHolder?._stamina ?? 100) < 40) toRisk += 0.05;
-                    if (ballHolder?._condStr === "不調") toRisk += 0.05;
+                    // リスクの上限・下限を安全にクリップ
+                    toRisk = Math.max(0.01, Math.min(0.95, baseToRisk + (defensePressure * 0.15)));
+                    
+                    // bStats側で反映済みなら二重計上を避けるが、念のための軽減ペナルティとして維持
+                    if (!bStats._fatigueApplied && (ballHolder?._stamina ?? 100) < 40) toRisk += 0.03;
+                    if (!bStats._condApplied && ballHolder?._condStr === "不調") toRisk += 0.03;
                 }
 
                 if (toRisk > 0 && Math.random() < toRisk) {
@@ -2328,8 +2332,8 @@ while (gameState.currentQ <= gameState.maxQ) {
                     if (Math.random() < Math.max(0.02, stlChance)) {
                         if (defender?._box) defender._box.stl++;
                         let stlText = gameState.isFastBreak 
-                            ? `${ballHolder.name}の速攻のパスを${defender.name}が見事にパスカット！` 
-                            : `${ballHolder.name}の隙を突き、${defender.name}が鋭いスティール！`;
+                            ? `${ballHolder.name}の速攻のドリブルを${defender.name}が見事にカット！ [DATA: HANDLER_TO]` 
+                            : `${ballHolder.name}の隙を突き、${defender.name}が鋭いスティール！ [DATA: HANDLER_TO]`;
                         writeLog(gameState.clock, defData.team.name, stlText, true, [ballHolder.id, defender.id]);
                         
                         if ((dStats.speed || 50) > 80 && Math.random() < 0.6) {
@@ -2338,8 +2342,8 @@ while (gameState.currentQ <= gameState.maxQ) {
                         }
                     } else {
                         let toText = gameState.isFastBreak 
-                            ? `${ballHolder.name}が速攻で急ぎすぎてボールをこぼしターンオーバー！` 
-                            : `激しいマークに遭い、${ballHolder.name}がボールを失ってターンオーバー。`;
+                            ? `${ballHolder.name}が速攻で急ぎすぎてボールをこぼしターンオーバー！ [DATA: HANDLER_TO]` 
+                            : `激しいマークに遭い、${ballHolder.name}がボールを失ってターンオーバー。 [DATA: HANDLER_TO]`;
                         writeLog(gameState.clock, offData.team.name, toText, false, [ballHolder.id]);
                     }
                     
@@ -2347,36 +2351,45 @@ while (gameState.currentQ <= gameState.maxQ) {
                     continue;
                 }
 
-
-                                        // --- 1. パス判断、および【課題2】アイソレーション判定 ---
+                // --- 1. パス判断、およびアイソレーション判定 ---
                 let isAssist = false;
                 let playmakerBuff = 0;
                 let assistText = ""; 
                 let actualPasser = null;
                 let shooter = ballHolder; 
 
-                // ▼ アイソレーションのローカル変数
+                // ▼ アイソレーション・パス自重のローカル変数（後続のシュート処理へ引き継がれる）
                 let isIsolation = false;
                 let isIsoBreakdown = false;
+                let passCanceled = false; 
                 let isoText = "";
 
                 // 第1段階：アイソレーション適性（ISO）の計算
-                // ISO = 0.40*D + 0.25*V + 0.20*P + 0.15*S
                 let scoreForIso = ((bStats.three||50) + (bStats.middle||50) + (bStats.layup||50) + (bStats.dunk||50)) / 4;
                 let isoScore = (0.40 * (bStats.dribble||50)) + (0.25 * (bStats.speed||50)) + (0.20 * (bStats.physical||50)) + (0.15 * scoreForIso);
 
-                // 第2段階：実行すべき状況かの判定
-                // 条件：適性が高く、エース級であり、ショットクロックに余裕があるか、クラッチ状況
-                let isAce = ballHolder._aceScore >= [...offData.court].sort((a,b)=>b._aceScore - a._aceScore)[0]._aceScore;
-                let defStamina = defender._stamina !== undefined ? defender._stamina : 100;
+                // 【課題24, 25】コートが空でないか確認し、エース判定を実行
+                let isAce = false;
+                if (offData.court && offData.court.length > 0) {
+                    let sortedCourt = [...offData.court].sort((a,b)=>(b._aceScore || 0) - (a._aceScore || 0));
+                    isAce = (ballHolder._aceScore >= (sortedCourt[0]._aceScore || 0));
+                }
+
+                let defStamina = defender?._stamina !== undefined ? defender._stamina : 100;
                 let matchUpAdvantage = isoScore - ((dStats.defense||50)*0.6 + (dStats.speed||50)*0.4);
+
+                // 【課題27】クラッチタイムフラグの二重管理を統一
+                let unifiedClutchTime = typeof isClutchTime !== 'undefined' ? isClutchTime : (typeof isClutchTimeBase !== 'undefined' ? isClutchTimeBase : false);
 
                 if (isoScore > 85 && isAce && !gameState.isFastBreak) {
                     let isoProb = 0.15; // 基礎確率
-                    if (isClutchTime) isoProb += 0.3; // クラッチ時は増加
-                    if (matchUpAdvantage > 15) isoProb += 0.2; // マッチアップで有利
-                    if (gameState.shotClock <= 8) isoProb += 0.2; // 時間がない
-                    if (defStamina < 40) isoProb += 0.15; // 相手がバテている
+                    if (unifiedClutchTime) isoProb += 0.3;
+                    if (matchUpAdvantage > 15) isoProb += 0.2;
+                    if (gameState.shotClock <= 8) isoProb += 0.2; 
+                    if (defStamina < 40) isoProb += 0.15; 
+
+                    // 【課題22】ISO確率の上限を設定
+                    isoProb = Math.min(0.95, isoProb);
 
                     if (Math.random() < isoProb) {
                         isIsolation = true;
@@ -2386,21 +2399,20 @@ while (gameState.currentQ <= gameState.maxQ) {
                 let playmakingStat = bStats.playmaking || bStats.pass || 50;
                 let passDecisionProb = Math.min(0.75, (playmakingStat / 150) + 0.15); 
 
-                // 🔴【既存維持＋拡張】Clutch Isolation または 今回の判定によるアイソレーション
-                if (isIsolation || (isClutchTime && prevDiff < 0 && (bStats.dribble > 110 && bStats.three > 100))) {
+                // クラッチISOまたは直前で判定されたISO
+                if (isIsolation || (unifiedClutchTime && (typeof prevDiff !== 'undefined' && prevDiff < 0) && ((bStats.dribble||50) > 110 && (bStats.three||50) > 100))) {
                     isIsolation = true;
                     passDecisionProb = 0.0; // アイソレーション時はパスしない
                     
-                    // アイソレーション内部処理：突破判定（シュート判定とは完全に分離）
                     let breakdownRoll = Math.random() * 100;
-                    let breakdownThreshold = 40 + matchUpAdvantage; 
+                    // 【課題21】ISO突破判定の上限・下限をクリップ
+                    let breakdownThreshold = Math.max(5, Math.min(95, 40 + matchUpAdvantage)); 
                     if (breakdownRoll < breakdownThreshold) {
                         isIsoBreakdown = true;
                     }
 
-                    // アイソレーションのログ生成
                     const rLog = Math.random();
-                    if (isClutchTime) {
+                    if (unifiedClutchTime) {
                         isoText = `🔥残り時間わずか！${ballHolder.name}がアイソレーションで勝負を仕掛ける！`;
                     } else {
                         if (rLog < 0.33) isoText = `${ballHolder.name}が味方を退け、アイソレーションを仕掛ける！`;
@@ -2410,163 +2422,184 @@ while (gameState.currentQ <= gameState.maxQ) {
                     writeLog(gameState.clock, offData.team.name, `<span style="color:#e67e22; font-weight:bold;">【ISO】</span>${isoText}`, false, [ballHolder.id, defender.id]);
                 }
 
-                // 🔴【新機能8, 9】Double Team & Deny
-                // 相手エース（現在のボールホルダー）に対して、終盤ビハインド時に強制ダブルチーム
+                // 【課題26】ダブルチーム判定：ISO中は原則チーム戦術（パス展開）より個を優先するため除外
                 let isDoubleTeamed = false;
-                if (currentDefStrategy.intensity === 'max' && (bStats.three > 110 || bStats.middle > 110)) {
+                if (!isIsolation && typeof currentDefStrategy !== 'undefined' && currentDefStrategy.intensity === 'max' && ((bStats.three||50) > 110 || (bStats.middle||50) > 110)) {
                     isDoubleTeamed = true;
-                    defensePressure += 0.3; // 守備圧爆上がり
-                    passDecisionProb += 0.2; // パスせざるを得ない状況を作る
+                    defensePressure += 0.3; 
+                    passDecisionProb += 0.2; // 囲まれたためパス判断確率が上がる
                 }
 
-                            // 【課題23,24,25】状況に応じたパス基本確率の調整（時間やクラッチでの一律排除を廃止）
                 let timeFactor = 1.0;
-                if (gameState.shotClock <= 5) timeFactor = 0.5; // 極端な0.15倍を緩和、オープンなら出せる余地を残す
+                if (gameState.shotClock <= 5) timeFactor = 0.5; 
                 
-                // クラッチタイムでも、エースがダブルチームされていればパスを探す（完全禁止の撤廃）
-                let canPass = isClutchTimeBase ? (isDoubleTeamed && Math.random() < 0.7) : true;
+                let canPass = unifiedClutchTime ? (isDoubleTeamed && Math.random() < 0.7) : true;
 
-                let passCanceled = false; // パス自重フラグ
-
-                if (Math.random() < (passDecisionProb * timeFactor) && canPass) {
+                if (Math.random() < (passDecisionProb * timeFactor) && canPass && !isIsolation) {
                     
-                    // 【課題13】能力の役割分離: 判断力(IQ)と実行力(Accuracy)
                     let passIQ = bStats.playmaking || 50;
                     let passAccuracy = bStats.pass || 50;
 
                     const receiverCandidates = offData.court.filter(p => p.id !== ballHolder.id);
                     
                     if (receiverCandidates.length > 0) {
-                        // 【課題15,16,17,18,19,20,21,22】オープン度・守備配置を考慮したパス先評価
+                        // パス先評価
                         let courtEvals = receiverCandidates.map(p => {
-                            let matchDef = currentMatchups.get(p.id);
-                            // 受けてのオープン度算出 (守備能力の逆数 + ファウルトラブル加味による滑らかな補正)
-                            let defAbility = matchDef ? (matchDef.currentStats.defense || 50) : 50;
-                            let foulRisk = (matchDef && matchDef._box?.pf >= 4) ? 1.2 : 1.0;
+                            // 【課題5】 currentStatsの存在確認
+                            let pStats = p.currentStats || {};
+                            let matchDef = typeof currentMatchups !== 'undefined' ? currentMatchups.get(p.id) : null;
+                            let defAbility = matchDef ? (matchDef.currentStats?.defense || 50) : 50;
+                            
+                            // 【課題28】ファウルトラブルの影響をマイルドに調整
+                            let foulRisk = (matchDef && matchDef._box?.pf >= 4) ? 1.05 : 1.0;
                             let openness = Math.max(0.1, (100 - defAbility) / 50) * foulRisk;
                             
-                            // ダブルチーム時、ハンドラー以外の味方のオープン度が劇的に向上
-                            if (isDoubleTeamed) openness *= 1.8;
+                            // 【課題3】ダブルチーム補正の重複を整理（オープン度倍率を低下）
+                            if (isDoubleTeamed) openness *= 1.3;
 
-                            // キックアウト判定（ハンドラーの能力だけでなく、受け手のオープン度を重視）
                             let handlerDriveAdv = ((bStats.speed || 50) > 80 && (bStats.dribble || 50) > 80);
-                            let isKickOut = (handlerDriveAdv && openness > 1.0 && p.currentStats.three > 80) ? 1.5 : 1.0; 
+                            let isKickOut = (handlerDriveAdv && openness > 1.0 && (pStats.three || 50) > 80) ? 1.5 : 1.0; 
                             
-                            // オフボールカット判定（相手インサイドのブロック能力が低い時に有効）
-                            let oppCenterDef = defData.court.find(dp => dp.pos === "C")?.currentStats.blocks || 50;
-                            let isCut = (!handlerDriveAdv && p.currentStats.speed > 80 && p.currentStats.layup > 80 && oppCenterDef < 70) ? 1.4 : 1.0; 
+                            let oppCenterDef = defData.court.find(dp => dp.pos === "C")?.currentStats?.blocks || 50;
+                            let isCut = (!handlerDriveAdv && (pStats.speed || 50) > 80 && (pStats.layup || 50) > 80 && oppCenterDef < 70) ? 1.4 : 1.0; 
 
-                            // 基礎評価(evalPlayer)にオープン度と戦術合致度を掛け合わせる
-                            let evalScore = Math.max(1, evalPlayer(p)) * openness * isKickOut * isCut;
+                            // 【課題29】簡易的なポジション別のパス出やすさ
+                            let posFactor = (p.pos === "PG" || p.pos === "SG") ? 1.1 : 1.0;
+
+                            let evalScore = Math.max(1, typeof evalPlayer === 'function' ? evalPlayer(p) : 1) * openness * isKickOut * isCut * posFactor;
                             
-                            // 【課題26】速攻時は前線を走る選手(スピード重視)を高く評価
+                            // 【課題30】速攻時のスピード評価をマイルドに
                             if (gameState.isFastBreak) {
-                                evalScore *= (p.currentStats.speed / 50);
+                                evalScore *= (0.5 + ((pStats.speed || 50) / 100));
                             }
-                            return evalScore;
+                            // 【課題4】0にならないよう保証
+                            return Math.max(0.1, evalScore); 
                         });
 
-                        // 評価に基づくルーレット選択
                         let totalEval = courtEvals.reduce((a, b) => a + b, 0);
+                        if (totalEval <= 0) totalEval = 1; // ゼロ割防止
+                        
                         let r = Math.random(); 
                         let cum = 0; 
                         let receiver = receiverCandidates[0];
-                        let receiverDef = currentMatchups.get(receiver.id);
+                        let receiverDef = typeof currentMatchups !== 'undefined' ? currentMatchups.get(receiver.id) : null;
 
                         for (let i = 0; i < receiverCandidates.length; i++) {
                             cum += (courtEvals[i] / totalEval);
                             if (r < cum) { 
                                 receiver = receiverCandidates[i]; 
-                                receiverDef = currentMatchups.get(receiver.id);
+                                receiverDef = typeof currentMatchups !== 'undefined' ? currentMatchups.get(receiver.id) : null;
                                 break; 
                             }
                         }
 
-                        // 【課題10,21】リスクの分離：ハンドラーのプレッシャー(元) と コース/受け手のプレッシャー(先)
-                        let handlerPressure = isDoubleTeamed ? 0.4 : (defensePressure > 0.5 ? 0.15 : 0);
-                        let targetPressure = receiverDef ? (receiverDef.currentStats.steal || 50) / 200 : 0.25; 
-                        let passRisk = handlerPressure + targetPressure;
+                        // 【課題10,14】リスクの計算と上限設定
+                        let handlerPressure = isDoubleTeamed ? 0.3 : (defensePressure > 0.5 ? 0.15 : 0);
+                        let targetPressure = receiverDef ? (receiverDef.currentStats?.steal || 50) / 200 : 0.25; 
+                        let passRisk = Math.min(0.85, handlerPressure + targetPressure);
 
-                        // 【課題1,2,4】判断ミスの確率をIQに基づいて滑らかに計算 (シグモイド的アプローチ)
-                        // IQが高いほど、高いリスクを正確に認識して自重する
-                        let iqFactor = (100 - passIQ) / 100; // IQ100なら0、IQ50なら0.5
-                        let willForcePass = Math.random() < (passRisk * iqFactor); // リスクが高い＆IQが低いほど強行しやすい
+                        // 【課題1, 6】IQと判断ミスの分離
+                        let iqFactor = Math.max(0.1, (100 - passIQ) / 100); 
+                        let badDecisionProb = passRisk * iqFactor * 0.5;
+                        let willForcePass = Math.random() < badDecisionProb; 
 
-                        // 【課題8】判断フローの統合（二重乱数の排除）
-                        if (passRisk > 0.35 && !willForcePass) {
-                            // 【課題6,27】賢い判断：危険なのでパスを自重し、ブロックを抜けてシュート/ドライブへ合流
+                        // 判断フロー：リスクが高い場合にIQに任せて自重するかどうか
+                        if (passRisk > 0.40 && !willForcePass) {
                             passCanceled = true;
                             if (typeof isVisual !== 'undefined' && isVisual) {
                                 logs.push(`<div class="log-entry dev-log">🧠 [AI判断] ${ballHolder.name}はパスコースが塞がれていると判断。自ら仕掛ける！</div>`);
                             }
                         } else {
-                            // パスを実行する（強行した場合も含む）
-                            let isBadDecision = (passRisk > 0.35 && willForcePass); // 危険と分からず/無理に強行したフラグ
+                            let isBadDecision = (passRisk > 0.40 && willForcePass); 
 
-                            // 【課題9,11,12,14】実行力の判定（下限設定、疲労の線形化、能力幅の拡大）
-                            let passFatigue = (ballHolder._stamina !== undefined) ? ((100 - Math.max(0, ballHolder._stamina)) / 100) * 0.1 : 0;
-                            // 精度による基礎成功率 (50で75%, 100で95%) に、リスクと疲労を減算
-                            let passSuccessProb = Math.max(0.05, Math.min(0.99, 0.55 + (passAccuracy / 250)) - passRisk - passFatigue);
+                            // 【課題9,11,12】通常パス成功率の実測調整、疲労ペナルティの整理
+                            let passFatigue = (ballHolder._stamina !== undefined) ? ((100 - Math.max(0, ballHolder._stamina)) / 100) * 0.05 : 0;
+                            // 基礎成功率を上げ、リスクによる減算を調整
+                            let passSuccessProb = Math.min(0.99, 0.65 + (passAccuracy / 200) - (passRisk * 0.8) - passFatigue);
+                            passSuccessProb = Math.max(0.15, passSuccessProb); // 最低成功率15%を保証
                             
-                            let isExecutionError = false;
-                            
-                            // 成功判定（1回の乱数で決着）
-                            if (Math.random() > passSuccessProb) {
-                                isExecutionError = true;
-                            }
+                            let isExecutionError = (Math.random() > passSuccessProb);
 
                             if (!isExecutionError) {
                                 // ---------------- パス成功処理 ----------------
                                 actualPasser = ballHolder;
                                 shooter = receiver; 
                                 isAssist = true; 
-                                // 【課題32】バフ上限の統一 (最大0.12に制限)
                                 if (passAccuracy >= 80) playmakerBuff = Math.min(0.12, ((passAccuracy - 80) / 70) * 0.08); 
                                 
-                                // 【課題28,29,30,31】エクストラパスの完全な再構築
-                                let extraPassProb = (shooter.currentStats.playmaking || 50) / 250;
-                                if (Math.random() < extraPassProb && timeSpent < 20 && !gameState.isFastBreak) {
+                                // 【課題28〜31, 1-①, 2, 3, 4】エクストラパスの完全な再構築
+                                let sStats = shooter.currentStats || {};
+                                let extraPassProb = (sStats.playmaking || 50) / 300; 
+                                let safeTimeSpent = typeof timeSpent !== 'undefined' ? timeSpent : 0;
+                                
+                                if (Math.random() < extraPassProb && safeTimeSpent < 20 && !gameState.isFastBreak) {
                                     let extraCandidates = receiverCandidates.filter(p => p.id !== shooter.id);
                                     if (extraCandidates.length > 0) {
-                                        // エクストラパス先の評価（ランダム排除）
-                                        let extraEvals = extraCandidates.map(p => Math.max(1, evalPlayer(p)) * (100 - (currentMatchups.get(p.id)?.currentStats.defense || 50)) / 50);
+                                        let extraEvals = extraCandidates.map(p => {
+                                            let matchD = typeof currentMatchups !== 'undefined' ? currentMatchups.get(p.id) : null;
+                                            let defD = matchD ? (matchD.currentStats?.defense || 50) : 50;
+                                            return Math.max(0.1, Math.max(1, typeof evalPlayer === 'function' ? evalPlayer(p) : 1) * (100 - defD) / 50);
+                                        });
                                         let extraTotal = extraEvals.reduce((a, b) => a + b, 0);
+                                        if (extraTotal <= 0) extraTotal = 1;
+                                        
                                         let extraR = Math.random(), extraCum = 0, extraReceiver = extraCandidates[0];
+                                        let extraReceiverDef = null;
                                         for(let i=0; i<extraCandidates.length; i++){
                                             extraCum += (extraEvals[i] / extraTotal);
-                                            if(extraR < extraCum) { extraReceiver = extraCandidates[i]; break; }
+                                            if(extraR < extraCum) { 
+                                                extraReceiver = extraCandidates[i]; 
+                                                extraReceiverDef = typeof currentMatchups !== 'undefined' ? currentMatchups.get(extraReceiver.id) : null;
+                                                break; 
+                                            }
                                         }
 
-                                        // エクストラパスの成功判定
-                                        let extraSuccessProb = Math.max(0.1, 0.70 + ((shooter.currentStats.pass||50)/300) - targetPressure);
-                                        if (Math.random() < extraSuccessProb) {
-                                            // エクストラパス成功
-                                            actualPasser = shooter; // パス元を中継者に更新
-                                            shooter = extraReceiver;
-                                            timeSpent += 2; // 時間消費を妥当な2秒へ
-                                            actualSpent = consumeTime(2); 
-                                            playmakerBuff = Math.min(0.12, playmakerBuff + 0.04); 
-                                            assistText = `【エクストラパス！】${ballHolder.name}から${actualPasser.name}、さらに${shooter.name}へ回す！見事なボールムーブ！ ➔ `;
+                                        let extraTargetPressure = extraReceiverDef ? (extraReceiverDef.currentStats?.steal || 50) / 200 : 0.25;
+                                        
+                                        // 【課題8】エクストラパスにも判断キャンセル(自重)を設ける
+                                        let extraIqFactor = Math.max(0.1, (100 - (sStats.playmaking || 50)) / 100);
+                                        let extraBadDecision = (extraTargetPressure * extraIqFactor) > 0.2;
+
+                                        if (extraTargetPressure > 0.35 && !extraBadDecision) {
+                                            if (typeof isVisual !== 'undefined' && isVisual) {
+                                                logs.push(`<div class="log-entry dev-log">🧠 [AI判断] ${shooter.name}は追加パスを自重し、シュート態勢へ！</div>`);
+                                            }
                                         } else {
-                                            // エクストラパス失敗処理
-                                            actualPasser = shooter;
-                                            if (actualPasser?._box) actualPasser._box.to++;
-                                            writeLog(gameState.clock, offData.team.name, `【パス連携ミス】${actualPasser.name}がさらにパスを回そうとするが、連携が合わずターンオーバー！[DATA: EXTRA_PASS_MISS]`, false, [actualPasser.id]);
-                                            switchPossession(24, false);
-                                            continue;
+                                            // 追加パス実行
+                                            let extraSuccessProb = Math.max(0.15, 0.70 + ((sStats.pass||50)/300) - extraTargetPressure);
+                                            if (Math.random() < extraSuccessProb) {
+                                                actualPasser = shooter; 
+                                                shooter = extraReceiver;
+                                                
+                                                // 【課題4-①】 時間消費の正しい反映
+                                                if (typeof timeSpent !== 'undefined') timeSpent += 2; 
+                                                if (typeof consumeTime === 'function') {
+                                                    let tempActual = consumeTime(2);
+                                                    try { actualSpent = tempActual; } catch(e) { /* 未定義なら無視 */ }
+                                                }
+                                                playmakerBuff = Math.min(0.12, playmakerBuff + 0.04); 
+                                                assistText = `【エクストラパス！】${ballHolder.name}から${actualPasser.name}、さらに${shooter.name}へ回す！見事なボールムーブ！ ➔ `;
+                                            } else {
+                                                actualPasser = shooter;
+                                                isAssist = false; // 失敗時はアシスト記録を除外
+                                                if (actualPasser?._box) actualPasser._box.to++;
+                                                writeLog(gameState.clock, offData.team.name, `【パス連携ミス】${actualPasser.name}がさらにパスを回そうとするが、連携が合わずターンオーバー！ [DATA: EXTRA_PASS_MISS]`, false, [actualPasser.id]);
+                                                switchPossession(24, false);
+                                                continue;
+                                            }
                                         }
                                     }
-                                                                } else {
-                                    // --- 修正箇所: ここで受け手(shooter)を元に状況を再判定し、エラーを回避 ---
+                                } 
+                                
+                                // エクストラパスが発生しなかった場合のテキスト（修正済み版）
+                                if (actualPasser.id === ballHolder.id) {
                                     let handlerDriveAdvFinal = ((bStats.speed || 50) > 80 && (bStats.dribble || 50) > 80);
-                                    let oppCenterDefFinal = defData.court.find(dp => dp.pos === "C")?.currentStats.blocks || 50;
+                                    let oppCenterDefFinal = defData.court.find(dp => dp.pos === "C")?.currentStats?.blocks || 50;
                                     
-                                    let isKickOutSituation = handlerDriveAdvFinal && (shooter.currentStats.three > 80);
-                                    let isCutSituation = !handlerDriveAdvFinal && (shooter.currentStats.speed > 80) && (shooter.currentStats.layup > 80) && (oppCenterDefFinal < 70);
+                                    let isKickOutSituation = handlerDriveAdvFinal && ((sStats.three || 50) > 80);
+                                    let isCutSituation = !handlerDriveAdvFinal && ((sStats.speed || 50) > 80) && ((sStats.layup || 50) > 80) && (oppCenterDefFinal < 70);
                                     
-                                    // 提案いただいたログ拡充案を反映（ランダムでバリエーションを持たせる）
                                     const rLog = Math.random();
-                                    
                                     if (isDoubleTeamed) {
                                         if (rLog < 0.5) assistText = `【ダブルチーム回避】${ballHolder.name}が囲まれながらも冷静に空いた${shooter.name}へパス！ ➔ `;
                                         else assistText = `【プレッシャー回避】${ballHolder.name}が厳しいマークを潜り抜け、${shooter.name}へパスを展開！ ➔ `;
@@ -2577,7 +2610,6 @@ while (gameState.currentQ <= gameState.maxQ) {
                                         if (rLog < 0.5) assistText = `【鮮やかなカット】${shooter.name}がリング下へ飛び込む！${ballHolder.name}からドンピシャのパス！ ➔ `;
                                         else assistText = `【ハイロー連携】インサイドに切れ込んだ${shooter.name}へ、${ballHolder.name}が合わせる！ ➔ `;
                                     } else {
-                                        // 通常のパス展開にもバリエーションを追加
                                         if (rLog < 0.3) assistText = `【視野の広さ】${ballHolder.name}がコート全体を見渡し、フリーの${shooter.name}へ展開！ ➔ `;
                                         else if (rLog < 0.6) assistText = `【ボールムーブメント】素早いパス回し！${ballHolder.name}から${shooter.name}へ！ ➔ `;
                                         else assistText = `${ballHolder.name}から${shooter.name}へのパスが通る！ ➔ `;
@@ -2587,33 +2619,29 @@ while (gameState.currentQ <= gameState.maxQ) {
                             } else {
                                 // ---------------- パス失敗(TO)処理 ----------------
                                 actualPasser = ballHolder;
-                                if (actualPasser?._box) actualPasser._box.to++; // 既存の加算ロジックを踏襲
+                                isAssist = false;
+                                if (actualPasser?._box) actualPasser._box.to++; 
                                 
                                 let toReasonText = "";
-                                // 【課題3,5,34,35】TO原因の厳密な判定とデータタグ化
                                 if (isBadDecision) {
-                                    // 判断ミスによるTO：強引なパスが相手に読まれる
-                                    toReasonText = `【判断ミス】${actualPasser.name}が狭いコースへ強引なパス！相手の${receiverDef ? receiverDef.name : 'ディフェンダー'}に完全に読まれてスティールされる！ [DATA: BAD_DECISION]`;
+                                    toReasonText = `【判断ミス】${actualPasser.name}が狭いコースへ強引なパス！相手の${receiverDef ? receiverDef.name : 'ディフェンダー'}に完全に読まれてスティールされる！ [DATA: NORMAL_PASS_MISS]`;
+                                    if (receiverDef && receiverDef._box) receiverDef._box.stl++; 
                                 } else if (targetPressure > 0.35 && Math.random() < 0.5) {
-                                    // スティール：パスの判断は悪くなかったが、相手の好守備に阻まれる
-                                    toReasonText = `【好守備】${actualPasser.name}のパスコースにディフェンダーが飛び込み、ボールを奪い取る！ [DATA: STEAL_DEF]`;
+                                    toReasonText = `【好守備】${actualPasser.name}のパスコースにディフェンダーが飛び込み、ボールを奪い取る！ [DATA: NORMAL_PASS_MISS]`;
+                                    if (receiverDef && receiverDef._box) receiverDef._box.stl++; 
                                 } else if (handlerPressure > 0.3) {
-                                    // プレッシャーによるTO
-                                    toReasonText = `【プレッシャー】強烈な守備圧に耐えきれず、${actualPasser.name}のパスが乱れてコート外へ！ [DATA: PRESSURE_TO]`;
+                                    toReasonText = `【プレッシャー】強烈な守備圧に耐えきれず、${actualPasser.name}のパスが乱れてコート外へ！ [DATA: NORMAL_PASS_MISS]`;
                                 } else {
-                                    // 純粋な実行ミス（コントロールミス）
-                                    toReasonText = `【パスミス】${actualPasser.name}のパスが味方の意図と合わず、そのままターンオーバー。 [DATA: EXECUTION_ERROR]`;
+                                    toReasonText = `【パスミス】${actualPasser.name}のパスが味方の意図と合わず、そのままターンオーバー。 [DATA: NORMAL_PASS_MISS]`;
                                 }
 
                                 writeLog(gameState.clock, offData.team.name, toReasonText, false, [actualPasser.id]);
-                                // 【課題36】既存のポゼッション切り替えとcontinueを踏襲
                                 switchPossession(24, false);
                                 continue;
                             }
                         }
                     }
                 }
-
 
               
                 // 【改良】シューターのステータス取得を整理し、ネスト深い参照エラーを防止
