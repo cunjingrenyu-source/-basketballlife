@@ -1742,65 +1742,125 @@ const updateMomentum = (scoringSide, pts) => {
         gameState.homeRun = 0;
     }
 };
-
-// =========================================================
-// 🔴【課題3-①】試合前チームアシスト相殺補正（8段階テーブル）
-// 安全性を高め、対象が存在しない場合のエラーを完全に防ぐようアプデ
+        // =========================================================
+// 🔴【課題3-①】試合前チーム環境補正（アシスト・パス用）
 // =========================================================
 const calculateTeamAssistLevel = (team) => {
-    if (!team || !team.roster || team.roster.length === 0) return 5; // デフォルトはLv5
-    let totalAssist = team.roster.reduce((sum, p) => sum + ((p.pass || 50) + (p.playmaking || 50)) / 2, 0);
-    let avgAssist = totalAssist / team.roster.length;
+    if (!team || !team.roster || team.roster.length === 0) return 1.0; 
+
+    // 【課題8】欠損値とゼロを厳密に区別（??演算子を使用）
+    const getAttr = (p, attr) => p[attr] ?? 50;
+
+    // 【課題4, 5】スタメン格を重視するため、パス技術+判断力の合計値でソート
+    let sortedRoster = [...team.roster].sort((a, b) => 
+        ((getAttr(b, 'pass') + getAttr(b, 'playmaking'))) - ((getAttr(a, 'pass') + getAttr(a, 'playmaking')))
+    );
+
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
+    let topPlaymakerScore = 0; 
+
+    sortedRoster.forEach((p, index) => {
+        // 【課題3】パス（技術）とプレーメイク（判断力）を分離して重み付け
+        let passVal = getAttr(p, 'pass');
+        let iqVal = getAttr(p, 'playmaking');
+        let combinedVal = (passVal * 0.4) + (iqVal * 0.6); 
+
+        // 【課題4, 5】出場時間と役割の偏りを反映。上位5人を重く、控えを軽く評価
+        let weight = index < 5 ? 1.0 : (index < 8 ? 0.3 : 0.05); 
+        
+        if (index === 0) topPlaymakerScore = combinedVal;
+
+        totalWeightedScore += combinedVal * weight;
+        totalWeight += weight;
+    });
+
+    let weightedAvg = totalWeight > 0 ? (totalWeightedScore / totalWeight) : 50;
+
+    // 【課題6】チーム全体の平均(70%)と、チーム内最強の司令塔の能力(30%)をミックス
+    let teamEnvironmentScore = (weightedAvg * 0.7) + (topPlaymakerScore * 0.3);
+
+    // 【課題1, 10】8段階テーブルを廃止。段階的ではなく滑らかな連続的係数（0.8〜1.2前後）を算出
+    // 基礎能力を破壊する底上げではなく、後でパス成功率に掛ける「環境バフ/デバフ係数」として返す
+    let continuousMultiplier = 0.8 + ((teamEnvironmentScore / 100) * 0.5); 
     
-    if (avgAssist < 40) return 1;
-    if (avgAssist < 50) return 2;
-    if (avgAssist < 60) return 3;
-    if (avgAssist < 65) return 4;
-    if (avgAssist < 75) return 5;
-    if (avgAssist < 85) return 6;
-    if (avgAssist < 95) return 7;
-    return 8;
+    // 極端な数値を防ぐ安全クリップ
+    return Math.max(0.6, Math.min(1.4, continuousMultiplier));
 };
 
-// チームが存在するかどうかを安全に確認してレベルを算出
-const homeAssistLevel = (typeof hTeam !== 'undefined' && hTeam) ? calculateTeamAssistLevel(hTeam) : 5;
-const awayAssistLevel = (typeof aTeam !== 'undefined' && aTeam) ? calculateTeamAssistLevel(aTeam) : 5;
+const homeAssistLevel = (typeof hTeam !== 'undefined' && hTeam) ? calculateTeamAssistLevel(hTeam) : 1.0;
+const awayAssistLevel = (typeof aTeam !== 'undefined' && aTeam) ? calculateTeamAssistLevel(aTeam) : 1.0;
 
 // =========================================================
-// 🔴【課題1-②】疲労ペナルティ補正付きステータス取得関数
+// 🔴【課題1-②】疲労ペナルティ補正付きステータス取得関数（3層構造対応）
 // =========================================================
 const getEffectiveStatsWithFatigue = (player) => {
     if (!player) return {};
     
-    // 初期のcurrentStatsが存在しない場合は生成（既存ロジック互換）
-    let baseStats = player.currentStats || (typeof getEffectiveStats === 'function' ? getEffectiveStats(player) : player);
+    // 【課題11, 17】二重適用とデータ汚染を防止。
+    // まず「素の能力（baseStats）」を探し、なければ次点を使用。絶対にcurrentStatsを再参照して劣化させない。
+    let base = player.baseStats || (typeof getEffectiveStats === 'function' ? getEffectiveStats(player) : (player.currentStats || player));
+    
     let stamina = player._stamina !== undefined ? player._stamina : 100;
     
-    let fatigueMulti = 1.0;
-    if (stamina <= 30) {
-        fatigueMulti = 0.75; // スタミナ30%以下 ➔ 全能力値 × 0.75（パス精度大幅低下・TO率急増）
-    } else if (stamina <= 50) {
-        fatigueMulti = 0.90; // スタミナ50%以下 ➔ 全能力値 × 0.9（シュート精度・反応速度ダウン）
-    }
+    // 【課題13, 14】段階的な閾値（30%, 50%）を廃止。滑らかな二次関数による疲労曲線（急変を防止）
+    // スタミナ100で0（ダメージなし）、スタミナ0で1.0（最大ダメージ）となる係数
+    let fatigueSeverity = Math.pow((100 - stamina) / 100, 2); 
     
-    let currentFatigueStats = {};
-    for (let key in baseStats) {
-        if (typeof baseStats[key] === 'number') {
-            currentFatigueStats[key] = baseStats[key] * fatigueMulti;
+    let effectiveStats = {};
+    for (let key in base) {
+        if (typeof base[key] === 'number') {
+            // 【課題12】能力ごとに疲労の影響度（デバフ率）を変える
+            let impactFactor = 0.20; // 基本は最大20%減
+            
+            if (key === 'speed' || key === 'stamina' || key === 'physical' || key === 'dribble') {
+                impactFactor = 0.35; // 身体能力・足を使うプレーは最大35%減
+            } else if (key === 'three' || key === 'middle' || key === 'freeThrow') {
+                impactFactor = 0.25; // シュート系は最大25%減
+            } else if (key === 'pass' || key === 'playmaking' || key === 'vision') {
+                impactFactor = 0.10; // パス技術や判断力(脳)は最大10%減に留める
+            } else if (key === 'defense' || key === 'steal' || key === 'blocks') {
+                impactFactor = 0.30; // 守備力は最大30%減（足が動かなくなるため）
+            }
+
+            // 素の能力 × (1.0 - (疲労深刻度 × 能力ごとの影響度))
+            let currentMultiplier = 1.0 - (fatigueSeverity * impactFactor);
+            effectiveStats[key] = Math.max(0, base[key] * currentMultiplier); 
         } else {
-            currentFatigueStats[key] = baseStats[key];
+            effectiveStats[key] = base[key]; // 数値以外（名前やID）はそのままコピー
         }
     }
-    return currentFatigueStats;
+    
+    // 疲労計算済みフラグ（他の関数で二重減算を防止するため）
+    effectiveStats._fatigueApplied = true;
+    
+    return effectiveStats;
 };
 
-// 試合開始前に全選手へ「実質ステータス(currentStats)」を付与
+// 試合開始前処理：能力値の【3層構造化】
+// 【課題11, 16, 17】currentStats を上書きして元データを破壊（汚染）するのを防ぐ
 if (typeof hTeam !== 'undefined' && hTeam && hTeam.roster) {
-    hTeam.roster.forEach(p => p.currentStats = typeof getEffectiveStats === 'function' ? getEffectiveStats(p) : p);
+    hTeam.roster.forEach(p => {
+        // 選手本来の「素の能力」を baseStats に完全分離してバックアップ保存
+        if (!p.baseStats) {
+            let initialStats = typeof getEffectiveStats === 'function' ? getEffectiveStats(p) : (p.currentStats || p);
+            p.baseStats = JSON.parse(JSON.stringify(initialStats));
+        }
+        // 既存コードが落ちないよう初期値としてのみ代入。以降の試合中は更新せず、
+        // 必要な時に都度 getEffectiveStatsWithFatigue(p) を呼ぶ運用とする。
+        p.currentStats = JSON.parse(JSON.stringify(p.baseStats)); 
+    });
 }
 if (typeof aTeam !== 'undefined' && aTeam && aTeam.roster) {
-    aTeam.roster.forEach(p => p.currentStats = typeof getEffectiveStats === 'function' ? getEffectiveStats(p) : p);
+    aTeam.roster.forEach(p => {
+        if (!p.baseStats) {
+            let initialStats = typeof getEffectiveStats === 'function' ? getEffectiveStats(p) : (p.currentStats || p);
+            p.baseStats = JSON.parse(JSON.stringify(initialStats));
+        }
+        p.currentStats = JSON.parse(JSON.stringify(p.baseStats)); 
+    });
 }
+
 
 // 🔴【第1章】攻守交代・時計・速攻フラグを一元管理する絶対関数（gameState連動）
 // この関数を通さない限り攻守は交代しない。これにより不整合を100%防ぐ。
