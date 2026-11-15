@@ -1891,6 +1891,12 @@ const consumeTime = (seconds) => {
     let actualSpent = Math.min(gameState.clock, seconds);
     gameState.clock -= actualSpent;
     gameState.shotClock -= actualSpent;
+    
+    // 【課題修復】フロントコート到達前(バックコート)なら8秒カウントを加算
+    if (!gameState.isFastBreak && !gameState.isFrontCourt) {
+        gameState.eightSecCount += actualSpent;
+    }
+    
     return actualSpent;
 };
 
