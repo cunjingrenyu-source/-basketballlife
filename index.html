@@ -3465,10 +3465,10 @@ else {
                 `${shooter.name}がフリーで放ったミドルシュートだったが、惜しくも外れる。`,
                 `${shooter.name}のプルアップジャンパーはリムの手前を叩く！`
             ];
-            missText = midLogs[Math.floor(rMiss * midLogs.length)];
+                    missText = midLogs[Math.floor(rMiss * midLogs.length)];
         }
 
-        let distBadge = `<span style="font-size:14px; font-weight:bold; color:#2c3e50;">【${shotDistance}ft】</span>`;
+        let distBadge = `<span style="font-size:14px; font-weight:bold; color:#ffffff;">【${shotDistance}ft】</span>`;
         writeLog(gameState.clock, offData.team.name, `${distBadge} ${missText}`, false, [shooter.id]);
     }
 
