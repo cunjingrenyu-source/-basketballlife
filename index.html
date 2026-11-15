@@ -2443,11 +2443,11 @@ while (gameState.currentQ <= gameState.maxQ) {
 
                 // 【課題27】クラッチタイムフラグの二重管理を統一
                 let unifiedClutchTime = typeof isClutchTime !== 'undefined' ? isClutchTime : (typeof isClutchTimeBase !== 'undefined' ? isClutchTimeBase : false);
-
                 if (isoScore > 85 && isAce && !gameState.isFastBreak) {
-                    let isoProb = 0.15; // 基礎確率
-                    if (unifiedClutchTime) isoProb += 0.3;
-                    if (matchUpAdvantage > 15) isoProb += 0.2;
+                    // 【課題7】アシスト増＆エース無双対策：ISOに走る確率を低下
+                    let isoProb = 0.08; // 基礎確率低下(0.15 -> 0.08)
+                    if (unifiedClutchTime) isoProb += 0.2; // (0.3 -> 0.2)
+                    if (matchUpAdvantage > 15) isoProb += 0.15;
                     if (gameState.shotClock <= 8) isoProb += 0.2; 
                     if (defStamina < 40) isoProb += 0.15; 
 
@@ -2460,7 +2460,9 @@ while (gameState.currentQ <= gameState.maxQ) {
                 }
 
                 let playmakingStat = bStats.playmaking || bStats.pass || 50;
-                let passDecisionProb = Math.min(0.75, (playmakingStat / 150) + 0.15); 
+                // 【課題7】全員のアシストを増やすため、パス判断確率を底上げ＆上限アップ
+                let passDecisionProb = Math.min(0.85, (playmakingStat / 150) + 0.25); 
+
 
                 // クラッチISOまたは直前で判定されたISO
                 if (isIsolation || (unifiedClutchTime && (typeof prevDiff !== 'undefined' && prevDiff < 0) && ((bStats.dribble||50) > 110 && (bStats.three||50) > 100))) {
