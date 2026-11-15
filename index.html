@@ -1891,12 +1891,6 @@ const consumeTime = (seconds) => {
     let actualSpent = Math.min(gameState.clock, seconds);
     gameState.clock -= actualSpent;
     gameState.shotClock -= actualSpent;
-    
-    // 【課題修復】フロントコート到達前(バックコート)なら8秒カウントを加算
-    if (!gameState.isFastBreak && !gameState.isFrontCourt) {
-        gameState.eightSecCount += actualSpent;
-    }
-    
     return actualSpent;
 };
 
@@ -2341,61 +2335,58 @@ while (gameState.currentQ <= gameState.maxQ) {
                 let defPressureBonus = (defender._condStr === "好調" || defender._condStr === "絶好調") ? 0.05 : 0;
                 let defensePressure = (((defender.currentStats.defense || 50) * 0.35) / 150) + defPressureBonus; 
 
-                        // =========================================================
-                // 🔴【修正・強化】バイオレーション判定の厳密化（強制ランダムを排除）
                 // =========================================================
-                // 1. 24秒バイオレーション
+                // 🔴【修正・強化】バイオレーション判定の厳密化
+                // =========================================================
+                // 1. 24秒バイオレーション（ショットクロックが0以下に到達した場合）
                 if (gameState.shotClock <= 0 && gameState.clock > 0 && !gameState.isFastBreak) {
-                    writeLog(gameState.clock, defData.team.name, `⏰【24秒バイオレーション】ショットクロックバイオレーション！${defender.name}ら守備陣の息詰まるプレッシャーが24秒を守り切った！ [DATA: 24SEC_VIOLATION]`, false, [defender.id]);
-                    if(gameState.devStats) gameState.devStats[offSideStr].violations24s++;
+                    writeLog(gameState.clock, defData.team.name, `⏰ショットクロックバイオレーション！${defender.name}ら守備陣の息詰まるプレッシャーが24秒を守り切った！`, false, [defender.id]);
                     switchPossession(24, false);
                     continue;
                 }
 
-                // 2. 8秒ルール（バックコートバイオレーション）の完全タイマー連動判定
-                if (!gameState.isFastBreak && !gameState.isFrontCourt) {
-                    // consumeTimeで正確に加算されたeightSecCountを評価
-                    if (gameState.eightSecCount > 8) {
-                        writeLog(gameState.clock, defData.team.name, `🛡️【8秒バイオレーション】${defender.name}ら守備陣の厳しいプレス！${ballHolder.name}は8秒以内にフロントコートへ進めなかった！ [DATA: 8SEC_VIOLATION]`, false, [ballHolder.id, defender.id]);
+                // 2. 8秒ルール（バックコートバイオレーション）の論理的判定
+                // 単なるランダムではなく「8秒以上経過(ショットクロック16以下) ＋ ディフェンス圧力がハンドラーの能力を凌駕」した場合に発生
+                if (!gameState.isFastBreak && actualSpent >= 8 && gameState.shotClock <= 16) {
+                    let dribbleSkill = ballHolder.currentStats.dribble || 50;
+                    // 守備圧力が高い、かつランダム要素（プレッシャーによるミス）
+                    if (Math.random() < (0.02 + defensePressure) - (dribbleSkill / 2500)) {
+                        writeLog(gameState.clock, defData.team.name, `🛡️【8秒バイオレーション】${defender.name}の激しいフルコートプレス！相手は8秒以内にハーフコートを越えられなかった！`, false, [ballHolder.id, defender.id]);
                         if(ballHolder._box) ballHolder._box.to++;
-                        if(gameState.devStats) gameState.devStats[offSideStr].violations8s++;
                         switchPossession(24, false);
                         continue;
-                    } else {
-                        // 8秒を超えていなければ、無事にハーフコートを越えたとみなす
-                        gameState.isFrontCourt = true;
                     }
                 }
 
 
 
-
-                                                  // --- A. ハンドラーのターンオーバー & スティール判定 ---
-                // 【課題修復】NBA水準（1試合14〜15回）への収束。毎プレーの能力差分による自然発生に切り替え
+                                  
+        　　　　                      // --- A. ハンドラーのターンオーバー & スティール判定 ---
+                // 【課題1-②】疲労ペナルティ付きのステータスを取得（既存の安全確認を維持）
                 const bStats = typeof getEffectiveStatsWithFatigue === 'function' && ballHolder ? getEffectiveStatsWithFatigue(ballHolder) : (ballHolder?.currentStats || {});
                 const dStats = typeof getEffectiveStatsWithFatigue === 'function' && defender ? getEffectiveStatsWithFatigue(defender) : (defender?.currentStats || {});
                 
                 let handlerStat = ((bStats.dribble || 50) * 1.2) + ((bStats.pass || 50) * 0.8) + ((bStats.speed || 50) * 0.5);
                 
-                // 【能力差分での発生】不自然なランダムを排除し、スティール能力で算出
-                let stlChance = Math.min(0.85, ((dStats.steal || 50) / 200) + (defensePressure * 0.2));
+                // 【課題6】stlChanceの上限を95%に設定
+                let stlChance = Math.min(0.95, ((dStats.defense || 50) / 150) + (defensePressure * 0.2));
                 let isStaminaEmpty = ((ballHolder?._stamina ?? 100) < 30);
                 let isDoubleTeamFlag = (typeof currentDefStrategy !== 'undefined' && currentDefStrategy.intensity === 'max' && ((bStats.three || 50) > 110 || (bStats.middle || 50) > 110));
                 
                 let toRisk = 0;
-                // 1試合全体で回数が収束するよう、ポゼッションあたりのベースリスクを設定（速攻時はやや高め）
-                let baseToRisk = gameState.isFastBreak ? 0.06 : 0.035; 
-                
-                // ハンドリング能力 vs オンボールディフェンス の差分で変動させる
-                let dribbleDiff = ((dStats.defense || 50) - (bStats.dribble || 50)) / 1000; 
-                toRisk = Math.max(0.005, baseToRisk + dribbleDiff + (defensePressure * 0.05));
-
-                if (isDoubleTeamFlag) toRisk += 0.04;
-                if (isStaminaEmpty) toRisk += 0.03;
-
-                // 確率の暴走を防ぐ安全クリップ
-                toRisk = Math.min(0.25, toRisk);
-
+                // 明確なTO発生フラグ：スティール能力が高い、ダブルチーム、スタミナ切れ、速攻の場合のみリスクを加算
+                if (stlChance > 0.4 || isDoubleTeamFlag || isStaminaEmpty || gameState.isFastBreak) {
+                    // 【課題13, 21】ファストブレイクのTOリスクもハンドラー能力と守備力で変動させる
+                    let fastBreakRisk = Math.max(0.02, 0.10 - ((bStats.dribble || 50) / 2000) + (stlChance * 0.1));
+                    let baseToRisk = gameState.isFastBreak ? fastBreakRisk : (0.15 - ((handlerStat * (typeof mentalBuff !== 'undefined' ? mentalBuff : 1)) / 1500));
+                    
+                    // リスクの上限・下限を安全にクリップ
+                    toRisk = Math.max(0.01, Math.min(0.95, baseToRisk + (defensePressure * 0.15)));
+                    
+                    // bStats側で反映済みなら二重計上を避けるが、念のための軽減ペナルティとして維持
+                    if (!bStats._fatigueApplied && (ballHolder?._stamina ?? 100) < 40) toRisk += 0.03;
+                    if (!bStats._condApplied && ballHolder?._condStr === "不調") toRisk += 0.03;
+                }
 
                 if (toRisk > 0 && Math.random() < toRisk) {
                     if (ballHolder?._box) ballHolder._box.to++;
