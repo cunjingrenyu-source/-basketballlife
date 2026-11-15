@@ -2112,7 +2112,7 @@ while (gameState.currentQ <= gameState.maxQ) {
                     let clutchPlayer = [...teamData.court].sort((a,b) => b._clutchPriority - a._clutchPriority)[0];
                     let secondClutch = [...teamData.court].sort((a,b) => b._clutchPriority - a._clutchPriority)[1];
 
-                    let weights = teamData.court.map(p => {
+                                    let weights = teamData.court.map(p => {
                         let pm = p.currentStats.playmaking || p.currentStats.pass || 50; 
                         let drb = p.currentStats.dribble || 50;
                         let pass = p.currentStats.pass || 50;
@@ -2123,15 +2123,18 @@ while (gameState.currentQ <= gameState.maxQ) {
                         
                         let targetBonus = 1.0;
                         if (isClutch) {
-                            if (p.id === clutchPlayer.id) targetBonus = 3.0; // クラッチ時は優先度スコア1位を強力に重視
-                            else if (p.id === secondClutch.id) targetBonus = 1.5;
+                            // 【課題6】エースボール集中の緩和（3.0 -> 2.0へ低下）
+                            if (p.id === clutchPlayer.id) targetBonus = 2.0; 
+                            else if (p.id === secondClutch.id) targetBonus = 1.3;
                         } else {
-                            if (p.id === acePlayer.id) targetBonus = 1.3;
+                            // 【課題6】通常時のエース依存も緩和（1.3 -> 1.15へ低下）
+                            if (p.id === acePlayer.id) targetBonus = 1.15;
                         }
                         
                         let handlerScore = ((pm * 1.5) + (drb * 1.0) + (pass * 0.5)) * posBonus * staminaFactor * hotHandBonus * targetBonus;
                         return Math.pow(Math.max(1, handlerScore / 50), 2);
                     });
+
                     
                     let totalWeight = weights.reduce((a, b) => a + b, 0);
                     let rand = Math.random() * totalWeight;
