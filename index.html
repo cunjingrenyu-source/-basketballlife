@@ -2592,10 +2592,12 @@ while (gameState.currentQ <= gameState.maxQ) {
                                 isAssist = true; 
                                 if (passAccuracy >= 80) playmakerBuff = Math.min(0.12, ((passAccuracy - 80) / 70) * 0.08); 
                                 
-                                // 【課題28〜31, 1-①, 2, 3, 4】エクストラパスの完全な再構築
+                                                                // 【課題28〜31, 1-①, 2, 3, 4】エクストラパスの完全な再構築
                                 let sStats = shooter.currentStats || {};
-                                let extraPassProb = (sStats.playmaking || 50) / 300; 
+                                // 【課題7】全員のアシストを劇的に増やすため、エクストラパス発生率を上方修正
+                                let extraPassProb = ((sStats.playmaking || 50) / 200) + 0.1; 
                                 let safeTimeSpent = typeof timeSpent !== 'undefined' ? timeSpent : 0;
+
                                 
                                 if (Math.random() < extraPassProb && safeTimeSpent < 20 && !gameState.isFastBreak) {
                                     let extraCandidates = receiverCandidates.filter(p => p.id !== shooter.id);
